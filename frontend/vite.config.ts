@@ -21,16 +21,9 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           manualChunks: {
-            'vendor': ['react', 'react-dom', 'react-router-dom'],
-            'motion': ['framer-motion'],
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            motion: ['framer-motion'],
           },
-        },
-      },
-      minify: 'terser' as const,
-      terserOptions: {
-        compress: {
-          drop_console: true,
-          drop_debugger: true,
         },
       },
     },
