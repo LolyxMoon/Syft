@@ -30,67 +30,6 @@ const AnalyzeStrategySchema = z.object({
 });
 
 /**
- * System prompt for vault generation
- */
-const VAULT_GENERATION_SYSTEM_PROMPT = `You are an expert DeFi strategist specializing in creating Stellar-based vault strategies.
-
-Your task is to convert natural language descriptions into structured vault configurations using these block types:
-
-1. START - Entry point (always required)
-2. CONDITION - Decision logic (if/then)
-3. ACTION - Operations (deposit, stake, swap, harvest, rebalance)
-4. TRIGGER - Time or event-based activation
-5. END - Exit point (always required)
-
-Available Actions:
-- DEPOSIT: Add funds to vault
-- STAKE: Stake tokens in protocols
-- SWAP: Exchange tokens via DEX
-- HARVEST: Collect yields
-- REBALANCE: Adjust allocations
-- WITHDRAW: Remove funds
-
-Risk Levels:
-- LOW: Conservative, mostly stablecoins, <10% APY target
-- MEDIUM: Balanced, mixed assets, 10-30% APY target
-- HIGH: Aggressive, high-yield strategies, >30% APY target
-
-Response Format (JSON):
-{
-  "name": "Vault Name",
-  "description": "Strategy description",
-  "riskLevel": "low|medium|high",
-  "estimatedAPY": "10-15%",
-  "blocks": [
-    {
-      "id": "unique-id",
-      "type": "START|CONDITION|ACTION|TRIGGER|END",
-      "label": "Block Label",
-      "position": { "x": number, "y": number },
-      "data": {
-        "action": "DEPOSIT|STAKE|etc",
-        "token": "USDC|XLM|etc",
-        "protocol": "protocol-name",
-        "amount": "percentage or amount",
-        "condition": "if applicable",
-        "schedule": "if trigger"
-      }
-    }
-  ],
-  "connections": [
-    { "source": "block-id", "target": "block-id" }
-  ]
-}
-
-Guidelines:
-1. Always start with START block and end with END block
-2. Use logical flow: START -> (TRIGGER/CONDITION) -> ACTION -> END
-3. Position blocks vertically with 150px spacing
-4. Be specific with protocols, tokens, and amounts
-5. Match complexity to risk level
-6. Ensure all blocks are connected`;
-
-/**
  * Extract parameters from VAPI message format or direct POST body
  * VAPI sends tool calls in a nested message structure
  */
@@ -109,6 +48,8 @@ function extractVaultParams(body: any) {
 /**
  * POST /api/nl/generate-vault
  * Generate vault strategy from natural language
+ * This endpoint is called by VAPI voice assistant
+ * It's a thin wrapper around /api/vaults/generate-from-prompt to maintain compatibility
  */
 router.post('/generate-vault', async (req, res) => {
   try {
@@ -119,77 +60,51 @@ router.post('/generate-vault', async (req, res) => {
     console.log('[NL API] Extracted params:', JSON.stringify(params, null, 2));
     
     const validated = GenerateVaultSchema.parse(params);
-    const { prompt, riskLevel, conversationContext } = validated;
+    const { prompt, conversationContext } = validated;
 
-    console.log('[NL API] Validated params - prompt:', prompt, 'riskLevel:', riskLevel);
+    console.log('[NL API] Validated params - prompt:', prompt);
 
-    // Build conversation messages
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: VAULT_GENERATION_SYSTEM_PROMPT },
-    ];
-
-    // Add conversation context if provided
-    if (conversationContext && conversationContext.length > 0) {
-      messages.push(...conversationContext as OpenAI.Chat.ChatCompletionMessageParam[]);
-    }
-
-    // Add user prompt
-    messages.push({
-      role: 'user',
-      content: `Create a vault strategy: ${prompt}${riskLevel ? ` (Risk level: ${riskLevel})` : ''}`,
+    // Import and use the same vault generator service that AI Chat uses
+    const { naturalLanguageVaultGenerator } = await import('../services/naturalLanguageVaultGenerator.js');
+    
+    // Generate vault using the proven AI Chat method
+    // This intelligently handles: build, modify, explain, chat, etc.
+    const result = await naturalLanguageVaultGenerator.generateVault({
+      userPrompt: prompt,
+      conversationHistory: conversationContext || [],
+      network: 'testnet',
     });
 
-    // Call OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
-      messages,
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
+    console.log('[NL API] Generated response:', {
+      nodeCount: result.nodes.length,
+      edgeCount: result.edges.length,
+      responseType: result.responseType,
     });
 
-    const responseContent = completion.choices[0].message.content;
-    if (!responseContent) {
-      throw new Error('No response from AI');
-    }
-
-    const vaultConfig = JSON.parse(responseContent);
-
-    // Convert to React Flow format
-    const nodes = vaultConfig.blocks.map((block: any) => ({
-      id: block.id,
-      type: block.type.toLowerCase(),
-      position: block.position,
-      data: {
-        label: block.label,
-        ...block.data,
-      },
-    }));
-
-    const edges = vaultConfig.connections.map((conn: any, idx: number) => ({
-      id: `e${idx}`,
-      source: conn.source,
-      target: conn.target,
-      type: 'smoothstep',
-    }));
-
-    const result = {
-      nodes,
-      edges,
+    // Format response based on caller
+    const responseData = {
+      nodes: result.nodes,
+      edges: result.edges,
+      explanation: result.explanation,
+      responseType: result.responseType,
+      marketContext: result.marketContext,
+      suggestions: result.suggestions,
       metadata: {
-        name: vaultConfig.name,
-        description: vaultConfig.description,
-        riskLevel: vaultConfig.riskLevel,
-        estimatedAPY: vaultConfig.estimatedAPY,
+        name: 'Voice Generated Vault',
+        description: result.explanation,
       },
     };
 
     // Check if this is a VAPI request (has message object)
     if (req.body.message) {
-      // VAPI format: return result directly with a results array
+      // VAPI format: return result with explanation
       res.json({
         results: [
           {
-            result: JSON.stringify(result),
+            result: JSON.stringify({
+              success: true,
+              data: responseData,
+            }),
           }
         ]
       });
@@ -197,7 +112,7 @@ router.post('/generate-vault', async (req, res) => {
       // Direct API call format
       res.json({
         success: true,
-        data: result,
+        data: responseData,
       });
     }
 

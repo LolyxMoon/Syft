@@ -119,24 +119,12 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
       console.log('[useVoiceAssistant] Function call result received:', data);
       
       try {
-        switch (data.name) {
-          case 'generate_vault_strategy':
-            handleGenerateVaultResult(data.result);
-            break;
-          case 'modify_vault_strategy':
-            handleModifyVaultResult(data.result);
-            break;
-          case 'explain_contract':
-            handleExplainContractResult(data.result);
-            break;
-          case 'get_vault_templates':
-            handleGetTemplatesResult(data.result);
-            break;
-          case 'analyze_strategy':
-            handleAnalyzeStrategyResult(data.result);
-            break;
-          default:
-            console.warn('[useVoiceAssistant] Unknown function result:', data.name);
+        // VAPI only has one function now: generate_vault_strategy
+        // The backend AI intelligently decides whether to build, modify, explain, or chat
+        if (data.name === 'generate_vault_strategy') {
+          handleGenerateVaultResult(data.result);
+        } else {
+          console.warn('[useVoiceAssistant] Unknown function result:', data.name);
         }
       } catch (error) {
         console.error('[useVoiceAssistant] Error handling function call result:', error);
@@ -168,7 +156,11 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     };
   }, []);
 
-  // Function call result handlers - these receive the results from VAPI server-side tool execution
+  // Function call result handler - processes results from VAPI server-side tool execution
+  // The backend AI (naturalLanguageVaultGenerator) intelligently decides the response type:
+  // - 'build': Generate new vault → display in visual builder
+  // - 'chat': Just conversation → assistant speaks the response
+  // - Can also handle modifications, explanations, etc. all through one endpoint
   const handleGenerateVaultResult = (result: any) => {
     try {
       console.log('[useVoiceAssistant] handleGenerateVaultResult called with result:', result);
@@ -180,106 +172,38 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
       if (!vaultData) {
         console.error('[useVoiceAssistant] No vault data in result:', result);
         vapiService.sendMessage(
-          `Error: I couldn't generate the vault strategy. Please try describing it again.`
+          `Error: I couldn't process your request. Please try again.`
         );
         return;
       }
 
-      const { nodes, edges, metadata } = vaultData;
+      const { nodes, edges, responseType } = vaultData;
       
-      if (!nodes || !edges) {
-        console.error('[useVoiceAssistant] Missing nodes or edges in result:', vaultData);
+      // Check if the AI actually built a vault or just chatted
+      if (responseType === 'build' && nodes && edges && nodes.length > 0) {
+        // Notify all registered callbacks to display the vault
+        vaultGeneratedCallbacks.current.forEach(callback => {
+          callback(nodes, edges, vaultData.metadata);
+        });
+
+        console.log('[useVoiceAssistant] Successfully processed vault with', nodes.length, 'nodes');
+
+        // Send success message back to assistant
         vapiService.sendMessage(
-          `Error: The vault data was incomplete. Please try again.`
+          `Successfully generated vault strategy. The vault has ${nodes.length} blocks configured and is now displayed in the visual builder.`
         );
-        return;
+      } else {
+        // AI chose to just chat - the explanation is already spoken by the assistant
+        console.log('[useVoiceAssistant] AI response type:', responseType, '- No vault built');
+        
+        // The VAPI assistant will speak the explanation naturally
+        // No need to manually send it as it's already in the tool result
       }
-      
-      // Notify all registered callbacks
-      vaultGeneratedCallbacks.current.forEach(callback => {
-        callback(nodes, edges, metadata);
-      });
-
-      console.log('[useVoiceAssistant] Successfully processed vault with', nodes.length, 'nodes');
-
-      // Send success message back to assistant
-      vapiService.sendMessage(
-        `Successfully generated vault strategy: "${metadata?.name || 'Custom Strategy'}". The vault has ${nodes.length} blocks configured.`
-      );
     } catch (error) {
       console.error('[useVoiceAssistant] Error processing vault result:', error);
       vapiService.sendMessage(
-        `Error generating vault: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Error processing your request: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
-    }
-  };
-
-  const handleModifyVaultResult = (result: any) => {
-    try {
-      const modificationData = result.data || result;
-      
-      // Notify callbacks with modification data
-      strategyRefinementCallbacks.current.forEach(callback => {
-        callback(modificationData.modifications || modificationData);
-      });
-
-      vapiService.sendMessage(
-        `Applied modifications to the vault strategy.`
-      );
-    } catch (error) {
-      console.error('[useVoiceAssistant] Error modifying vault:', error);
-      vapiService.sendMessage(
-        `Error modifying vault: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  };
-
-  const handleExplainContractResult = (result: any) => {
-    try {
-      const explanationData = result.data || result;
-      
-      // Notify callbacks with contract explanation
-      contractExplanationCallbacks.current.forEach(callback => {
-        callback(explanationData.explanation || explanationData);
-      });
-
-      // Assistant will speak the explanation naturally
-      vapiService.sendMessage(
-        `Here's the explanation: ${explanationData.explanation || 'See the interface for details.'}`
-      );
-    } catch (error) {
-      console.error('[useVoiceAssistant] Error with contract explanation:', error);
-      vapiService.sendMessage(
-        `Error explaining contract: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  };
-
-  const handleGetTemplatesResult = (result: any) => {
-    try {
-      const templates = result.data || result;
-      
-      if (templates && Array.isArray(templates)) {
-        vapiService.sendMessage(
-          `I found ${templates.length} vault templates. ${templates.map((t: any) => t.name).join(', ')}`
-        );
-      }
-    } catch (error) {
-      console.error('[useVoiceAssistant] Error getting templates:', error);
-    }
-  };
-
-  const handleAnalyzeStrategyResult = (result: any) => {
-    try {
-      const analysis = result.data || result;
-      
-      if (analysis && analysis.summary) {
-        vapiService.sendMessage(
-          `Strategy analysis: ${analysis.summary}`
-        );
-      }
-    } catch (error) {
-      console.error('[useVoiceAssistant] Error analyzing strategy:', error);
     }
   };
 
