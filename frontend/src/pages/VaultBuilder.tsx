@@ -751,7 +751,24 @@ const VaultBuilder = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
-        {builderMode === 'visual' ? (
+        {/* Voice Component - Always mounted but hidden when not in voice mode */}
+        <div className={builderMode === 'voice' ? 'flex-1 overflow-hidden' : 'hidden'}>
+          <VoiceToVault
+            onVaultGenerated={handleVaultGenerated}
+            onStrategyModified={(modifications) => {
+              console.log('Strategy modifications:', modifications);
+              // Apply modifications to nodes/edges
+            }}
+            onContractExplained={(explanation) => {
+              console.log('Contract explanation:', explanation);
+              modal.message(explanation, 'Contract Explanation', 'info');
+            }}
+            currentNodes={nodes}
+            currentEdges={edges}
+          />
+        </div>
+
+        {builderMode === 'visual' && (
           <>
             {/* Left Sidebar - Block Palette */}
             <div className="w-72 flex-shrink-0 border-r border-default bg-card overflow-hidden flex flex-col">
@@ -954,7 +971,9 @@ const VaultBuilder = () => {
               </div>
             </div>
           </>
-        ) : builderMode === 'chat' ? (
+        )}
+
+        {builderMode === 'chat' && (
           /* AI Chat Builder Mode */
           <div className="flex-1 flex overflow-hidden">
             {/* Chat Interface - Takes most of the space */}
@@ -1056,26 +1075,11 @@ const VaultBuilder = () => {
               </div>
             </div>
           </div>
-        ) : (
-          /* Voice Builder Mode */
-          <div className="flex-1 flex overflow-hidden">
-            {/* Voice Interface - Takes most of the space */}
-            <div className="flex-1 overflow-hidden">
-              <VoiceToVault
-                onVaultGenerated={handleVaultGenerated}
-                onStrategyModified={(modifications) => {
-                  console.log('Strategy modifications:', modifications);
-                  // Apply modifications to nodes/edges
-                }}
-                onContractExplained={(explanation) => {
-                  console.log('Contract explanation:', explanation);
-                  modal.message(explanation, 'Contract Explanation', 'info');
-                }}
-                currentNodes={nodes}
-                currentEdges={edges}
-              />
-            </div>
+        )}
 
+        {builderMode === 'voice' && (
+          /* Voice Builder Mode - Right Sidebar Only (Voice interface is always mounted above) */
+          <div className="flex-1 flex overflow-hidden">
             {/* Right Sidebar - Preview & Validation (same as chat mode) */}
             <div className="w-96 flex-shrink-0 border-l border-default bg-card overflow-hidden flex flex-col">
               {/* Vault Settings */}
