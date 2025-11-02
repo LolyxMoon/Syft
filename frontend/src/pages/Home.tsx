@@ -302,38 +302,146 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-16 relative bg-secondary">
-        <div className="container mx-auto px-4 max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-5xl font-bold mb-3 text-white tracking-tight">
-              Why Choose <span className="text-[#dce85d]">Syft</span>?
+      {/* Features Section - Enhanced with Animated Integrations */}
+      <section id="features" className="py-24 relative bg-[#090a0a] overflow-hidden">
+        <div className="opacity-30 absolute top-0 right-0 bottom-0 left-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#dce85d] rounded-full blur-[120px]"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#74b97f] rounded-full blur-[120px]"></div>
+        </div>
+        
+        <div className="container mx-auto px-4 max-w-7xl relative z-10">
+          <div className="text-center mb-16">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#dce85d]/10 px-3 py-1.5 text-xs text-[#dce85d] ring-1 ring-[#dce85d]/20 uppercase tracking-tight mb-4">
+              <Sparkles className="w-3.5 h-3.5" />
+              Platform Features
+            </span>
+            <h2 className="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight">
+              Everything You Need to{' '}
+              <span className="text-[#dce85d]">Succeed</span>
             </h2>
             <p className="text-lg text-[#a1a1aa] max-w-2xl mx-auto">
-              Everything you need to create and manage high-performance yield strategies
+              Powerful tools and integrations designed to maximize your yield strategies
             </p>
-          </motion.div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <div key={feature.title}>
-                  <Card className="p-5 h-full bg-card hover:border-primary-500/30 transition-colors">
-                    <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center mb-4">
-                      <Icon className="w-5 h-5 text-primary-500" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2 text-neutral-50">{feature.title}</h3>
-                    <p className="text-sm text-[#a1a1aa] leading-relaxed">{feature.description}</p>
-                  </Card>
-                </div>
-              );
-            })}
+          {/* Animated Integration Icons */}
+          <div className="relative mx-auto mt-12 max-w-5xl mb-16">
+            <div className="flex gap-8 sm:gap-12 mb-8 gap-x-8 gap-y-8 items-center justify-center">
+              <motion.span 
+                whileHover={{ scale: 1.1 }}
+                className="inline-flex items-center justify-center glass-card transition-all duration-300 w-14 h-14 rounded-xl"
+                style={{ animation: 'float 3s ease-in-out infinite' }}
+              >
+                <Shield className="w-6 h-6 text-[#dce85d]" />
+              </motion.span>
+              <motion.span 
+                whileHover={{ scale: 1.1 }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
+                style={{ animation: 'float 3s ease-in-out infinite 0.2s' }}
+              >
+                <Activity className="w-6 h-6 text-[#dce85d]" />
+              </motion.span>
+              <motion.span 
+                whileHover={{ scale: 1.1 }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
+                style={{ animation: 'float 3s ease-in-out infinite 0.4s' }}
+              >
+                <Box className="w-6 h-6 text-[#dce85d]" />
+              </motion.span>
+              <motion.span 
+                whileHover={{ scale: 1.1 }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
+                style={{ animation: 'float 3s ease-in-out infinite 0.6s' }}
+              >
+                <Layers className="w-6 h-6 text-[#dce85d]" />
+              </motion.span>
+              <motion.span 
+                whileHover={{ scale: 1.1 }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
+                style={{ animation: 'float 3s ease-in-out infinite 0.8s' }}
+              >
+                <TrendingUp className="w-6 h-6 text-[#dce85d]" />
+              </motion.span>
+              <motion.span 
+                whileHover={{ scale: 1.1 }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
+                style={{ animation: 'float 3s ease-in-out infinite 1s' }}
+              >
+                <Zap className="w-6 h-6 text-[#dce85d]" />
+              </motion.span>
+            </div>
+
+            {/* Animated Connection Lines (SVG) */}
+            <div className="relative h-72">
+              <svg viewBox="0 0 900 360" className="absolute top-0 right-0 bottom-0 left-0 w-full h-[288px] max-w-[1008px] mx-auto" fill="none" strokeWidth="2">
+                <defs>
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                
+                <circle cx="150" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite' }}></circle>
+                <circle cx="270" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.2s' }}></circle>
+                <circle cx="390" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.4s' }}></circle>
+                <circle cx="510" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.6s' }}></circle>
+                <circle cx="630" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.8s' }}></circle>
+                <circle cx="750" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 1s' }}></circle>
+
+                <path d="M450 300 C 450 200, 300 120, 150 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: '600' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="0s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                </path>
+                <path d="M450 300 C 450 210, 360 130, 270 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: '520' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                </path>
+                <path d="M450 300 C 450 150, 420 80, 390 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: '450' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                </path>
+                <path d="M450 300 C 450 150, 480 80, 510 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: '450' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                </path>
+                <path d="M450 300 C 450 210, 540 130, 630 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: '520' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                </path>
+                <path d="M450 300 C 450 200, 600 120, 750 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: '600' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                </path>
+              </svg>
+
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#dce85d]/20 ring-2 ring-[#dce85d]/40" style={{ boxShadow: '0 0 30px rgba(220,232,93,0.6), 0 0 60px rgba(220,232,93,0.3)' }}>
+                  <Sparkles className="w-8 h-8 text-[#dce85d]" />
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature Benefits */}
+          <div className="mx-auto max-w-5xl mt-16">
+            <div className="flex flex-wrap md:flex-nowrap text-sm gap-x-4 gap-y-4 items-center justify-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card whitespace-nowrap">
+                <ShieldCheck className="w-4 h-4 text-[#dce85d]" />
+                <span className="text-neutral-50">Audited Smart Contracts</span>
+              </div>
+              <div className="hidden md:block w-16 h-px border-t border-dashed border-[#dce85d]/40 flex-shrink-0"></div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card whitespace-nowrap">
+                <Activity className="w-4 h-4 text-[#dce85d]" />
+                <span className="text-neutral-50">Real-time Monitoring</span>
+              </div>
+              <div className="hidden md:block w-16 h-px border-t border-dashed border-[#dce85d]/40 flex-shrink-0"></div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card whitespace-nowrap">
+                <Layers className="w-4 h-4 text-[#dce85d]" />
+                <span className="text-neutral-50">Multi-Protocol Support</span>
+              </div>
+              <div className="hidden md:block w-16 h-px border-t border-dashed border-[#dce85d]/40 flex-shrink-0"></div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card whitespace-nowrap">
+                <Sparkles className="w-4 h-4 text-[#dce85d]" />
+                <span className="text-neutral-50">AI-Powered Optimization</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>

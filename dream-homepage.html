@@ -1,0 +1,1060 @@
+<html lang="en"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Syft — Build Smarter Vaults on Stellar</title>
+    <meta name="description" content="Create, deploy, and manage automated yield strategies on Stellar. No coding required. Maximum security. Optimal returns.">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #090a0a;
+      }
+      ::selection {
+        background: rgba(220, 232, 93, 0.3);
+        color: #fafafa;
+      }
+      @keyframes marquee-ltr {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+      }
+      @keyframes marquee-rtl {
+        0% { transform: translateX(-50%); }
+        100% { transform: translateX(0); }
+      }
+      @keyframes ticker {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-100%); }
+      }
+      @keyframes glow-rotate {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+      }
+      @keyframes border-flow {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 400% 50%; }
+      }
+      @keyframes rotate-gradient {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+      }
+      @keyframes pulse-glow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .ticker-track {
+        animation: ticker 40s linear infinite;
+        width: calc(200% + 16px);
+      }
+      .ticker-track:hover {
+        animation-play-state: paused;
+      }
+      .glass-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      .glass-card:hover {
+        background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+        border-color: rgba(220, 232, 93, 0.3);
+      }
+    </style>
+  <link id="all-fonts-link-font-geist" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-geist">.font-geist { font-family: 'Geist', sans-serif !important; }</style><link id="all-fonts-link-font-roboto" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-roboto">.font-roboto { font-family: 'Roboto', sans-serif !important; }</style><link id="all-fonts-link-font-montserrat" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-montserrat">.font-montserrat { font-family: 'Montserrat', sans-serif !important; }</style><link id="all-fonts-link-font-poppins" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-poppins">.font-poppins { font-family: 'Poppins', sans-serif !important; }</style><link id="all-fonts-link-font-playfair" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;900&amp;display=swap"><style id="all-fonts-style-font-playfair">.font-playfair { font-family: 'Playfair Display', serif !important; }</style><link id="all-fonts-link-font-instrument-serif" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:wght@400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-instrument-serif">.font-instrument-serif { font-family: 'Instrument Serif', serif !important; }</style><link id="all-fonts-link-font-merriweather" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&amp;display=swap"><style id="all-fonts-style-font-merriweather">.font-merriweather { font-family: 'Merriweather', serif !important; }</style><link id="all-fonts-link-font-bricolage" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-bricolage">.font-bricolage { font-family: 'Bricolage Grotesque', sans-serif !important; }</style><link id="all-fonts-link-font-jakarta" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap"><style id="all-fonts-style-font-jakarta">.font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif !important; }</style><link id="all-fonts-link-font-manrope" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap"><style id="all-fonts-style-font-manrope">.font-manrope { font-family: 'Manrope', sans-serif !important; }</style><link id="all-fonts-link-font-space-grotesk" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-space-grotesk">.font-space-grotesk { font-family: 'Space Grotesk', sans-serif !important; }</style><link id="all-fonts-link-font-work-sans" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700;800&amp;display=swap"><style id="all-fonts-style-font-work-sans">.font-work-sans { font-family: 'Work Sans', sans-serif !important; }</style><link id="all-fonts-link-font-pt-serif" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&amp;display=swap"><style id="all-fonts-style-font-pt-serif">.font-pt-serif { font-family: 'PT Serif', serif !important; }</style><link id="all-fonts-link-font-geist-mono" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-geist-mono">.font-geist-mono { font-family: 'Geist Mono', monospace !important; }</style><link id="all-fonts-link-font-space-mono" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&amp;display=swap"><style id="all-fonts-style-font-space-mono">.font-space-mono { font-family: 'Space Mono', monospace !important; }</style><link id="all-fonts-link-font-quicksand" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-quicksand">.font-quicksand { font-family: 'Quicksand', sans-serif !important; }</style><link id="all-fonts-link-font-nunito" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&amp;display=swap"><style id="all-fonts-style-font-nunito">.font-nunito { font-family: 'Nunito', sans-serif !important; }</style></head>
+  <body class="bg-[#090a0a] text-[#fafafa]">
+    <!-- Header - Enhanced Glassmorphic -->
+    <header class="fixed top-0 left-0 right-0 z-50 pt-6 px-6">
+      <div class="max-w-7xl mx-auto rounded-full px-6 py-3" style="background: linear-gradient(180deg, rgba(9,10,10,0.75), rgba(9,10,10,0.45)) padding-box, linear-gradient(120deg, rgba(220,232,93,0.25), rgba(255,255,255,0.08)) border-box; border: 1px solid transparent; backdrop-filter: blur(16px) saturate(120%); -webkit-backdrop-filter: blur(16px) saturate(120%); box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);">
+        <div class="flex items-center justify-between">
+          <!-- Logo -->
+          <a href="/" class="flex items-center gap-2">
+            <img src="/logo.png" alt="Syft logo" class="w-8 h-8 rounded">
+            <span class="text-white text-lg font-semibold">Syft</span>
+          </a>
+
+          <!-- Desktop Navigation -->
+          <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-white/60">
+            <a class="hover:text-white transition-colors duration-300 px-4 py-2 rounded-full hover:bg-white/5" href="#features">
+              Features
+            </a>
+            <a class="hover:text-white transition-colors duration-300 px-4 py-2 rounded-full hover:bg-white/5" href="#how-it-works">
+              How It Works
+            </a>
+            <a class="hover:text-white transition-colors duration-300 px-4 py-2 rounded-full hover:bg-white/5" href="/app/vaults">
+              Vaults
+            </a>
+            <a class="hover:text-white transition-colors duration-300 px-4 py-2 rounded-full hover:bg-white/5" href="#docs">
+              Docs
+            </a>
+          </nav>
+
+          <!-- Right Side - Desktop Only -->
+          <div class="hidden md:flex items-center gap-2">
+            <button class="inline-flex items-center gap-2 bg-[#dce85d] hover:bg-[#e8f06d] text-[#090a0a] px-4 py-2 rounded-lg text-sm font-medium transition">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet w-4 h-4"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg>
+              Connect Wallet
+            </button>
+          </div>
+
+          <!-- Mobile Menu Button -->
+          <button id="mobile-menu-btn" class="md:hidden p-2 text-white hover:text-white/80 transition-colors rounded-full hover:bg-white/10" aria-label="Toggle menu">
+            <svg id="menu-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg>
+            <svg id="close-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x hidden"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Menu Overlay -->
+      <div id="mobile-menu" class="fixed inset-0 bg-black/80 backdrop-blur-md z-40 md:hidden hidden">
+        <div class="fixed top-0 right-0 bottom-0 w-full max-w-sm bg-[#090a0a] overflow-y-auto" style="border-left: 1px solid rgba(255,255,255,0.1);">
+          <!-- Mobile Menu Header -->
+          <div class="flex items-center justify-between p-6 border-b border-white/10">
+            <div class="flex items-center gap-2">
+              <img src="/logo.png" alt="Syft logo" class="w-8 h-8 rounded">
+              <span class="text-white text-xl font-semibold">Syft</span>
+            </div>
+            <button id="mobile-menu-close" class="p-2.5 text-white/80 hover:text-white transition-colors rounded-full hover:bg-white/10" aria-label="Close menu">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            </button>
+          </div>
+
+          <!-- Mobile Menu Content -->
+          <div class="flex flex-col p-6 space-y-8">
+            <!-- Navigation Items -->
+            <nav class="flex flex-col gap-2">
+              <div class="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3 px-2">
+                Menu
+              </div>
+              <a href="#features" class="mobile-menu-link px-5 py-4 rounded-xl text-lg font-medium transition-all duration-200 text-white hover:bg-white/5 active:bg-white/10 flex items-center justify-between group">
+                <span>Features</span>
+                <svg class="w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </a>
+              <a href="#how-it-works" class="mobile-menu-link px-5 py-4 rounded-xl text-lg font-medium transition-all duration-200 text-white hover:bg-white/5 active:bg-white/10 flex items-center justify-between group">
+                <span>How It Works</span>
+                <svg class="w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </a>
+              <a href="/app/vaults" class="mobile-menu-link px-5 py-4 rounded-xl text-lg font-medium transition-all duration-200 text-white hover:bg-white/5 active:bg-white/10 flex items-center justify-between group">
+                <span>Vaults</span>
+                <svg class="w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </a>
+              <a href="#docs" class="mobile-menu-link px-5 py-4 rounded-xl text-lg font-medium transition-all duration-200 text-white hover:bg-white/5 active:bg-white/10 flex items-center justify-between group">
+                <span>Docs</span>
+                <svg class="w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </a>
+            </nav>
+
+            <!-- Divider -->
+            <div class="border-t border-white/10"></div>
+
+            <!-- Wallet Connection Section -->
+            <div class="space-y-4">
+              <div class="text-xs font-semibold text-white/40 uppercase tracking-wider px-2">
+                Connect
+              </div>
+              <button class="w-full inline-flex items-center justify-center gap-2 bg-[#dce85d] hover:bg-[#e8f06d] text-[#090a0a] px-6 py-4 rounded-xl text-base font-medium transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet w-5 h-5"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg>
+                Connect Wallet
+              </button>
+            </div>
+
+            <!-- Footer Info -->
+            <div class="pt-6 mt-auto">
+              <p class="text-xs text-white/30 text-center px-4">
+                Build smarter vaults on Stellar
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <script>
+      // Mobile menu toggle functionality
+      const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const mobileMenuClose = document.getElementById('mobile-menu-close');
+      const menuIcon = document.getElementById('menu-icon');
+      const closeIcon = document.getElementById('close-icon');
+      const mobileMenuLinks = document.querySelectorAll('.mobile-menu-link');
+
+      function toggleMobileMenu() {
+        mobileMenu.classList.toggle('hidden');
+        menuIcon.classList.toggle('hidden');
+        closeIcon.classList.toggle('hidden');
+        document.body.style.overflow = mobileMenu.classList.contains('hidden') ? '' : 'hidden';
+      }
+
+      mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+      mobileMenuClose.addEventListener('click', toggleMobileMenu);
+      mobileMenu.addEventListener('click', (e) => {
+        if (e.target === mobileMenu) toggleMobileMenu();
+      });
+      mobileMenuLinks.forEach(link => {
+        link.addEventListener('click', () => {
+          if (link.getAttribute('href').startsWith('#')) {
+            toggleMobileMenu();
+          }
+        });
+      });
+    </script>
+
+    <!-- Hero Section with Animated Background -->
+    <section class="relative overflow-hidden py-24 md:py-32">
+      <!-- UnicornStudio Animated Background -->
+      <div class="aura-background-component top-0 w-full -z-10 absolute h-full">
+        <div data-us-project="4gq2Yrv2p0bIa0hdLPQx" class="absolute w-full h-full left-0 top-0 -z-10"></div>
+        <script type="text/javascript">
+          !function(){if(!window.UnicornStudio){window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v1.4.29/dist/unicornStudio.umd.js",i.onload=function(){window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)},(document.head || document.body).appendChild(i)}}();
+        </script>
+      </div>
+
+      <div class="container mx-auto px-4 max-w-6xl relative z-10">
+        <div class="text-center">
+          <!-- Heading -->
+          <h1 class="text-5xl md:text-7xl font-bold mb-4 text-white tracking-tight leading-[0.95]">
+            Build Smarter Vaults on
+            <span class="text-[#dce85d]">Stellar</span>
+          </h1>
+
+          <!-- Description -->
+          <p class="text-lg md:text-xl text-[#a1a1aa] mb-8 max-w-2xl mx-auto">
+            Create, deploy, and manage automated yield strategies. No coding
+            required. Maximum security. Optimal returns.
+          </p>
+
+          <!-- CTA Buttons -->
+          <div class="flex flex-col sm:flex-row gap-3 justify-center mb-16">
+            <a href="#builder" class="group isolate inline-flex cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_8px_rgba(220,232,93,0.35)] rounded-full relative shadow-[0_8px_40px_rgba(220,232,93,0.25)]" style="--spread: 90deg; --shimmer-color: rgba(255,255,255,0.6); --radius: 9999px; --speed: 4s; --cut: 1px; --bg: rgba(220, 232, 93, 0.1);">
+              <div class="absolute inset-0">
+                <div class="absolute inset-[-200%] w-[400%] h-[400%] [animation:rotate-gradient_var(--speed)_linear_infinite]">
+                  <div class="absolute inset-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]"></div>
+                </div>
+              </div>
+              <div class="absolute rounded-full [background:var(--bg)] [inset:var(--cut)] backdrop-blur"></div>
+              <div class="z-10 flex gap-3 sm:w-auto overflow-hidden text-base font-medium text-white w-full pt-3 pr-4 pb-3 pl-4 relative gap-x-3 gap-y-3 items-center" style="border-radius: 9999px;">
+                <div style="position: absolute; content: ' '; display: block; width: 200%; height: 200%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), transparent); animation: rotate-gradient 4s infinite linear; top: 50%; left: 50%; transform: translate(-50%, -50%);" class=""></div>
+                <div style="position: absolute; inset: 1px; background: rgba(10, 11, 20, 0.8); border-radius: 9999px; backdrop-filter: blur(8px);" class=""></div>
+                <span class="whitespace-nowrap relative z-10 font-sans">
+                  Start Building
+                </span>
+                <span class="inline-flex items-center justify-center z-10 bg-white/10 w-7 h-7 rounded-full ml-1 relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-[24px] h-[16px]">
+                    <path d="M5 12h14"></path>
+                    <path d="m12 5 7 7-7 7"></path>
+                  </svg>
+                </span>
+              </div>
+            </a>
+          </div>
+
+          <!-- Stats Bar -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="glass-card rounded-xl p-4 text-center transition-all duration-300">
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                  <path d="M16 7h6v6"></path>
+                  <path d="m22 7-8.5 8.5-5-5L2 17"></path>
+                </svg>
+                <div class="text-2xl font-bold text-white">$76M</div>
+              </div>
+              <div class="text-xs text-[#a1a1aa] mb-1">Total Value Locked</div>
+              <div class="text-xs text-[#74b97f] font-medium">+12.5%</div>
+            </div>
+            <div class="glass-card rounded-xl p-4 text-center transition-all duration-300">
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <path d="m3.3 7 8.7 5 8.7-5"></path>
+                  <path d="M12 22V12"></path>
+                </svg>
+                <div class="text-2xl font-bold text-white">600+</div>
+              </div>
+              <div class="text-xs text-[#a1a1aa] mb-1">Active Vaults</div>
+              <div class="text-xs text-[#74b97f] font-medium">+23.1%</div>
+            </div>
+            <div class="glass-card rounded-xl p-4 text-center transition-all duration-300">
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                  <path d="M16 3.128a4 4 0 0 1 0 7.744"></path>
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                </svg>
+                <div class="text-2xl font-bold text-white">80K</div>
+              </div>
+              <div class="text-xs text-[#a1a1aa] mb-1">Total Users</div>
+              <div class="text-xs text-[#74b97f] font-medium">+8.3%</div>
+            </div>
+            <div class="glass-card rounded-xl p-4 text-center transition-all duration-300">
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                  <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path>
+                </svg>
+                <div class="text-2xl font-bold text-white">15.2%</div>
+              </div>
+              <div class="text-xs text-[#a1a1aa] mb-1">Avg APY</div>
+              <div class="text-xs text-[#74b97f] font-medium">+2.1%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trusted By Section -->
+    <section class="py-12 relative">
+      <div class="max-w-7xl mx-auto px-4">
+        <div class="text-center mb-8">
+          <p class="uppercase text-xs font-medium text-[#a1a1aa] tracking-wide">
+            Trusted by teams at
+          </p>
+        </div>
+        <div class="overflow-hidden relative" style="mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);">
+          <div class="ticker-track flex gap-16 py-2 items-center">
+            <div class="flex gap-16 shrink-0 items-center">
+              <span class="text-lg font-normal tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Soroban Labs
+              </span>
+              <span class="text-lg font-semibold tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Stellar Foundation
+              </span>
+              <span class="text-lg font-normal tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                DeFi Alliance
+              </span>
+              <span class="text-lg font-semibold tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Meridian Protocol
+              </span>
+              <span class="text-lg font-normal tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Anchor Platform
+              </span>
+              <span class="text-lg font-semibold tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                YieldSpace
+              </span>
+            </div>
+            <div class="flex gap-16 shrink-0 items-center">
+              <span class="text-lg font-normal tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Soroban Labs
+              </span>
+              <span class="text-lg font-semibold tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Stellar Foundation
+              </span>
+              <span class="text-lg font-normal tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                DeFi Alliance
+              </span>
+              <span class="text-lg font-semibold tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Meridian Protocol
+              </span>
+              <span class="text-lg font-normal tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                Anchor Platform
+              </span>
+              <span class="text-lg font-semibold tracking-tighter text-[#a1a1aa] hover:text-white transition">
+                YieldSpace
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section - Enhanced with Animated Integrations -->
+    <section id="features" class="py-24 relative bg-[#090a0a] overflow-hidden">
+      <div class="opacity-30 absolute top-0 right-0 bottom-0 left-0">
+  <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-[#dce85d] rounded-full blur-[120px]"></div>
+  <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#74b97f] rounded-full blur-[120px]"></div>
+</div>
+      
+      <div class="container mx-auto px-4 max-w-7xl relative z-10">
+        <div class="text-center mb-16">
+          <span class="inline-flex items-center gap-2 rounded-full bg-[#dce85d]/10 px-3 py-1.5 text-xs text-[#dce85d] ring-1 ring-[#dce85d]/20 uppercase tracking-tight mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+              <path d="M12 22v-5" class=""></path>
+              <path d="M9 8V2"></path>
+              <path d="M15 8V2"></path>
+              <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"></path>
+            </svg>
+            Platform Features
+          </span>
+          <h2 class="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight">
+            Connect your entire
+            <span class="text-[#dce85d]">tech stack</span>
+          </h2>
+          <p class="text-lg text-[#a1a1aa] max-w-2xl mx-auto">
+            One platform, infinite possibilities. Sync with all your favorite DeFi protocols
+          </p>
+        </div>
+
+        <!-- Animated Integration Icons -->
+        <div class="relative mx-auto mt-12 max-w-5xl mb-16">
+          <div class="flex gap-8 sm:gap-12 mb-8 gap-x-8 gap-y-8 items-center justify-center">
+  <span class="inline-flex items-center justify-center glass-card transition-all duration-300 hover:scale-110 w-14 h-14 rounded-xl" style="animation: float 3s ease-in-out infinite">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-[#dce85d]">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+  </span>
+  <span class="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 hover:scale-110" style="animation: float 3s ease-in-out infinite 0.2s;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-[#dce85d]">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+  </span>
+  <span class="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 hover:scale-110" style="animation: float 3s ease-in-out infinite 0.4s;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-[#dce85d]">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+      <polyline points="3.29 7 12 12 20.71 7"></polyline>
+      <line x1="12" y1="22" x2="12" y2="12"></line>
+    </svg>
+  </span>
+  <span class="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 hover:scale-110" style="animation: float 3s ease-in-out infinite 0.6s;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-[#dce85d]">
+      <circle cx="12" cy="12" r="10"></circle>
+      <circle cx="12" cy="12" r="6"></circle>
+      <circle cx="12" cy="12" r="2"></circle>
+    </svg>
+  </span>
+  <span class="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 hover:scale-110" style="animation: float 3s ease-in-out infinite 0.8s;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-[#dce85d]">
+      <path d="M16 7h6v6"></path>
+      <path d="M22 7l-8.5 8.5-5-5L2 17"></path>
+    </svg>
+  </span>
+</div>
+
+          <!-- Animated Connection Lines (SVG) -->
+          <div class="relative h-72">
+            <svg viewBox="0 0 900 360" class="absolute top-0 right-0 bottom-0 left-0 w-[1008px] h-[288px]" fill="none" stroke-width="2" data-icon-replaced="true" style="width: 1008px; height: 288px; color: rgb(250, 250, 250);">
+              <defs>
+                
+              </defs>
+              
+              <circle cx="150" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style="animation: pulse-glow 2s ease-in-out infinite;"></circle>
+              <circle cx="270" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style="animation: pulse-glow 2s ease-in-out infinite 0.2s;"></circle>
+              <circle cx="390" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style="animation: pulse-glow 2s ease-in-out infinite 0.4s;"></circle>
+              <circle cx="510" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style="animation: pulse-glow 2s ease-in-out infinite 0.6s;"></circle>
+              <circle cx="630" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style="animation: pulse-glow 2s ease-in-out infinite 0.8s;" class=""></circle>
+              <circle cx="750" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style="animation: pulse-glow 2s ease-in-out infinite 1s;"></circle>
+
+              <path d="M450 300 C 450 200, 300 120, 150 30" stroke="#dce85d" stroke-width="2" stroke-linecap="round" fill="none" style="stroke-dasharray: 600; stroke-dashoffset: 600; animation: 3s linear infinite forwards;" opacity="0.6" class="">
+                <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="0s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"></animate>
+              </path>
+              <path d="M450 300 C 450 210, 360 130, 270 30" stroke="#dce85d" stroke-width="2" stroke-linecap="round" fill="none" style="stroke-dasharray: 520; stroke-dashoffset: 520;" opacity="0.6" class="">
+                <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"></animate>
+              </path>
+              <path d="M450 300 C 450 150, 420 80, 390 30" stroke="#dce85d" stroke-width="2" stroke-linecap="round" fill="none" style="stroke-dasharray: 450; stroke-dashoffset: 450;" opacity="0.6">
+                <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"></animate>
+              </path>
+              <path d="M450 300 C 450 150, 480 80, 510 30" stroke="#dce85d" stroke-width="2" stroke-linecap="round" fill="none" style="stroke-dasharray: 450; stroke-dashoffset: 450;" opacity="0.6" class="">
+                <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"></animate>
+              </path>
+              <path d="M450 300 C 450 210, 540 130, 630 30" stroke="#dce85d" stroke-width="2" stroke-linecap="round" fill="none" style="stroke-dasharray: 520; stroke-dashoffset: 520;" opacity="0.6">
+                <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"></animate>
+              </path>
+              <path d="M450 300 C 450 200, 600 120, 750 30" stroke="#dce85d" stroke-width="2" stroke-linecap="round" fill="none" style="stroke-dasharray: 600; stroke-dashoffset: 600;" opacity="0.6" class="">
+                <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"></animate>
+              </path>
+            </svg>
+
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2">
+              <span class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#dce85d]/20 ring-2 ring-[#dce85d]/40" style="box-shadow: 0 0 30px rgba(220,232,93,0.6), 0 0 60px rgba(220,232,93,0.3);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 text-[#dce85d]">
+                  <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" class=""></path>
+                </svg>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature Benefits -->
+        <div class="mx-auto max-w-5xl mt-16">
+          <div class="flex flex-wrap text-sm gap-x-4 gap-y-4 items-center justify-center">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                <rect width="8" height="8" x="3" y="3" rx="2"></rect>
+                <path d="M7 11v4a2 2 0 0 0 2 2h4"></path>
+                <rect width="8" height="8" x="13" y="13" rx="2"></rect>
+              </svg>
+              <span class="font-medium text-white">Instant sync</span>
+            </div>
+            <div class="hidden sm:block w-16 h-px border-t border-dashed border-[#dce85d]/40"></div>
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
+                <path d="m9 12 2 2 4-4"></path>
+              </svg>
+              <span class="font-medium text-white">Enterprise security</span>
+            </div>
+            <div class="hidden sm:block w-16 h-px border-t border-dashed border-[#dce85d]/40"></div>
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                <path d="m12 14 4-4"></path>
+                <path d="M3.34 19a10 10 0 1 1 17.32 0"></path>
+              </svg>
+              <span class="font-medium text-white">Real-time updates</span>
+            </div>
+            <div class="hidden sm:block w-16 h-px border-t border-dashed border-[#dce85d]/40"></div>
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dce85d]">
+                <path d="M14 4.1 12 6"></path>
+                <path d="m5.1 8-2.9-.8"></path>
+                <path d="m6 12-1.9 2"></path>
+                <path d="M7.2 2.2 8 5.1"></path>
+                <path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path>
+              </svg>
+              <span class="font-medium text-white">One-click setup</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Showcase Section with Premium Layout -->
+    <section class="bg-[#090a0a] pt-24 pb-24 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-8">
+        <div class="glass-card sm:p-10 transition-all duration-300 group rounded-3xl pt-6 pr-6 pb-6 pl-6">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 items-start">
+    <div class="flex flex-col min-h-full justify-between">
+      <div class="">
+        <span class="text-sm font-normal text-[#a1a1aa] inline-block transition-all duration-300 group-hover:text-[#dce85d]">Platform</span>
+        <h2 class="text-5xl sm:text-6xl lg:text-7xl leading-[0.9] text-white tracking-tighter mt-2 transition-all duration-500 group-hover:text-[#dce85d]">
+          A vault platform built for speed and precision.
+        </h2>
+        <div class="mt-8 relative">
+          <div class="flex flex-col gap-4 relative text-[#fafafa] pr-4 pl-4">
+            <div class="relative group/item">
+              <div class="absolute left-2 top-8 bottom-0 w-px bg-gradient-to-b from-[#dce85d] via-[#a8c93a] to-[#74b97f] transition-all duration-300 group-hover/item:w-0.5 group-hover/item:shadow-[0_0_8px_rgba(220,232,93,0.6)]">
+              </div>
+              <div class="flex gap-4 items-start transition-all duration-300 hover:translate-x-2">
+                <div class="flex-shrink-0 w-4 h-4 z-10 relative bg-[#090a0a] border-[#dce85d] border-2 rounded-full mt-0.5 transition-all duration-300 group-hover/item:scale-125 group-hover/item:shadow-[0_0_12px_rgba(220,232,93,0.8)]">
+                  <div class="w-1.5 h-1.5 absolute top-0.5 left-0.5 bg-[#dce85d] rounded-full transition-all duration-300 group-hover/item:animate-pulse"></div>
+                </div>
+                <div class="flex-1 pb-6">
+                  <span class="text-sm font-medium text-[#dce85d] transition-all duration-300 group-hover/item:text-white">
+                    Smart Strategy Builder
+                  </span>
+                  <p class="text-xs text-[#a1a1aa] mt-1 transition-all duration-300 group-hover/item:text-[#fafafa]">
+                    Visual interface for complex yield strategies
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="relative group/item">
+              <div class="absolute left-2 top-8 bottom-0 w-px bg-gradient-to-b from-[#dce85d] via-[#a8c93a] to-[#74b97f] transition-all duration-300 group-hover/item:w-0.5 group-hover/item:shadow-[0_0_8px_rgba(168,201,58,0.6)]">
+              </div>
+              <div class="flex gap-4 items-start transition-all duration-300 hover:translate-x-2">
+                <div class="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#a8c93a] bg-[#090a0a] z-10 relative mt-0.5 transition-all duration-300 group-hover/item:scale-125 group-hover/item:shadow-[0_0_12px_rgba(168,201,58,0.8)]">
+                  <div class="w-1.5 h-1.5 rounded-full bg-[#a8c93a] absolute top-0.5 left-0.5 transition-all duration-300 group-hover/item:animate-pulse"></div>
+                </div>
+                <div class="flex-1 pb-6">
+                  <span class="text-sm font-medium text-[#a8c93a] transition-all duration-300 group-hover/item:text-white">
+                    Real-time Analytics
+                  </span>
+                  <p class="text-xs text-[#a1a1aa] mt-1 transition-all duration-300 group-hover/item:text-[#fafafa]">
+                    Monitor performance across all positions
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="relative group/item">
+              <div class="flex items-start gap-4 transition-all duration-300 hover:translate-x-2">
+                <div class="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#74b97f] bg-[#090a0a] z-10 relative mt-0.5 transition-all duration-300 group-hover/item:scale-125 group-hover/item:shadow-[0_0_12px_rgba(116,185,127,0.8)]">
+                  <div class="w-1.5 h-1.5 rounded-full bg-[#74b97f] absolute top-0.5 left-0.5 transition-all duration-300 group-hover/item:animate-pulse"></div>
+                </div>
+                <div class="flex-1">
+                  <span class="text-sm font-medium text-[#74b97f] transition-all duration-300 group-hover/item:text-white">
+                    Gas Optimization
+                  </span>
+                  <p class="text-xs text-[#a1a1aa] mt-1 transition-all duration-300 group-hover/item:text-[#fafafa]">
+                    Minimize fees with smart batching
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="w-full mt-10">
+        <p class="text-sm font-medium text-white tracking-tight transition-all duration-300 group-hover:text-[#dce85d]">
+          Maximize every opportunity
+        </p>
+        <p class="text-sm text-[#a1a1aa] mt-1 max-w-sm transition-all duration-300 group-hover:text-[#fafafa]">
+          Advanced automation, risk management, and portfolio
+          rebalancing that keeps your strategy optimized 24/7.
+        </p>
+        <a href="#features" class="inline-flex items-center justify-center gap-2 h-10 hover:bg-[#e8f06d] transition-all duration-300 text-sm font-normal text-[#090a0a] bg-[#dce85d] rounded-full mt-4 px-4 hover:scale-105 hover:shadow-[0_0_20px_rgba(220,232,93,0.6)]">
+          Explore vaults
+          <span class="inline-flex h-2 w-2 rounded-full bg-[#090a0a] transition-all duration-300 group-hover:animate-pulse"></span>
+        </a>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 relative">
+      <div class="relative overflow-hidden aspect-[4/3] bg-center bg-cover border border-white/[0.06] rounded-2xl group/card transition-all duration-500 hover:scale-[1.05] hover:border-[#dce85d]/30 hover:shadow-[0_0_30px_rgba(220,232,93,0.3)]" style="background-image: url('https://image.pollinations.ai/prompt/dark%20fintech%20dashboard%20interface%20with%20live%20tracking%20graphs,%20neon%20lime%20accents%20(%23dce85d),%20black%20background,%20minimal,%20cinematic%20lighting,%20high%20contrast,%203D%20render?width=800&amp;height=600&amp;nologo=1&amp;seed=syft-live-tracking&amp;model=imagen-3');">
+        <div class="bg-gradient-to-b from-black/0 via-black/15 to-black/60 absolute top-0 right-0 bottom-0 left-0 group-hover/card:from-black/10 group-hover/card:to-black/50 transition-all duration-500">
+        </div>
+        <div class="absolute top-3 left-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-1.5 transition-all duration-300 group-hover/card:bg-[#dce85d]/20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 transition-all duration-300 group-hover/card:text-[#dce85d]">
+              <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="absolute top-3 right-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-3 transition-all duration-300 group-hover/card:bg-[#dce85d]/20 group-hover/card:text-white">
+            Monitoring
+          </span>
+        </div>
+        <div class="absolute bottom-3 left-3 right-3 transition-all duration-300 group-hover/card:bottom-4">
+          <p class="text-white text-lg font-medium tracking-tight leading-tight transition-all duration-300 group-hover/card:text-[#dce85d]">
+            Live tracking
+          </p>
+        </div>
+      </div>
+      <div class="relative overflow-hidden aspect-[4/3] bg-center bg-cover border border-white/[0.06] rounded-2xl group/card transition-all duration-500 hover:scale-[1.05] hover:border-[#dce85d]/30 hover:shadow-[0_0_30px_rgba(220,232,93,0.3)]" style="background-image: url('https://image.pollinations.ai/prompt/cybersecurity%20shield%20locked%20vault,%20glowing%20lime%20accents%20(%23dce85d)%20on%20dark%20background,%20photorealistic%203D%20render,%20depth%20of%20field?width=800&amp;height=600&amp;nologo=1&amp;seed=syft-security&amp;model=imagen-3');">
+        <div class="absolute inset-0 bg-gradient-to-b from-black/0 via-black/20 to-black/60 group-hover/card:from-black/10 group-hover/card:to-black/50 transition-all duration-500">
+        </div>
+        <div class="absolute top-3 left-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-1.5 transition-all duration-300 group-hover/card:bg-[#dce85d]/20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 transition-all duration-300 group-hover/card:text-[#dce85d]">
+              <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
+              <path d="m9 12 2 2 4-4"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="absolute top-3 right-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-3 transition-all duration-300 group-hover/card:bg-[#dce85d]/20 group-hover/card:text-white">
+            Security
+          </span>
+        </div>
+        <div class="absolute bottom-3 left-3 right-3 transition-all duration-300 group-hover/card:bottom-4">
+          <p class="text-white text-lg font-medium tracking-tight leading-tight transition-all duration-300 group-hover/card:text-[#dce85d]">
+            Audited contracts
+          </p>
+        </div>
+      </div>
+      <div class="relative overflow-hidden aspect-[4/5] bg-center bg-cover border border-white/[0.06] rounded-2xl group/card transition-all duration-500 hover:scale-[1.05] hover:border-[#dce85d]/30 hover:shadow-[0_0_30px_rgba(220,232,93,0.3)]" style="background-image: url('https://image.pollinations.ai/prompt/multi-protocol%20DeFi%20network%20diagram,%20layered%20nodes%20and%20connections,%20isometric,%20lime%20accents%20(%23dce85d)%20on%20black,%20minimal?width=800&amp;height=1000&amp;nologo=1&amp;seed=syft-strategy&amp;model=imagen-3');">
+        <div class="absolute inset-0 bg-gradient-to-b from-black/0 via-black/20 to-black/60 group-hover/card:from-black/10 group-hover/card:to-black/50 transition-all duration-500">
+        </div>
+        <div class="absolute top-3 left-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-1.5 transition-all duration-300 group-hover/card:bg-[#dce85d]/20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 transition-all duration-300 group-hover/card:text-[#dce85d]">
+              <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"></path>
+              <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path>
+              <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="absolute top-3 right-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-3 transition-all duration-300 group-hover/card:bg-[#dce85d]/20 group-hover/card:text-white">
+            Strategy
+          </span>
+        </div>
+        <div class="absolute bottom-3 left-3 right-3 transition-all duration-300 group-hover/card:bottom-4">
+          <p class="text-white text-lg font-medium tracking-tight leading-tight transition-all duration-300 group-hover/card:text-[#dce85d]">
+            Multi-protocol
+          </p>
+        </div>
+      </div>
+      <div class="relative overflow-hidden aspect-[4/5] bg-center bg-cover border border-white/[0.06] rounded-2xl group/card transition-all duration-500 hover:scale-[1.05] hover:border-[#dce85d]/30 hover:shadow-[0_0_30px_rgba(220,232,93,0.3)]" style="background-image: url('https://image.pollinations.ai/prompt/AI%20optimization%20neural%20network%20brain%20made%20of%20circuits,%20lime%20glow%20(%23dce85d)%20on%20dark,%20futuristic,%20clean,%20high%20detail?width=800&amp;height=1000&amp;nologo=1&amp;seed=syft-ai&amp;model=imagen-3');">
+        <div class="bg-gradient-to-b from-black/0 via-black/20 to-black/60 absolute top-0 right-0 bottom-0 left-0 group-hover/card:from-black/10 group-hover/card:to-black/50 transition-all duration-500">
+        </div>
+        <div class="absolute top-3 left-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-1.5 transition-all duration-300 group-hover/card:bg-[#dce85d]/20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 transition-all duration-300 group-hover/card:text-[#dce85d]">
+              <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path>
+              <path d="M20 2v4"></path>
+              <path d="M22 4h-4"></path>
+              <circle cx="4" cy="20" r="2"></circle>
+            </svg>
+          </span>
+        </div>
+        <div class="absolute top-3 right-3 transition-all duration-300 group-hover/card:scale-110">
+          <span class="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-3 transition-all duration-300 group-hover/card:bg-[#dce85d]/20 group-hover/card:text-white">
+            AI
+          </span>
+        </div>
+        <div class="absolute bottom-3 left-3 right-3 transition-all duration-300 group-hover/card:bottom-4">
+          <p class="text-white text-lg font-medium tracking-tight leading-tight transition-all duration-300 group-hover/card:text-[#dce85d]">
+            Smart optimization
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="bg-[#161a1d] pt-24 pb-24 relative" id="how-it-works">
+      <div class="container mx-auto px-4 max-w-4xl">
+        <div class="text-center mb-16">
+          <h2 class="md:text-6xl text-4xl font-bold text-white tracking-tight mb-4" style="">Get Started in <span class="text-[#dce85d]">3 Steps</span></h2>
+          <p class="text-lg text-[#a1a1aa]">From zero to earning in minutes</p>
+        </div>
+
+        <div class="space-y-6">
+          <div class="glass-card rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02]">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0">
+                <div class="w-14 h-14 rounded-xl bg-[#dce85d] flex items-center justify-center">
+                  <span class="text-xl font-bold text-[#090a0a]">01</span>
+                </div>
+              </div>
+              <div class="flex-1">
+                <h3 class="text-xl font-semibold mb-2 text-white">
+                  Connect Wallet
+                </h3>
+                <p class="text-base text-[#a1a1aa]">
+                  Connect your Freighter or Albedo wallet in seconds
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="glass-card rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02]">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0">
+                <div class="w-14 h-14 rounded-xl bg-[#dce85d] flex items-center justify-center">
+                  <span class="text-xl font-bold text-[#090a0a]">02</span>
+                </div>
+              </div>
+              <div class="flex-1">
+                <h3 class="text-xl font-semibold mb-2 text-white">
+                  Build Strategy
+                </h3>
+                <p class="text-base text-[#a1a1aa]">
+                  Use visual blocks to design your yield strategy
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="glass-card rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02]">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0">
+                <div class="w-14 h-14 rounded-xl bg-[#dce85d] flex items-center justify-center">
+                  <span class="text-xl font-bold text-[#090a0a]">03</span>
+                </div>
+              </div>
+              <div class="flex-1">
+                <h3 class="text-xl font-semibold mb-2 text-white">
+                  Deploy &amp; Earn
+                </h3>
+                <p class="text-base text-[#a1a1aa]">
+                  Deploy your vault and start earning automatically
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center mt-12">
+          <a href="#builder" class="group isolate inline-flex cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_8px_rgba(220,232,93,0.35)] rounded-full relative shadow-[0_8px_40px_rgba(220,232,93,0.25)]" style="--spread: 90deg; --shimmer-color: rgba(255,255,255,0.6); --radius: 9999px; --speed: 4s; --cut: 1px; --bg: rgba(220, 232, 93, 0.1);">
+            <div class="absolute inset-0">
+              <div class="absolute inset-[-200%] w-[400%] h-[400%] [animation:rotate-gradient_var(--speed)_linear_infinite]">
+                <div class="absolute inset-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]"></div>
+              </div>
+            </div>
+            <div class="absolute rounded-full [background:var(--bg)] [inset:var(--cut)] backdrop-blur"></div>
+            <div class="z-10 flex gap-3 sm:w-auto overflow-hidden text-base font-medium text-white w-full pt-3 pr-5 pb-3 pl-5 relative gap-x-3 gap-y-3 items-center" style="border-radius: 9999px;">
+              <div style="position: absolute; content: ' '; display: block; width: 200%; height: 200%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), transparent); animation: rotate-gradient 4s infinite linear; top: 50%; left: 50%; transform: translate(-50%, -50%);"></div>
+              <div style="position: absolute; inset: 1px; background: rgba(10, 11, 20, 0.8); border-radius: 9999px; backdrop-filter: blur(8px);"></div>
+              <span class="whitespace-nowrap relative z-10 font-sans">
+                Create Your First Vault
+              </span>
+              <span class="inline-flex items-center justify-center z-10 bg-white/10 w-7 h-7 rounded-full relative">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12h14"></path>
+                  <path d="m12 5 7 7-7 7"></path>
+                </svg>
+              </span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Testimonials Section - Glassmorphism Stack -->
+    <section class="py-24 lg:py-32 relative bg-[#090a0a] overflow-hidden">
+      <div class="absolute inset-0 opacity-20">
+        <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-[#dce85d] rounded-full blur-[150px]"></div>
+      </div>
+      
+      <div class="max-w-7xl mx-auto px-4 relative z-10">
+        <div class="flex items-center justify-between mb-12">
+          <div class="space-y-1">
+            <p class="text-sm text-[#a1a1aa]">
+              What vault creators say
+            </p>
+            <h2 class="text-3xl sm:text-4xl md:text-5xl tracking-tight font-bold text-white">
+              Testimonials
+            </h2>
+          </div>
+          <div class="hidden sm:flex items-center gap-2 text-[#a1a1aa]">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+              <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+              <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+            </svg>
+            <span class="text-sm">Real feedback from builders</span>
+          </div>
+        </div>
+
+        <div class="relative flex items-center justify-center min-h-[400px] sm:min-h-[450px]">
+          <div class="container-glassmorphism" style="position: relative; display: flex; justify-content: center; align-items: center; height: 100%;">
+            <!-- Card 1 -->
+            <div class="glass-testimonial" style="position: relative; width: 320px; height: 360px; background: linear-gradient(rgba(255,255,255,0.08), transparent); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 45px rgba(0, 0, 0, 0.25); display: flex; justify-content: center; align-items: center; transition: 0.5s; border-radius: 1rem; margin: 0 -45px; backdrop-filter: blur(15px); transform: rotate(-8deg); z-index: 1;">
+              <div class="absolute inset-4 rounded-xl bg-white/95 text-neutral-900 shadow-2xl ring-1 ring-black/5 overflow-hidden">
+                <div class="p-6">
+                  <div class="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-neutral-100 ring-1 ring-black/5 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-neutral-700">
+                      <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+                      <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+                    </svg>
+                  </div>
+                  <p class="text-sm leading-relaxed text-neutral-900 mb-4">
+                    "Syft made vault creation incredibly simple. Deployed my first strategy in under 10 minutes with zero coding."
+                  </p>
+                  <div class="pt-3 border-t border-neutral-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <div class="h-7 w-7 rounded-full bg-gradient-to-br from-[#dce85d] to-[#a8c93a] flex items-center justify-center text-[#090a0a] font-semibold text-xs">AK</div>
+                      <div>
+                        <div class="text-xs font-medium text-neutral-900">Alex Kim</div>
+                        <div class="text-xs text-neutral-500">@alexk_defi</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-amber-400">
+                        <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path>
+                      </svg>
+                      <span class="text-xs font-medium">5.0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="glass-testimonial" style="position: relative; width: 320px; height: 360px; background: linear-gradient(rgba(255,255,255,0.1), transparent); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 45px rgba(0, 0, 0, 0.25); display: flex; justify-content: center; align-items: center; transition: 0.5s; border-radius: 1rem; margin: 0 -45px; backdrop-filter: blur(15px); transform: rotate(-4deg); z-index: 2;">
+              <div class="absolute inset-4 rounded-xl bg-white/90 text-neutral-900 shadow-xl ring-1 ring-black/5 backdrop-blur overflow-hidden">
+                <div class="p-6">
+                  <div class="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-neutral-100 ring-1 ring-black/5 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-neutral-700">
+                      <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+                      <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+                    </svg>
+                  </div>
+                  <p class="text-sm leading-relaxed text-neutral-900 mb-4">
+                    "The AI optimization suggestions have increased my vault's APY by 3%. Absolutely game-changing platform."
+                  </p>
+                  <div class="pt-3 border-t border-neutral-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <div class="h-7 w-7 rounded-full bg-gradient-to-br from-[#74b97f] to-[#5a9268] flex items-center justify-center text-white font-semibold text-xs">SM</div>
+                      <div>
+                        <div class="text-xs font-medium text-neutral-900">Sarah Martinez</div>
+                        <div class="text-xs text-neutral-500">@sarahm_yields</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-amber-400">
+                        <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path>
+                      </svg>
+                      <span class="text-xs font-medium">5.0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3 (Center/Focus) -->
+            <div class="glass-testimonial" style="position: relative; width: 320px; height: 360px; background: linear-gradient(rgba(255,255,255,0.12), transparent); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3); display: flex; justify-content: center; align-items: center; transition: 0.5s; border-radius: 1rem; margin: 0 -45px; backdrop-filter: blur(15px); transform: rotate(0deg); z-index: 3;">
+              <div class="absolute inset-4 rounded-xl bg-white text-neutral-900 shadow-2xl ring-1 ring-black/5 overflow-hidden">
+                <div class="p-6">
+                  <div class="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-neutral-100 ring-1 ring-black/5 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-neutral-700">
+                      <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+                      <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"></path>
+                    </svg>
+                  </div>
+                  <p class="text-sm leading-relaxed text-neutral-900 mb-4">
+                    "Security was my biggest concern. Syft's multi-layer protection and transparent approach gave me confidence."
+                  </p>
+                  <div class="pt-3 border-t border-neutral-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <div class="h-7 w-7 rounded-full bg-gradient-to-br from-[#dce85d] to-[#c8d750] flex items-center justify-center text-[#090a0a] font-semibold text-xs">JP</div>
+                      <div>
+                        <div class="text-xs font-medium text-neutral-900">James Park</div>
+                        <div class="text-xs text-neutral-500">@jpark_stellar</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-amber-400">
+                        <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path>
+                      </svg>
+                      <span class="text-xs font-medium">5.0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <style>
+              .container-glassmorphism:hover .glass-testimonial {
+                transform: rotate(0deg) !important;
+                margin: 0 -35px !important;
+              }
+            </style>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 relative bg-[#161a1d]">
+      <div class="container mx-auto px-4 max-w-4xl">
+        <div class="glass-card rounded-3xl p-12 md:p-16 text-center relative overflow-hidden">
+          <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-0 right-1/4 w-64 h-64 bg-[#dce85d] rounded-full blur-[100px]"></div>
+            <div class="absolute bottom-0 left-1/4 w-64 h-64 bg-[#74b97f] rounded-full blur-[100px]"></div>
+          </div>
+          <div class="relative z-10">
+            <h2 class="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight">
+              Ready to
+              <span class="text-[#dce85d]">Maximize</span>
+              Your Yields?
+            </h2>
+            <p class="text-lg text-[#a1a1aa] mb-8 max-w-2xl mx-auto">
+              Join thousands of users who are already earning with Syft's
+              automated yield vaults
+            </p>
+            <a href="#builder" class="group isolate inline-flex cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_8px_rgba(220,232,93,0.35)] rounded-full relative shadow-[0_8px_40px_rgba(220,232,93,0.25)]" style="--spread: 90deg; --shimmer-color: rgba(255,255,255,0.6); --radius: 9999px; --speed: 4s; --cut: 1px; --bg: rgba(220, 232, 93, 0.1);">
+              <div class="absolute inset-0">
+                <div class="absolute inset-[-200%] w-[400%] h-[400%] [animation:rotate-gradient_var(--speed)_linear_infinite]">
+                  <div class="absolute inset-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]"></div>
+                </div>
+              </div>
+              <div class="absolute rounded-full [background:var(--bg)] [inset:var(--cut)] backdrop-blur"></div>
+              <div class="z-10 flex gap-3 sm:w-auto overflow-hidden text-base font-medium text-white w-full pt-3 pr-5 pb-3 pl-5 relative gap-x-3 gap-y-3 items-center" style="border-radius: 9999px;">
+                <div style="position: absolute; content: ' '; display: block; width: 200%; height: 200%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), transparent); animation: rotate-gradient 4s infinite linear; top: 50%; left: 50%; transform: translate(-50%, -50%);" class=""></div>
+                <div style="position: absolute; inset: 1px; background: rgba(10, 11, 20, 0.8); border-radius: 9999px; backdrop-filter: blur(8px);" class=""></div>
+                <span class="whitespace-nowrap relative z-10 font-sans">
+                  Launch App
+                </span>
+                <span class="inline-flex items-center justify-center z-10 bg-white/10 w-7 h-7 rounded-full relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14"></path>
+                    <path d="m12 5 7 7-7 7"></path>
+                  </svg>
+                </span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/[0.06] bg-[#090a0a] py-12">
+      <div class="container mx-auto px-4 max-w-6xl">
+        <div class="grid md:grid-cols-4 gap-8">
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded bg-[#dce85d]">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="text-[#090a0a]">
+                  <path d="M12 2l3.8 3.8a1 1 0 0 1-1.4 1.4L13 5.2V12h-2V5.2L9.6 7.2a1 1 0 0 1-1.4-1.4L12 2zm0 9.5 7 7-1.4 1.4L12 14.3l-5.6 5.6L5 18.6l7-7z"></path>
+                </svg>
+              </span>
+              <span class="text-white text-lg font-semibold">Syft</span>
+            </div>
+            <p class="text-sm text-[#a1a1aa]">
+              Build smarter yield vaults on Stellar
+            </p>
+          </div>
+          <div>
+            <p class="text-white font-medium mb-3">Product</p>
+            <ul class="space-y-2 text-sm">
+              <li>
+                <a href="#features" class="text-[#a1a1aa] hover:text-white transition">
+                  Features
+                </a>
+              </li>
+              <li>
+                <a href="#how-it-works" class="text-[#a1a1aa] hover:text-white transition">
+                  How It Works
+                </a>
+              </li>
+              <li>
+                <a href="#vaults" class="text-[#a1a1aa] hover:text-white transition">
+                  Vaults
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p class="text-white font-medium mb-3">Resources</p>
+            <ul class="space-y-2 text-sm">
+              <li>
+                <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+                  Docs
+                </a>
+              </li>
+              <li>
+                <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+                  Security
+                </a>
+              </li>
+              <li>
+                <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+                  FAQ
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="">
+            <p class="text-white font-medium mb-3">Community</p>
+            <ul class="space-y-2 text-sm">
+              <li>
+                <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+                  Discord
+                </a>
+              </li>
+              <li>
+                <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+                  Twitter
+                </a>
+              </li>
+              <li>
+                <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+                  GitHub
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="mt-10 pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p class="text-xs text-[#a1a1aa]">
+            © 2025 Syft. All rights reserved.
+          </p>
+          <div class="flex items-center gap-4 text-xs">
+            <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+              Terms
+            </a>
+            <a href="#" class="text-[#a1a1aa] hover:text-white transition">
+              Privacy
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script>
+      if (window.lucide) lucide.createIcons();
+    </script>
+  
+</body></html>
