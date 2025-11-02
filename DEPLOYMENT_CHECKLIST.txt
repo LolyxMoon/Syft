@@ -1,0 +1,182 @@
+# 🚀 SYFT DEPLOYMENT - QUICK CHECKLIST
+
+## ✅ Pre-Deployment Setup
+
+### 1. Supabase Setup
+- [ ] Create Supabase project
+- [ ] Run all migrations (001-014) in SQL Editor
+- [ ] Copy Supabase URL, anon key, and service_role key
+- [ ] Test database connection
+
+### 2. Get API Keys
+- [ ] OpenAI API key (optional, for AI features)
+- [ ] Tavily API key (optional, for market news)
+- [ ] Runware API key (optional, for image generation)
+- [ ] Stellar deployer secret key (for on-chain transactions)
+
+### 3. Deploy Stellar Contracts (if not done)
+- [ ] Deploy vault factory contract
+- [ ] Deploy vault contracts
+- [ ] Save contract IDs
+
+## 🔧 Backend Deployment (Heroku)
+
+### Setup
+- [ ] Install Heroku CLI: `winget install Heroku.HerokuCLI`
+- [ ] Login: `heroku login`
+- [ ] Create app: `heroku create syft-defi-backend`
+
+### Environment Variables (run these commands)
+```powershell
+cd backend
+heroku config:set NODE_ENV=production --app syft-defi-backend
+heroku config:set SUPABASE_URL="YOUR_URL" --app syft-defi-backend
+heroku config:set SUPABASE_ANON_KEY="YOUR_KEY" --app syft-defi-backend
+heroku config:set SUPABASE_SERVICE_ROLE_KEY="YOUR_KEY" --app syft-defi-backend
+heroku config:set OPENAI_API_KEY="YOUR_KEY" --app syft-defi-backend
+heroku config:set JWT_SECRET="$(openssl rand -hex 32)" --app syft-defi-backend
+heroku config:set CORS_ORIGINS="https://your-app.vercel.app" --app syft-defi-backend
+```
+
+### Deploy
+- [ ] Ensure Procfile exists: `echo "web: node dist/index.js" > Procfile`
+- [ ] Commit changes: `git add . && git commit -m "Deploy to Heroku"`
+- [ ] Push: `git push heroku main`
+- [ ] Test health: `curl https://syft-defi-backend.herokuapp.com/health`
+
+### Scale Dyno (Use Your $300 Credits)
+- [ ] Scale to Hobby: `heroku ps:scale web=1:hobby --app syft-defi-backend`
+- [ ] Or Standard: `heroku ps:scale web=1:standard-1x --app syft-defi-backend`
+- [ ] Check logs: `heroku logs --tail --app syft-defi-backend`
+
+## 🌐 Frontend Deployment (Vercel)
+
+### Vercel Dashboard Method
+1. [ ] Go to https://vercel.com
+2. [ ] Click "Add New Project"
+3. [ ] Import Git repository
+4. [ ] Configure:
+   - Framework: Vite
+   - Root Directory: frontend
+   - Build Command: `npm run build`
+   - Output Directory: dist
+
+5. [ ] Add Environment Variables:
+```
+VITE_PUBLIC_STELLAR_NETWORK = FUTURENET
+VITE_PUBLIC_STELLAR_NETWORK_PASSPHRASE = Test SDF Future Network ; October 2022
+VITE_PUBLIC_STELLAR_RPC_URL = https://rpc-futurenet.stellar.org
+VITE_PUBLIC_STELLAR_HORIZON_URL = https://horizon-futurenet.stellar.org
+VITE_PUBLIC_SUPABASE_URL = [Your Supabase URL]
+VITE_PUBLIC_SUPABASE_ANON_KEY = [Your Supabase anon key]
+VITE_PUBLIC_BACKEND_URL = https://syft-defi-backend.herokuapp.com
+VITE_PUBLIC_VAULT_FACTORY_CONTRACT_ID = [Your contract ID]
+```
+
+6. [ ] Click Deploy
+7. [ ] Wait for deployment to complete
+
+### OR Vercel CLI Method
+```powershell
+cd frontend
+npm install -g vercel
+vercel login
+vercel
+# Follow prompts
+vercel --prod
+```
+
+## 🔄 Post-Deployment
+
+### Update CORS
+- [ ] Get Vercel URL from dashboard
+- [ ] Update backend CORS:
+```powershell
+heroku config:set CORS_ORIGINS="https://your-vercel-url.vercel.app" --app syft-defi-backend
+heroku restart --app syft-defi-backend
+```
+
+### Test Everything
+- [ ] Backend health: https://syft-defi-backend.herokuapp.com/health
+- [ ] Frontend loads: https://your-app.vercel.app
+- [ ] Wallet connection works
+- [ ] API calls succeed (check browser console)
+- [ ] No CORS errors
+
+### Monitor
+- [ ] Check Heroku logs: `heroku logs --tail --app syft-defi-backend`
+- [ ] Check Vercel logs in dashboard
+- [ ] Check Supabase dashboard
+
+## 📊 Optional: Custom Domain
+
+### Frontend (Vercel)
+- [ ] Vercel Dashboard → Your Project → Settings → Domains
+- [ ] Add domain: syft.yourdomain.com
+- [ ] Configure DNS as instructed
+- [ ] Wait for SSL
+
+### Backend (Heroku)
+- [ ] `heroku domains:add api.yourdomain.com --app syft-defi-backend`
+- [ ] Add CNAME in DNS
+- [ ] Update frontend env: VITE_PUBLIC_BACKEND_URL
+- [ ] Update backend CORS
+
+## 🔒 Security Checklist
+
+- [ ] All secrets are set (no defaults)
+- [ ] JWT_SECRET is strong and random
+- [ ] CORS only allows your domain
+- [ ] No .env files committed to Git
+- [ ] 2FA enabled on all services
+- [ ] Supabase RLS policies configured
+- [ ] API keys rotated regularly
+
+## 💰 Cost Tracking
+
+Current Setup:
+- Heroku: $___/month (Hobby = $7, Standard-1X = $25)
+- Vercel: $0/month (Free tier)
+- Supabase: $0/month (Free tier)
+
+Credits Used: $___/$300
+
+## 🆘 Troubleshooting
+
+### Backend not starting
+```powershell
+heroku logs --tail --app syft-defi-backend
+heroku config --app syft-defi-backend
+heroku restart --app syft-defi-backend
+```
+
+### Frontend build fails
+- Check Vercel build logs
+- Test locally: `npm run build`
+- Verify all env vars are set
+
+### CORS errors
+- Verify CORS_ORIGINS includes Vercel URL
+- Check for typos in URLs
+- Restart backend after CORS change
+
+### Database errors
+- Check Supabase credentials
+- Verify migrations ran
+- Check Supabase project status
+
+## 📝 Important URLs
+
+- Backend: https://syft-defi-backend.herokuapp.com
+- Frontend: https://your-app.vercel.app
+- Heroku Dashboard: https://dashboard.heroku.com/apps/syft-defi-backend
+- Vercel Dashboard: https://vercel.com/your-account/syft-defi-platform
+- Supabase Dashboard: https://app.supabase.com/project/your-project
+
+---
+
+## ✨ You're Done!
+
+Your Syft DeFi Platform is now live! 🎉
+
+For full details, see DEPLOYMENT_GUIDE.txt
