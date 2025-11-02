@@ -49,7 +49,7 @@ function extractVaultParams(body: any) {
  * POST /api/nl/generate-vault
  * Generate vault strategy from natural language
  * This endpoint is called by VAPI voice assistant
- * It's a thin wrapper around /api/vaults/generate-from-prompt to maintain compatibility
+ * It uses the EXACT same service as AI Chat (/api/vaults/generate-from-prompt)
  */
 router.post('/generate-vault', async (req, res) => {
   try {
@@ -81,40 +81,12 @@ router.post('/generate-vault', async (req, res) => {
       responseType: result.responseType,
     });
 
-    // Format response based on caller
-    const responseData = {
-      nodes: result.nodes,
-      edges: result.edges,
-      explanation: result.explanation,
-      responseType: result.responseType,
-      marketContext: result.marketContext,
-      suggestions: result.suggestions,
-      metadata: {
-        name: 'Voice Generated Vault',
-        description: result.explanation,
-      },
-    };
-
-    // Check if this is a VAPI request (has message object)
-    if (req.body.message) {
-      // VAPI format: return result with explanation
-      res.json({
-        results: [
-          {
-            result: JSON.stringify({
-              success: true,
-              data: responseData,
-            }),
-          }
-        ]
-      });
-    } else {
-      // Direct API call format
-      res.json({
-        success: true,
-        data: responseData,
-      });
-    }
+    // Return the EXACT same format as /api/vaults/generate-from-prompt
+    // This ensures AI Chat and VAPI get identical responses
+    res.json({
+      success: true,
+      data: result, // Return the raw result, no extra wrapping
+    });
 
   } catch (error: any) {
     console.error('[NL API] Error generating vault:', error);

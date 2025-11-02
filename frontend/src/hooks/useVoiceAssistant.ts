@@ -163,14 +163,17 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
   // - Can also handle modifications, explanations, etc. all through one endpoint
   const handleGenerateVaultResult = (result: any) => {
     try {
-      console.log('[useVoiceAssistant] handleGenerateVaultResult called with result:', result);
+      console.log('[useVoiceAssistant] ===== VAULT RESULT RECEIVED =====');
+      console.log('[useVoiceAssistant] Raw result:', JSON.stringify(result, null, 2));
       
-      // The backend returns either {success: true, data: {...}} or VAPI format {results: [...]}
-      // After parsing in vapiService, we should have the actual data
+      // The backend returns: {success: true, data: {nodes, edges, explanation, responseType, ...}}
+      // After VAPI and vapiService parsing, we should have this structure
       const vaultData = result.data || result;
       
+      console.log('[useVoiceAssistant] Extracted vaultData:', JSON.stringify(vaultData, null, 2));
+      
       if (!vaultData) {
-        console.error('[useVoiceAssistant] No vault data in result:', result);
+        console.error('[useVoiceAssistant] No vault data in result');
         vapiService.sendMessage(
           `Error: I couldn't process your request. Please try again.`
         );
@@ -179,10 +182,15 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
 
       const { nodes, edges, responseType } = vaultData;
       
+      console.log('[useVoiceAssistant] Parsed data - nodes:', nodes?.length, 'edges:', edges?.length, 'responseType:', responseType);
+      
       // Check if the AI actually built a vault or just chatted
       if (responseType === 'build' && nodes && edges && nodes.length > 0) {
+        console.log('[useVoiceAssistant] ✅ Building vault with', nodes.length, 'nodes');
+        
         // Notify all registered callbacks to display the vault
         vaultGeneratedCallbacks.current.forEach(callback => {
+          console.log('[useVoiceAssistant] Calling vault generated callback');
           callback(nodes, edges, vaultData.metadata);
         });
 
@@ -194,13 +202,14 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
         );
       } else {
         // AI chose to just chat - the explanation is already spoken by the assistant
-        console.log('[useVoiceAssistant] AI response type:', responseType, '- No vault built');
+        console.log('[useVoiceAssistant] ℹ️ AI response type:', responseType, '- No vault built (nodes:', nodes?.length, ')');
         
         // The VAPI assistant will speak the explanation naturally
         // No need to manually send it as it's already in the tool result
       }
     } catch (error) {
-      console.error('[useVoiceAssistant] Error processing vault result:', error);
+      console.error('[useVoiceAssistant] ❌ Error processing vault result:', error);
+      console.error('[useVoiceAssistant] Error stack:', error instanceof Error ? error.stack : 'No stack');
       vapiService.sendMessage(
         `Error processing your request: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
