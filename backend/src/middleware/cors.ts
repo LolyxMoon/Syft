@@ -7,6 +7,7 @@ const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:4173',
+  'https://syft-stellar.vercel.app',
 ];
 
 export const corsOptions: cors.CorsOptions = {
