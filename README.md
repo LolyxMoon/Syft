@@ -43,7 +43,7 @@ Create yield vaults using three powerful interfaces:
 ### 2. Intelligent Strategy Optimization
 
 - Real-time AI suggestions based on market conditions
-- Sentiment analysis from social media (Twitter/X, Reddit)
+- Market sentiment analysis via Tavily API
 - Historical performance data analysis
 - Risk-adjusted return optimization
 
@@ -99,8 +99,7 @@ Create yield vaults using three powerful interfaces:
 - **Database**: PostgreSQL (Supabase)
 - **Blockchain**: Stellar SDK (@stellar/stellar-sdk)
 - **AI/ML**: OpenAI API (GPT-5-Nano)
-- **Search**: Tavily API
-- **Sentiment**: Twitter & Reddit APIs
+- **Search & Sentiment**: Tavily API
 
 #### Smart Contracts
 - **Platform**: Soroban (Rust/WebAssembly)
@@ -501,7 +500,7 @@ Automatically routes assets across multiple Stellar protocols:
 ### 3. AI-Powered Strategy Optimization
 
 - GPT-4 analyzes market conditions
-- Sentiment analysis from Twitter/Reddit
+- Market sentiment via Tavily API
 - Historical performance data
 - Risk-adjusted return optimization
 
