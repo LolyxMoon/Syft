@@ -49,7 +49,7 @@ const Home = () => {
 
     // Load the script
     const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v1.4.29/dist/unicornStudio.umd.js';
+    script.src = '/unicornStudio.umd.js';
     script.async = true;
     
     script.onload = () => {
