@@ -95,6 +95,20 @@ Guidelines:
 6. Ensure all blocks are connected`;
 
 /**
+ * Extract parameters from VAPI message format or direct POST body
+ * VAPI sends tool calls in a nested message structure
+ */
+function extractVaultParams(body: any) {
+  // Check if this is a VAPI message format with toolCalls
+  if (body.message?.toolCalls?.[0]?.function?.arguments) {
+    return body.message.toolCalls[0].function.arguments;
+  }
+  
+  // Otherwise, assume it's a direct POST with parameters
+  return body;
+}
+
+/**
  * POST /api/nl/generate-vault
  * Generate vault strategy from natural language
  */
@@ -102,7 +116,11 @@ router.post('/generate-vault', async (req, res) => {
   try {
     console.log('[NL API] Received request body:', JSON.stringify(req.body, null, 2));
     
-    const validated = GenerateVaultSchema.parse(req.body);
+    // Extract parameters from either VAPI format or direct POST
+    const params = extractVaultParams(req.body);
+    console.log('[NL API] Extracted params:', JSON.stringify(params, null, 2));
+    
+    const validated = GenerateVaultSchema.parse(params);
     const { prompt, riskLevel, conversationContext } = validated;
 
     console.log('[NL API] Validated params - prompt:', prompt, 'riskLevel:', riskLevel);
