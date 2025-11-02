@@ -751,27 +751,10 @@ const VaultBuilder = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
-        {/* Voice Component - Always mounted but hidden when not in voice mode */}
-        <div className={builderMode === 'voice' ? 'flex-1 overflow-hidden' : 'hidden'}>
-          <VoiceToVault
-            onVaultGenerated={handleVaultGenerated}
-            onStrategyModified={(modifications) => {
-              console.log('Strategy modifications:', modifications);
-              // Apply modifications to nodes/edges
-            }}
-            onContractExplained={(explanation) => {
-              console.log('Contract explanation:', explanation);
-              modal.message(explanation, 'Contract Explanation', 'info');
-            }}
-            currentNodes={nodes}
-            currentEdges={edges}
-          />
-        </div>
-
-        {builderMode === 'visual' && (
-          <>
-            {/* Left Sidebar - Block Palette */}
-            <div className="w-72 flex-shrink-0 border-r border-default bg-card overflow-hidden flex flex-col">
+        {/* Visual Builder Mode */}
+        <div className={`flex-1 flex overflow-hidden ${builderMode === 'visual' ? '' : 'hidden'}`}>
+          {/* Left Sidebar - Block Palette */}
+          <div className="w-72 flex-shrink-0 border-r border-default bg-card overflow-hidden flex flex-col">
               <div className="flex-1 overflow-y-auto">
                 <BlockPalette onBlockSelect={handleBlockSelect} />
               </div>
@@ -970,12 +953,9 @@ const VaultBuilder = () => {
                 </div>
               </div>
             </div>
-          </>
-        )}
 
-        {builderMode === 'chat' && (
-          /* AI Chat Builder Mode */
-          <div className="flex-1 flex overflow-hidden">
+        {/* AI Chat Builder Mode */}
+        <div className={`flex-1 flex overflow-hidden ${builderMode === 'chat' ? '' : 'hidden'}`}>
             {/* Chat Interface - Takes most of the space */}
             <div className="flex-1 overflow-hidden">
               <NaturalLanguageBuilder 
@@ -1075,11 +1055,26 @@ const VaultBuilder = () => {
               </div>
             </div>
           </div>
-        )}
 
-        {builderMode === 'voice' && (
-          /* Voice Builder Mode - Right Sidebar Only (Voice interface is always mounted above) */
-          <div className="flex-1 flex overflow-hidden">
+        {/* Voice Builder Mode */}
+        <div className={`flex-1 flex overflow-hidden ${builderMode === 'voice' ? '' : 'hidden'}`}>
+            {/* Voice Interface - Takes most of the space */}
+            <div className="flex-1 overflow-hidden">
+              <VoiceToVault
+                onVaultGenerated={handleVaultGenerated}
+                onStrategyModified={(modifications) => {
+                  console.log('Strategy modifications:', modifications);
+                  // Apply modifications to nodes/edges
+                }}
+                onContractExplained={(explanation) => {
+                  console.log('Contract explanation:', explanation);
+                  modal.message(explanation, 'Contract Explanation', 'info');
+                }}
+                currentNodes={nodes}
+                currentEdges={edges}
+              />
+            </div>
+
             {/* Right Sidebar - Preview & Validation (same as chat mode) */}
             <div className="w-96 flex-shrink-0 border-l border-default bg-card overflow-hidden flex flex-col">
               {/* Vault Settings */}
@@ -1150,26 +1145,24 @@ const VaultBuilder = () => {
               </div>
 
               {/* Validation Status */}
-              <div className="flex-shrink-0 p-4 bg-neutral-900">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-4 h-4 text-neutral-400" />
-                  <span className="text-xs font-semibold text-neutral-400">Validation Status</span>
+              <div className="border-b border-default">
+                <div className="p-4 bg-neutral-900">
+                  {validation.valid ? (
+                    <div className="flex items-center gap-2 text-xs text-success-400">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Ready to deploy</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs text-error-400">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{validation.errors.length} error(s) found</span>
+                    </div>
+                  )}
                 </div>
-                {validation.valid ? (
-                  <div className="flex items-center gap-2 text-xs text-success-400">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Ready to deploy</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-error-400">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{validation.errors.length} error(s) found</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Load Saved Vaults Modal */}
