@@ -18,6 +18,21 @@ export default defineConfig(() => {
     ],
     build: {
       target: "esnext",
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor': ['react', 'react-dom', 'react-router-dom'],
+            'motion': ['framer-motion'],
+          },
+        },
+      },
+      minify: 'terser' as const,
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
     },
     optimizeDeps: {
       exclude: ["@stellar/stellar-xdr-json"],

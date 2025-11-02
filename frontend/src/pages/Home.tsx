@@ -11,11 +11,10 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    let mounted = true;
-    
+    // Script is already loaded in HTML, just initialize
     const initUnicorn = () => {
       const UnicornStudio = (window as any).UnicornStudio;
-      if (UnicornStudio && mounted) {
+      if (UnicornStudio) {
         try {
           UnicornStudio.init();
         } catch (error) {
@@ -24,16 +23,11 @@ const Home = () => {
       }
     };
 
-    // Check if UnicornStudio is already available
+    // Check if already loaded
     if ((window as any).UnicornStudio) {
       initUnicorn();
-      return;
-    }
-
-    // Check if script is already being loaded
-    const existingScript = document.querySelector('script[src*="unicornstudio"]');
-    if (existingScript) {
-      // Wait for it to load
+    } else {
+      // Wait for script to load (it's in HTML head)
       const checkLoaded = setInterval(() => {
         if ((window as any).UnicornStudio) {
           clearInterval(checkLoaded);
@@ -41,28 +35,8 @@ const Home = () => {
         }
       }, 50);
       
-      return () => {
-        clearInterval(checkLoaded);
-        mounted = false;
-      };
+      return () => clearInterval(checkLoaded);
     }
-
-    // Load the script immediately (no async to prioritize loading)
-    const script = document.createElement('script');
-    script.src = '/unicornStudio.umd.js';
-    // Remove async to load immediately and block rendering until ready
-    // script.async = true;
-    
-    script.onload = () => {
-      // Reduce delay to init faster
-      requestAnimationFrame(initUnicorn);
-    };
-    
-    document.head.appendChild(script);
-
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   const stats = useMemo(() => [
