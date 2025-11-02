@@ -6,13 +6,9 @@
 import { Router } from 'express';
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { openai } from '../lib/openaiClient.js';
 
 const router = Router();
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Validation schemas
 const GenerateVaultSchema = z.object({
