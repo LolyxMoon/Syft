@@ -97,29 +97,9 @@ Guidelines:
 function extractVaultParams(body: any) {
   // Check if this is a VAPI message format with toolCalls
   if (body.message?.toolCalls?.[0]?.function?.arguments) {
-    const args = body.message.toolCalls[0].function.arguments;
-    
-    // If we have conversation history, extract relevant user messages to build context
-    const conversationContext: string[] = [];
-    if (body.message?.artifact?.messages) {
-      const messages = body.message.artifact.messages;
-      
-      // Find all user messages to understand full intent
-      for (const msg of messages) {
-        if (msg.role === 'user' && msg.message) {
-          conversationContext.push(msg.message);
-        }
-      }
-    }
-    
-    // Enhance prompt with conversation context
-    if (conversationContext.length > 1) {
-      // Combine all user messages to preserve full context
-      const fullContext = conversationContext.join(' ');
-      args.prompt = fullContext;
-    }
-    
-    return args;
+    // Trust VAPI's agent - it already has the full conversation context
+    // and constructs the prompt intelligently
+    return body.message.toolCalls[0].function.arguments;
   }
   
   // Otherwise, assume it's a direct POST with parameters
