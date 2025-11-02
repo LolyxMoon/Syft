@@ -85,15 +85,18 @@ router.post('/generate-vault', async (req, res) => {
     // VAPI expects: { results: [{ toolCallId, result }] }
     // The result must be a JSON string (not an object)
     
-    // Check if this is a VAPI request (has message.toolCallId)
-    const isVAPIRequest = req.body.message?.toolCallId;
+    // Check if this is a VAPI request (has message.toolCalls array)
+    const isVAPIRequest = req.body.message?.toolCalls?.[0];
+    const toolCallId = isVAPIRequest?.id;
     
-    if (isVAPIRequest) {
+    if (isVAPIRequest && toolCallId) {
+      console.log('[NL API] Returning VAPI format with toolCallId:', toolCallId);
+      
       // VAPI format: return as required by VAPI docs
       res.json({
         results: [
           {
-            toolCallId: req.body.message.toolCallId,
+            toolCallId: toolCallId,
             result: JSON.stringify({
               success: true,
               data: result
@@ -103,6 +106,7 @@ router.post('/generate-vault', async (req, res) => {
       });
     } else {
       // Regular API format (for AI Chat compatibility)
+      console.log('[NL API] Returning standard format');
       res.json({
         success: true,
         data: result,
@@ -118,14 +122,17 @@ router.post('/generate-vault', async (req, res) => {
     }
     
     // Check if this is a VAPI request
-    const isVAPIRequest = req.body.message?.toolCallId;
+    const isVAPIRequest = req.body.message?.toolCalls?.[0];
+    const toolCallId = isVAPIRequest?.id;
     
-    if (isVAPIRequest) {
+    if (isVAPIRequest && toolCallId) {
+      console.log('[NL API] Returning VAPI error format with toolCallId:', toolCallId);
+      
       // VAPI format for errors (still return 200 with error in result)
       res.status(200).json({
         results: [
           {
-            toolCallId: req.body.message.toolCallId,
+            toolCallId: toolCallId,
             error: error.message || 'Failed to generate vault strategy'
           }
         ]
