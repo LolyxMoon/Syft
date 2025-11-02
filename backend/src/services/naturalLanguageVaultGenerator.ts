@@ -587,7 +587,7 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
         // Make second API call with search results - now request JSON format
         console.log('[NLVaultGenerator] Calling OpenAI with search results...');
         response = await openai.chat.completions.create({
-          model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+          model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
           messages: messages as any,
           temperature: 0.7,
           response_format: { type: 'json_object' },

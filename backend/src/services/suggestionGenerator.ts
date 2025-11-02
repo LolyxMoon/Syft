@@ -357,10 +357,10 @@ Respond only with valid JSON object.`;
         .replace('{forecasts}', JSON.stringify(forecasts, null, 2))
         .replace('{preferences}', JSON.stringify(preferences || {}, null, 2));
 
-      console.log('[SuggestionGenerator] Calling OpenAI API with model:', process.env.OPENAI_MODEL || 'gpt-4-turbo-preview');
+      console.log('[SuggestionGenerator] Calling OpenAI API with model:', process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07');
 
       const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+        model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
         messages: [
           {
             role: 'system',

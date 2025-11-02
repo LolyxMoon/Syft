@@ -197,7 +197,7 @@ Respond only with valid JSON.`;
       const prompt = this.SENTIMENT_PROMPT.replace('{posts}', postsText);
 
       const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+        model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
         messages: [
           {
             role: 'system',

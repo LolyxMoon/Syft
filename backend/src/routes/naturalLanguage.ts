@@ -139,11 +139,10 @@ router.post('/generate-vault', async (req, res) => {
 
     // Call OpenAI
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-5-nano-2025-08-07',
       messages,
       response_format: { type: 'json_object' },
       temperature: 0.7,
-      max_tokens: 2000,
     });
 
     const responseContent = completion.choices[0].message.content;
@@ -228,7 +227,7 @@ router.post('/explain-contract', async (req, res) => {
       ];
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-5-nano-2025-08-07',
         messages,
         temperature: 0.7,
         max_tokens: 1000,
@@ -251,7 +250,7 @@ router.post('/explain-contract', async (req, res) => {
       ];
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-5-nano-2025-08-07',
         messages,
         temperature: 0.7,
         max_tokens: 1000,
@@ -304,7 +303,7 @@ router.post('/analyze-strategy', async (req, res) => {
     ];
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-5-nano-2025-08-07',
       messages,
       temperature: 0.7,
       max_tokens: 1500,

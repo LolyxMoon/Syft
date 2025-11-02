@@ -95,7 +95,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 **Model Settings:**
 - **Provider**: OpenAI
-- **Model**: gpt-4-turbo-preview
+- **Model**: gpt-5-nano-2025-08-07
 - **Temperature**: 0.7
 - **Max Tokens**: 1000
 

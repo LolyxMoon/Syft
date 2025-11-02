@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const apiKey = process.env.OPENAI_API_KEY;
-const model = process.env.OPENAI_MODEL || 'gpt-4-turbo-preview';
+const model = process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07';
 
 if (!apiKey) {
   console.warn('WARNING: OPENAI_API_KEY not set. AI features will not be available.');
