@@ -101,7 +101,7 @@ router.get('/compare/:asset', async (req: Request, res: Response) => {
       // Combine protocols from both, removing duplicates by protocolId
       // This prevents protocols like Blend from appearing twice
       const allProtocols = [...customComparison.protocols, ...officialComparison.protocols];
-      const uniqueProtocols = allProtocols.reduce((acc, protocol) => {
+      const uniqueProtocols = allProtocols.reduce((acc: typeof allProtocols, protocol) => {
         const existing = acc.find(p => p.protocolId === protocol.protocolId);
         if (!existing) {
           acc.push(protocol);
@@ -124,7 +124,7 @@ router.get('/compare/:asset', async (req: Request, res: Response) => {
             ? officialComparison.bestYield
             : customComparison.bestYield
         ) : undefined,
-        averageApy: uniqueProtocols.reduce((sum, p) => sum + p.apy, 0) / uniqueProtocols.length,
+        averageApy: uniqueProtocols.reduce((sum: number, p) => sum + p.apy, 0) / uniqueProtocols.length,
         timestamp: new Date().toISOString()
       };
     } else {

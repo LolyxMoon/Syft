@@ -3,7 +3,7 @@
  * Smart routing logic to optimize yield by splitting funds across multiple protocols
  */
 
-import type { YieldAllocation, YieldRoutingStrategy, YieldOpportunity } from '../../../shared/types/protocol.js';
+import type { YieldAllocation, YieldRoutingStrategy, YieldOpportunity } from '../../../shared/types/protocol';
 import { getYieldOpportunities, calculateBlendedAPY } from './protocolYieldService.js';
 import { getAllUSDCAddresses, getAssetAddress as getTokenAddress } from '../config/tokenAddresses.js';
 
@@ -168,7 +168,7 @@ function sortOpportunities(
     }
 
     // Otherwise, prefer lower risk
-    const riskWeight = { low: 3, medium: 2, high: 1 };
+    const riskWeight: { low: number; medium: number; high: number } = { low: 3, medium: 2, high: 1 };
     return riskWeight[b.risk] - riskWeight[a.risk];
   });
 }
@@ -397,26 +397,26 @@ export function validateRoutingStrategy(
   const errors: string[] = [];
 
   // Check total allocations sum to total amount
-  const allocatedSum = strategy.allocations.reduce((sum, a) => sum + a.amount, 0);
+  const allocatedSum = strategy.allocations.reduce((sum: number, a: YieldAllocation) => sum + a.amount, 0);
   if (Math.abs(allocatedSum - strategy.totalAmount) > 0.01) {
     errors.push(`Allocation mismatch: ${allocatedSum} !== ${strategy.totalAmount}`);
   }
 
   // Check percentages sum to 100%
-  const percentageSum = strategy.allocations.reduce((sum, a) => sum + a.percentage, 0);
+  const percentageSum = strategy.allocations.reduce((sum: number, a: YieldAllocation) => sum + a.percentage, 0);
   if (Math.abs(percentageSum - 100) > 0.1) {
     errors.push(`Percentage sum is ${percentageSum}%, should be 100%`);
   }
 
   // Check no negative amounts
-  const hasNegative = strategy.allocations.some(a => a.amount < 0);
+  const hasNegative = strategy.allocations.some((a: YieldAllocation) => a.amount < 0);
   if (hasNegative) {
     errors.push('Found negative allocation amounts');
   }
 
   // Check APYs are reasonable
   const hasUnreasonableAPY = strategy.allocations.some(
-    a => a.expectedApy < 0 || a.expectedApy > 1000
+    (a: YieldAllocation) => a.expectedApy < 0 || a.expectedApy > 1000
   );
   if (hasUnreasonableAPY) {
     errors.push('Found unreasonable APY values');

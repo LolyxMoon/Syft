@@ -5,7 +5,7 @@
 
 import { supabase } from '../lib/supabase.js';
 import { suggestRebalancing } from './yieldRouterService.js';
-import type { YieldRoutingStrategy } from '../../../shared/types/protocol.js';
+import type { YieldRoutingStrategy } from '../../../shared/types/protocol';
 
 interface RebalanceSuggestion {
   vaultId: string;

@@ -5,7 +5,7 @@
  * PRODUCTION VERSION - Uses real contract data
  */
 
-import type { ProtocolYield, YieldOpportunity, ProtocolComparison } from '../../../shared/types/protocol.js';
+import type { ProtocolYield, YieldOpportunity, ProtocolComparison } from '../../../shared/types/protocol';
 import {
   getPoolInfo,
   calculatePoolAPY,
@@ -366,7 +366,7 @@ export async function getYieldsForAsset(
   const results = await Promise.all(promises);
   
   // Filter out null results and add to yields
-  results.forEach(result => {
+  results.forEach((result: ProtocolYield | null) => {
     if (result) yields.push(result);
   });
 

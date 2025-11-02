@@ -1057,7 +1057,7 @@ router.post('/:vaultId/build-deposit', async (req: Request, res: Response) => {
         console.log(`[Build Deposit] 📊 Routing analysis complete:`, {
           allocations: strategy.allocations.length,
           blendedAPY: strategy.expectedBlendedApy.toFixed(2) + '%',
-          protocols: strategy.allocations.map(a => a.protocolName).join(', ')
+          protocols: strategy.allocations.map((a: { protocolName: string }) => a.protocolName).join(', ')
         });
 
         console.log(`[Build Deposit] ✅ Optimal strategy identified - proceeding with intelligent routing...`);

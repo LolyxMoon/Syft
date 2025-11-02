@@ -106,7 +106,7 @@ export class StrategyAnalyzer {
     
     // CRITICAL FIX: Handle case where assets are stored as strings without percentage
     // This happens when vaults are deployed without explicit allocations
-    const assetsWithPercentages = assets.map(asset => {
+    const assetsWithPercentages = assets.map((asset: any) => {
       // If asset is just a string (legacy format), convert to AssetAllocation
       if (typeof asset === 'string') {
         return {
@@ -122,13 +122,13 @@ export class StrategyAnalyzer {
       };
     });
     
-    let totalAllocation = assetsWithPercentages.reduce((sum, asset) => sum + asset.percentage, 0);
+    let totalAllocation = assetsWithPercentages.reduce((sum: number, asset: any) => sum + asset.percentage, 0);
     
     // If total allocation is 0 but we have assets, assume equal distribution
     // This is a reasonable default for vaults without explicit allocations
     if (totalAllocation === 0 && assetsWithPercentages.length > 0) {
       const equalPercentage = 100 / assetsWithPercentages.length;
-      assetsWithPercentages.forEach(asset => {
+      assetsWithPercentages.forEach((asset: any) => {
         asset.percentage = equalPercentage;
       });
       totalAllocation = 100;
@@ -149,7 +149,7 @@ export class StrategyAnalyzer {
     }
 
     // Check for over-concentration in single asset
-    const maxAllocation = Math.max(...assetsWithPercentages.map(a => a.percentage));
+    const maxAllocation = Math.max(...assetsWithPercentages.map((a: any) => a.percentage));
     if (maxAllocation > 70) {
       issues.push({
         severity: 'medium',
@@ -164,7 +164,7 @@ export class StrategyAnalyzer {
     }
 
     // Check for minimum viable allocation
-    assetsWithPercentages.forEach((asset, index) => {
+    assetsWithPercentages.forEach((asset: any, index: number) => {
       if (asset.percentage < 5 && asset.percentage > 0) {
         issues.push({
           severity: 'low',
@@ -221,8 +221,8 @@ export class StrategyAnalyzer {
     }
 
     // Check for time-based rules
-    const hasTimeRule = rules.some(r => 
-      r.conditions?.some(c => c.type === 'time')
+    const hasTimeRule = rules.some((r: RebalanceRule) => 
+      r.conditions?.some((c: any) => c.type === 'time')
     );
     if (!hasTimeRule) {
       issues.push({
@@ -236,8 +236,8 @@ export class StrategyAnalyzer {
     }
 
     // Check for threshold-based rules
-    const hasThresholdRule = rules.some(r =>
-      r.conditions?.some(c => c.type === 'allocation')
+    const hasThresholdRule = rules.some((r: RebalanceRule) =>
+      r.conditions?.some((c: any) => c.type === 'allocation')
     );
     if (!hasThresholdRule) {
       issues.push({
@@ -269,7 +269,7 @@ export class StrategyAnalyzer {
     const assets = config.assets || [];
     
     // Normalize assets to handle both string[] and AssetAllocation[] formats
-    const normalizedAssets = assets.map(asset => {
+    const normalizedAssets = assets.map((asset: any) => {
       if (typeof asset === 'string') {
         return {
           assetCode: asset,
@@ -284,8 +284,8 @@ export class StrategyAnalyzer {
     
     const stablecoins = ['USDC', 'USDT', 'DAI'];
     const stablecoinAllocation = normalizedAssets
-      .filter(a => stablecoins.includes(a.assetCode?.toUpperCase() || ''))
-      .reduce((sum, a) => sum + a.percentage, 0);
+      .filter((a: any) => stablecoins.includes(a.assetCode?.toUpperCase() || ''))
+      .reduce((sum: number, a: any) => sum + a.percentage, 0);
 
     if (stablecoinAllocation === 0) {
       issues.push({
@@ -324,7 +324,7 @@ export class StrategyAnalyzer {
     if (assets.length === 1) return 20;
 
     // Normalize assets to handle both string[] and AssetAllocation[] formats
-    const normalizedAssets = assets.map(asset => {
+    const normalizedAssets = assets.map((asset: any) => {
       if (typeof asset === 'string') {
         return {
           assetCode: asset,
@@ -341,12 +341,12 @@ export class StrategyAnalyzer {
     const assetCountScore = Math.min((normalizedAssets.length / 5) * 40, 40);
 
     // Allocation balance (max 40 points) - using Herfindahl index inverse
-    const allocations = normalizedAssets.map(a => a.percentage / 100);
-    const herfindahl = allocations.reduce((sum, a) => sum + a * a, 0);
+    const allocations = normalizedAssets.map((a: any) => a.percentage / 100);
+    const herfindahl = allocations.reduce((sum: number, a: number) => sum + a * a, 0);
     const balanceScore = (1 - herfindahl) * 40;
 
     // Asset type diversity (max 20 points)
-    const hasStablecoin = normalizedAssets.some(a => 
+    const hasStablecoin = normalizedAssets.some((a: any) => 
       ['USDC', 'USDT', 'DAI'].includes(a.assetCode?.toUpperCase() || '')
     );
     const typeScore = hasStablecoin ? 20 : 10;
@@ -366,17 +366,17 @@ export class StrategyAnalyzer {
     const ruleScore = Math.min((rules.length / 3) * 30, 30);
 
     // Rule diversity (max 40 points)
-    const hasTimeRule = rules.some(r =>
-      r.conditions?.some(c => c.type === 'time')
+    const hasTimeRule = rules.some((r: RebalanceRule) =>
+      r.conditions?.some((c: any) => c.type === 'time')
     );
-    const hasThresholdRule = rules.some(r =>
-      r.conditions?.some(c => c.type === 'allocation')
+    const hasThresholdRule = rules.some((r: RebalanceRule) =>
+      r.conditions?.some((c: any) => c.type === 'allocation')
     );
     const diversityScore = (hasTimeRule ? 20 : 0) + (hasThresholdRule ? 20 : 0);
 
     // Allocation completeness (max 30 points)
     const assets = config.assets || [];
-    const totalAllocation = assets.reduce((sum, a) => sum + (a.percentage || 0), 0);
+    const totalAllocation = assets.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0);
     const allocationScore = Math.abs(totalAllocation - 100) < 1 ? 30 : 15;
 
     return Math.round(ruleScore + diversityScore + allocationScore);
@@ -436,8 +436,8 @@ export class StrategyAnalyzer {
     
     const stablecoins = ['USDC', 'USDT', 'DAI'];
     const stablecoinAllocation = normalizedAssets
-      .filter(a => stablecoins.includes(a.assetCode?.toUpperCase() || ''))
-      .reduce((sum, a) => sum + a.percentage, 0);
+      .filter((a: any) => stablecoins.includes(a.assetCode?.toUpperCase() || ''))
+      .reduce((sum: number, a: any) => sum + a.percentage, 0);
 
     if (stablecoinAllocation === 0) return 'high';
     if (stablecoinAllocation < 20) return 'medium';
