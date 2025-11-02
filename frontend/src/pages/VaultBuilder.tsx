@@ -1130,21 +1130,38 @@ const VaultBuilder = () => {
                 </div>
               </div>
 
-              {/* Validation Status */}
-              <div className="border-b border-default">
-                <div className="p-4 bg-neutral-900">
-                  {validation.valid ? (
-                    <div className="flex items-center gap-2 text-xs text-success-400">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Ready to deploy</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs text-error-400">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>{validation.errors.length} error(s) found</span>
-                    </div>
-                  )}
+              {/* Canvas Preview - Show generated vault visually */}
+              <div className="flex-1 flex flex-col overflow-hidden border-b border-default">
+                <div className="px-4 py-2 bg-neutral-900 border-b border-default">
+                  <h3 className="text-xs font-semibold text-neutral-400">Visual Preview</h3>
                 </div>
+                <div className="flex-1 overflow-hidden">
+                  <VaultCanvas
+                    initialNodes={nodes}
+                    initialEdges={edges}
+                    onNodesChange={handleNodesChange}
+                    onEdgesChange={handleEdgesChange}
+                  />
+                </div>
+              </div>
+
+              {/* Validation Status */}
+              <div className="flex-shrink-0 p-4 bg-neutral-900">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-4 h-4 text-neutral-400" />
+                  <span className="text-xs font-semibold text-neutral-400">Validation Status</span>
+                </div>
+                {validation.valid ? (
+                  <div className="flex items-center gap-2 text-xs text-success-400">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Ready to deploy</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-error-400">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{validation.errors.length} error(s) found</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
