@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, DollarSign, Percent, Box, Activity, AlertCircle } from 'lucide-react';
 import { Card, Button, Skeleton } from '../components/ui';
+import { YieldComparison } from '../components/yield/YieldComparison';
 import { useWallet } from '../providers/WalletProvider';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Link } from 'react-router-dom';
@@ -561,6 +562,31 @@ const Dashboard = () => {
             </Card>
           </motion.div>
         </div>
+
+        {/* Yield Opportunities Widget */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="mb-6"
+        >
+          <Card className="p-5 bg-card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-neutral-50 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary-500" />
+                Best Yield Opportunities
+              </h2>
+              <span className="text-xs px-2 py-1 bg-primary-500/20 text-primary-400 rounded-full">
+                Live Rates
+              </span>
+            </div>
+            <YieldComparison
+              asset="USDC"
+              amount={1000}
+              network={network || 'testnet'}
+            />
+          </Card>
+        </motion.div>
 
         {/* Active Vaults */}
         <motion.div

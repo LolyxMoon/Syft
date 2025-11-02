@@ -1,13 +1,14 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useCallback, useEffect } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Eye, EyeOff, Sparkles, Grid3x3 } from 'lucide-react';
+import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Eye, EyeOff, Sparkles, Grid3x3, TrendingUp } from 'lucide-react';
 import { Button, useModal } from '../components/ui';
 import BlockPalette from '../components/builder/BlockPalette';
 import VaultCanvas from '../components/builder/VaultCanvas';
 import ValidationFeedback from '../components/builder/ValidationFeedback';
 import StrategyPreview from '../components/builder/StrategyPreview';
 import { NaturalLanguageBuilder } from '../components/builder/NaturalLanguageBuilder';
+import { YieldComparison } from '../components/yield/YieldComparison';
 import { BlockValidator } from '../lib/blockValidator';
 import { ConfigSerializer } from '../lib/configSerializer';
 import { useBuilderHistory } from '../hooks/useBuilderHistory';
@@ -37,7 +38,7 @@ const VaultBuilder = () => {
   });
   const [saving, setSaving] = useState(false);
   const [deploying, setDeploying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'preview' | 'validation'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'validation' | 'yields'>('preview');
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [savedVaults, setSavedVaults] = useState<SavedVault[]>([]);
   const [loadingVaults, setLoadingVaults] = useState(false);
@@ -831,7 +832,7 @@ const VaultBuilder = () => {
                   <button
                     onClick={() => setActiveTab('preview')}
                     className={`
-                      flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors relative
+                      flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors relative
                       ${activeTab === 'preview' 
                         ? 'text-primary-500 bg-card' 
                         : 'text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800'
@@ -844,7 +845,7 @@ const VaultBuilder = () => {
                   <button
                     onClick={() => setActiveTab('validation')}
                     className={`
-                      flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors relative
+                      flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors relative
                       ${activeTab === 'validation' 
                         ? 'text-primary-500 bg-card' 
                         : 'text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800'
@@ -856,6 +857,20 @@ const VaultBuilder = () => {
                     {(!validation.valid || validation.warnings.length > 0) && (
                       <span className="w-2 h-2 rounded-full bg-error-500" />
                     )}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('yields')}
+                    className={`
+                      flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors relative
+                      ${activeTab === 'yields' 
+                        ? 'text-primary-500 bg-card' 
+                        : 'text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800'
+                      }
+                    `}
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    <span>Yields</span>
+                    <Sparkles className="w-3 h-3 text-primary-400" />
                   </button>
                 </div>
 
@@ -871,7 +886,7 @@ const VaultBuilder = () => {
                       >
                         <StrategyPreview nodes={nodes} edges={edges} />
                       </motion.div>
-                    ) : (
+                    ) : activeTab === 'validation' ? (
                       <motion.div
                         key="validation"
                         initial={{ opacity: 0 }}
@@ -880,6 +895,44 @@ const VaultBuilder = () => {
                         transition={{ duration: 0.15 }}
                       >
                         <ValidationFeedback validation={validation} />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="yields"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        {nodes.find(n => n.type === 'asset') ? (
+                          (() => {
+                            const assetNode = nodes.find(n => n.type === 'asset');
+                            const assetType = assetNode?.data?.assetType as string;
+                            const assetCode = assetNode?.data?.assetCode as string;
+                            // Use assetCode if it's a custom asset, otherwise use assetType
+                            const asset = assetType === 'CUSTOM' && assetCode ? assetCode : (assetType || 'USDC');
+                            
+                            console.log('[VaultBuilder] Yields tab - Asset:', asset, 'Node data:', assetNode?.data);
+                            
+                            return (
+                              <YieldComparison
+                                asset={asset}
+                                amount={1000}
+                                network={network || 'testnet'}
+                              />
+                            );
+                          })()
+                        ) : (
+                          <div className="text-center py-8">
+                            <Sparkles className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+                            <p className="text-sm text-neutral-400 mb-2">
+                              Add an asset to see yield opportunities
+                            </p>
+                            <p className="text-xs text-neutral-500">
+                              Drag an Asset block onto the canvas
+                            </p>
+                          </div>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>

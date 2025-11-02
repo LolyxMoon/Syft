@@ -2309,6 +2309,77 @@ router.get('/:id/positions', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/vaults/:vaultId/build-optimized-deposit
+ * Build optimized deposit transactions with cross-protocol yield routing
+ * PRODUCTION VERSION - Uses real yield data
+ */
+router.post('/:vaultId/build-optimized-deposit', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const { userAddress, amount, assetAddress, network } = req.body;
+
+    if (!userAddress || !amount || !assetAddress) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userAddress, amount, assetAddress',
+      });
+    }
+
+    // Import the optimized deposit builder
+    const { buildOptimizedDepositTransaction } = await import('../services/vaultActionService.js');
+
+    // Build optimized deposit with yield routing
+    const result = await buildOptimizedDepositTransaction(
+      vaultId,
+      userAddress,
+      amount,
+      assetAddress,
+      network
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in POST /api/vaults/:vaultId/build-optimized-deposit:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+});
+
+/**
+ * GET /api/vaults/:vaultId/check-protocol-rebalancing
+ * Check if vault should rebalance across protocols for better yields
+ * PRODUCTION VERSION - Uses real yield data
+ */
+router.get('/:vaultId/check-protocol-rebalancing', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const { network } = req.query;
+
+    // Import the rebalancing checker
+    const { checkProtocolRebalancing } = await import('../services/vaultActionService.js');
+
+    // Check if rebalancing would improve yields
+    const result = await checkProtocolRebalancing(vaultId, network as string);
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in GET /api/vaults/:vaultId/check-protocol-rebalancing:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+});
+
 export default router;
 
 

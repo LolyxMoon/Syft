@@ -8,6 +8,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { VaultActions } from '../vault/VaultActions';
+import { YieldComparison } from '../yield/YieldComparison';
 import { useWallet } from '../../providers/WalletProvider';
 import { useModal } from '../ui';
 import { MintAndListModal } from './MintAndListModal';
@@ -672,6 +673,40 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
           </Card>
         </motion.div>
       )}
+
+      {/* Yield Opportunities - Show protocol comparison */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+      >
+        <Card className="p-5 bg-card border border-default">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-neutral-50 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary-500" />
+              Protocol Yield Opportunities
+            </h2>
+            <span className="text-xs px-2 py-1 bg-primary-500/20 text-primary-400 rounded-full flex items-center gap-1">
+              <Activity className="w-3 h-3" />
+              Live Yields
+            </span>
+          </div>
+          {vault.config.assets && vault.config.assets.length > 0 ? (
+            <YieldComparison
+              asset={typeof vault.config.assets[0] === 'string' 
+                ? vault.config.assets[0] 
+                : vault.config.assets[0].code || 'USDC'}
+              amount={1000}
+              network="testnet"
+            />
+          ) : (
+            <div className="text-center py-8">
+              <TrendingUp className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+              <p className="text-neutral-400 text-sm">No assets configured</p>
+            </div>
+          )}
+        </Card>
+      </motion.div>
 
       {/* NFT Holders */}
       <motion.div

@@ -12,6 +12,7 @@ import priceRoutes from './price.js';
 import analyticsRoutes from './analytics.js';
 import tokenRoutes from './tokens.js';
 import chatRoutes from './chatRoutes.js';
+import protocolRoutes from './protocols.js';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.get('/', (_req, res) => {
       analytics: '/api/analytics',
       tokens: '/api/tokens',
       chat: '/api/chat',
+      protocols: '/api/protocols',
     },
   });
 });
@@ -61,5 +63,6 @@ router.use('/price', priceRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/tokens', tokenRoutes);
 router.use('/chat', chatRoutes);
+router.use('/protocols', protocolRoutes);
 
 export default router;
