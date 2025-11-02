@@ -1,6 +1,7 @@
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { horizonServer, getNetworkServers } from '../lib/horizonClient.js';
 import { supabase } from '../lib/supabase.js';
+import { getAssetAddress } from '../config/tokenAddresses.js';
 
 export interface VaultDeploymentConfig {
   owner: string;
@@ -90,83 +91,7 @@ async function validateTokenContract(
   }
 }
 
-/**
- * Convert asset symbol to Stellar contract address
- */
-function getAssetAddress(asset: string, network?: string): string {
-  const normalizedNetwork = (network || 'testnet').toLowerCase();
-  
-  // Network-specific Native XLM SAC addresses
-  const nativeXLMAddresses: { [key: string]: string } = {
-    'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-    'futurenet': 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT',
-    'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA', // Mainnet Native XLM
-    'public': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-  };
-  
-  // Network-specific token addresses
-  const tokenAddresses: { [key: string]: { [key: string]: string } } = {
-    'XLM': nativeXLMAddresses,
-    'USDC': {
-      'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
-      'futurenet': process.env.FUTURENET_USDC_ADDRESS || nativeXLMAddresses['futurenet'], // Use env var if set, otherwise fallback to XLM
-      'mainnet': '', // TODO: Add mainnet USDC address when available
-      'public': '',
-    },
-    'EURC': {
-      'testnet': 'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU',
-      'futurenet': nativeXLMAddresses['futurenet'], // Fallback to XLM
-      'mainnet': '',
-      'public': '',
-    },
-    'AQUA': {
-      'testnet': 'CCRRYUTYU3UJQME6ZKBDZMZS6P4ZXVFWRXLQGVL7TWVCXHWMLQOAAQUA',
-      'futurenet': nativeXLMAddresses['futurenet'], // Fallback to XLM
-      'mainnet': '',
-      'public': '',
-    },
-  };
-
-  // If it's already a valid contract address (starts with C and is 56 characters), return it directly
-  // This allows users to use ANY token on the Stellar network by providing the contract address
-  if (asset.startsWith('C') && asset.length === 56) {
-    console.log(`[Asset Resolution] Using custom token contract: ${asset}`);
-    return asset;
-  }
-  
-  // Also support 'G' addresses (Stellar account format) - these need to be wrapped as SAC
-  if (asset.startsWith('G') && asset.length === 56) {
-    console.warn(`⚠️  Classic Stellar asset (${asset}) provided. Make sure this is a wrapped SAC token.`);
-    // For now, we can't automatically convert Classic assets to SAC addresses
-    // User must provide the SAC wrapper address
-    throw new Error(
-      `Classic Stellar asset address detected. Please provide the Stellar Asset Contract (SAC) wrapper address instead. ` +
-      `Learn more: https://developers.stellar.org/docs/tokens/stellar-asset-contract`
-    );
-  }
-
-  // Look up asset in network-specific map
-  const assetSymbol = asset.toUpperCase();
-  const networkAddresses = tokenAddresses[assetSymbol];
-  
-  if (!networkAddresses) {
-    throw new Error(
-      `Unknown asset symbol: "${asset}". ` +
-      `Please use a known symbol (XLM, USDC, EURC, AQUA) or provide a Stellar contract address (starts with 'C', 56 characters). ` +
-      `Find token addresses at: https://github.com/soroswap/token-list`
-    );
-  }
-
-  const address = networkAddresses[normalizedNetwork];
-  
-  if (!address) {
-    // Fallback to XLM for unsupported network/asset combinations
-    console.warn(`⚠️  ${asset} not available on ${network}, using Native XLM instead`);
-    return nativeXLMAddresses[normalizedNetwork] || nativeXLMAddresses['testnet'];
-  }
-
-  return address;
-}
+// Note: getAssetAddress function is now imported from config/tokenAddresses.ts
 
 /**
  * Build unsigned deployment transaction for user to sign
@@ -579,11 +504,15 @@ export async function deployVault(
     console.log(`[Vault Deployment] Soroswap Factory: ${soroswapFactoryAddress}`);
 
     // Convert asset symbols to contract addresses (network-aware)
-    const assetAddressStrings = config.assets.map(asset => {
+    const assetAddressStrings = config.assets.map((asset, index) => {
       const address = getAssetAddress(asset, network);
-      console.log(`[Vault Deployment] ${asset} -> ${address}`);
+      console.log(`[Vault Deployment] Asset[${index}]: ${asset} -> ${address}`);
       return address;
     });
+    
+    console.log(`[Vault Deployment] Asset order is critical for target_allocation!`);
+    console.log(`[Vault Deployment] Assets array:`, config.assets);
+    console.log(`[Vault Deployment] Addresses array:`, assetAddressStrings);
     
     // Optional: Validate custom token contracts (for addresses starting with 'C')
     // This is a best-effort validation - if it fails, we'll still allow deployment
@@ -925,9 +854,12 @@ export async function deployVault(
       });
       
       console.log(`[Vault Initialization] Converted ${config.rules.length} rules to ScVal format`);
-      console.log(`[Vault Initialization] Rules:`, config.rules.map((r, i) => 
-        `Rule ${i}: ${r.action} with allocation ${r.target_allocation.join(', ')}`
-      ).join('; '));
+      config.rules.forEach((r, i) => {
+        console.log(`[Vault Initialization] Rule ${i}:`);
+        console.log(`  - Action: ${r.action}`);
+        console.log(`  - Target Allocation: ${r.target_allocation.join(', ')}`);
+        console.log(`  - This should map to assets: ${config.assets.join(', ')}`);
+      });
       
       // Build VaultConfig struct for initialization
       // IMPORTANT: ScMap entries MUST be sorted alphabetically by key!

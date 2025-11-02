@@ -5,6 +5,7 @@
 
 import type { YieldAllocation, YieldRoutingStrategy, YieldOpportunity } from '../../../shared/types/protocol.js';
 import { getYieldOpportunities, calculateBlendedAPY } from './protocolYieldService.js';
+import { getAllUSDCAddresses, getAssetAddress as getTokenAddress } from '../config/tokenAddresses.js';
 
 /**
  * Configuration for yield routing strategies
@@ -26,27 +27,16 @@ const DEFAULT_CONFIG: RouterConfig = {
 };
 
 /**
- * Map asset symbol to contract address
+ * Map asset symbol to contract address (using centralized config)
  */
 function getAssetAddress(asset: string, network: string): string {
-  const assetMap: { [key: string]: { [network: string]: string } } = {
-    'XLM': {
-      'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-      'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-    },
-    'USDC': {
-      'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
-      'mainnet': 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
-    },
-  };
-
   // If it's already an address (starts with C), return as is
   if (asset.startsWith('C')) {
     return asset;
   }
 
-  // Otherwise look up by symbol
-  return assetMap[asset]?.[network] || asset;
+  // Otherwise use centralized config
+  return getTokenAddress(asset, network);
 }
 
 /**
@@ -67,18 +57,16 @@ export async function calculateOptimalRouting(
   let opportunities: YieldOpportunity[] = [];
   
   if (asset.toUpperCase() === 'USDC') {
-    const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5';
-    const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+    const usdcAddresses = getAllUSDCAddresses(network);
     
-    const [officialOpps, customOpps] = await Promise.all([
-      getYieldOpportunities([officialUSDC], network),
-      getYieldOpportunities([customUSDC], network)
-    ]);
+    const allOpps = await Promise.all(
+      usdcAddresses.map((addr: string) => getYieldOpportunities([addr], network))
+    );
     
-    // Combine and deduplicate by protocolId (keep highest APY)
-    const allOpps = [...officialOpps, ...customOpps];
-    const uniqueOpps = allOpps.reduce((acc, opp) => {
-      const existing = acc.find(o => o.protocolId === opp.protocolId);
+    // Flatten and combine, then deduplicate by protocolId (keep highest APY)
+    const flatOpps = allOpps.flat();
+    const uniqueOpps = flatOpps.reduce((acc: YieldOpportunity[], opp: YieldOpportunity) => {
+      const existing = acc.find((o: YieldOpportunity) => o.protocolId === opp.protocolId);
       if (!existing) {
         acc.push(opp);
       } else if (opp.apy > existing.apy) {

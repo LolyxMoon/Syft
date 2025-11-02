@@ -27,27 +27,27 @@ router.get('/yields/:asset', async (req: Request, res: Response) => {
     const { asset } = req.params;
     const { network = 'testnet' } = req.query;
 
-    // Map asset symbol to address (simplified)
+    // Map asset symbol to address (using Soroswap-compatible custom USDC)
     const assetMap: { [key: string]: string } = {
       'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-      'USDC': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
+      'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA', // Soroswap custom USDC (primary)
     };
 
     const assetSymbol = asset.toUpperCase();
     const assetAddress = assetMap[assetSymbol] || asset;
 
-    // For USDC, query both variants and combine results
+    // For USDC, query both variants and combine results (for comprehensive yield comparison)
     let yields;
     if (assetSymbol === 'USDC') {
-      const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5';
-      const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+      const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA'; // Soroswap
+      const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5'; // Aquarius
       
-      const [officialYields, customYields] = await Promise.all([
-        getYieldsForAsset(officialUSDC, 'USDC', network as string),
-        getYieldsForAsset(customUSDC, 'USDC', network as string)
+      const [customYields, officialYields] = await Promise.all([
+        getYieldsForAsset(customUSDC, 'USDC', network as string),
+        getYieldsForAsset(officialUSDC, 'USDC', network as string)
       ]);
       
-      yields = [...officialYields, ...customYields];
+      yields = [...customYields, ...officialYields];
     } else {
       yields = await getYieldsForAsset(assetAddress, assetSymbol, network as string);
     }
@@ -81,26 +81,26 @@ router.get('/compare/:asset', async (req: Request, res: Response) => {
 
     const assetMap: { [key: string]: string } = {
       'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-      'USDC': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
+      'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA', // Soroswap custom USDC (primary)
     };
 
     const assetSymbol = asset.toUpperCase();
     const assetAddress = assetMap[assetSymbol] || asset;
 
-    // For USDC, query both variants and combine results
+    // For USDC, query both variants and combine results (for comprehensive yield comparison)
     let comparison;
     if (assetSymbol === 'USDC') {
-      const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5';
-      const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+      const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA'; // Soroswap
+      const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5'; // Aquarius
       
-      const [officialComparison, customComparison] = await Promise.all([
-        compareYields(officialUSDC, 'USDC', network as string),
-        compareYields(customUSDC, 'USDC', network as string)
+      const [customComparison, officialComparison] = await Promise.all([
+        compareYields(customUSDC, 'USDC', network as string),
+        compareYields(officialUSDC, 'USDC', network as string)
       ]);
       
       // Combine protocols from both, removing duplicates by protocolId
       // This prevents protocols like Blend from appearing twice
-      const allProtocols = [...officialComparison.protocols, ...customComparison.protocols];
+      const allProtocols = [...customComparison.protocols, ...officialComparison.protocols];
       const uniqueProtocols = allProtocols.reduce((acc, protocol) => {
         const existing = acc.find(p => p.protocolId === protocol.protocolId);
         if (!existing) {
@@ -117,8 +117,8 @@ router.get('/compare/:asset', async (req: Request, res: Response) => {
         asset: 'USDC',
         protocols: uniqueProtocols,
         bestYield: Math.max(
-          officialComparison.bestYield?.apy || 0,
-          customComparison.bestYield?.apy || 0
+          customComparison.bestYield?.apy || 0,
+          officialComparison.bestYield?.apy || 0
         ) > 0 ? (
           (officialComparison.bestYield?.apy || 0) > (customComparison.bestYield?.apy || 0)
             ? officialComparison.bestYield

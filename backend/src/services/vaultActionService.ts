@@ -4,43 +4,9 @@ import { supabase } from '../lib/supabase.js';
 import { invokeVaultMethod } from './vaultDeploymentService.js';
 import { invalidateVaultCache } from './vaultMonitorService.js';
 import { wsService } from './websocketService.js';
+import { getAssetAddress } from '../config/tokenAddresses.js';
 
-/**
- * Helper to get asset contract address from asset code
- */
-function getAssetAddressFromCode(assetCode: string, network?: string): string {
-  const normalizedNetwork = (network || 'testnet').toLowerCase();
-  
-  const nativeXLMAddresses: { [key: string]: string } = {
-    'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-    'futurenet': 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT',
-    'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-    'public': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-  };
-  
-  const tokenAddresses: { [key: string]: { [key: string]: string } } = {
-    'XLM': nativeXLMAddresses,
-    'USDC': {
-      'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
-      'futurenet': process.env.FUTURENET_USDC_ADDRESS || nativeXLMAddresses['futurenet'],
-      'mainnet': '',
-      'public': '',
-    },
-  };
-  
-  const assetSymbol = assetCode.toUpperCase();
-  const networkAddresses = tokenAddresses[assetSymbol];
-  
-  if (!networkAddresses) {
-    // If unknown, assume it's already an address or fallback to XLM
-    if (assetCode.startsWith('C') && assetCode.length === 56) {
-      return assetCode;
-    }
-    return nativeXLMAddresses[normalizedNetwork] || nativeXLMAddresses['testnet'];
-  }
-  
-  return networkAddresses[normalizedNetwork] || nativeXLMAddresses[normalizedNetwork] || nativeXLMAddresses['testnet'];
-}
+// Note: getAssetAddressFromCode is now replaced by getAssetAddress from tokenAddresses.ts
 
 /**
  * Build unsigned deposit transaction for user to sign
@@ -86,10 +52,10 @@ export async function buildDepositTransaction(
         const firstAsset = vaultConfig.assets[0];
         // Asset can be {code: "XLM", ...} or just "XLM"
         const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.code;
-        tokenAddress = getAssetAddressFromCode(assetCode, network);
+        tokenAddress = getAssetAddress(assetCode, network);
       } else {
         // Fallback to native XLM
-        tokenAddress = getAssetAddressFromCode('XLM', network);
+        tokenAddress = getAssetAddress('XLM', network);
       }
     }
 
@@ -1237,7 +1203,8 @@ function getAssetSymbolFromAddress(address: string): string {
     'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC': 'XLM',
     'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT': 'XLM',
     'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA': 'XLM',
-    'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5': 'USDC', // Official Stellar testnet USDC
+    'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA': 'USDC', // Soroswap custom USDC (primary)
+    'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5': 'USDC', // Official Stellar testnet USDC (legacy)
   };
   return knownAssets[address] || 'XLM';
 }

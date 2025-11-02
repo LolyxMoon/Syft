@@ -27,7 +27,15 @@ export class ConfigSerializer {
    */
   private static extractAssets(nodes: Node[]) {
     const assetBlocks = nodes.filter((n) => n.type === 'asset');
-
+    
+    // IMPORTANT: Sort asset blocks by ID to ensure consistent ordering
+    // This prevents target_allocation array mismatch issues
+    assetBlocks.sort((a, b) => {
+      const aId = parseInt(a.id.replace(/\D/g, '')) || 0;
+      const bId = parseInt(b.id.replace(/\D/g, '')) || 0;
+      return aId - bId;
+    });
+    
     return assetBlocks.map((block) => {
       const { assetType, assetCode, assetIssuer, allocation } = block.data;
 

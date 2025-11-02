@@ -11,6 +11,7 @@ import {
   calculatePoolAPY,
   getPool24hVolume,
 } from './protocolDataFetcher.js';
+import { getAssetSymbol, getAllUSDCAddresses } from '../config/tokenAddresses.js';
 
 // Protocol registry with contract addresses
 interface ProtocolConfig {
@@ -112,19 +113,7 @@ async function getSoroswapPoolAPY(
   }
 }
 
-/**
- * Get asset symbol from address
- */
-function getAssetSymbol(assetAddress: string): string {
-  const knownAssets: { [key: string]: string } = {
-    'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC': 'XLM',
-    'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT': 'XLM',
-    'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA': 'XLM',
-    'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5': 'USDC', // Official Stellar testnet USDC (Aquarius)
-    'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA': 'USDC', // Custom USDC (Soroswap)
-  };
-  return knownAssets[assetAddress] || 'TOKEN';
-}
+// Note: getAssetSymbol is now imported from config/tokenAddresses.ts
 
 /**
  * Get APY for staking pools (stXLM, etc.)
@@ -280,9 +269,10 @@ export async function getYieldsForAsset(
   // Token address mapping for pair discovery
   const tokenAddresses: Record<string, string> = {
     'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-    'USDC_OFFICIAL': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC (Aquarius)
-    'USDC_CUSTOM': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA', // Custom USDC (Soroswap)
   };
+  // Get all USDC addresses for cross-pair queries
+  const usdcAddresses = getAllUSDCAddresses(network);
+  
   // Soroswap liquidity pools
   if (assetSymbol === 'XLM' || assetSymbol === 'USDC') {
     const soroswapFactory = PROTOCOLS.find(p => p.id === 'soroswap')?.contracts[network as 'testnet'];
@@ -292,7 +282,6 @@ export async function getYieldsForAsset(
       
       if (assetSymbol === 'XLM') {
         // Try XLM with BOTH USDC tokens
-        const usdcAddresses = [tokenAddresses['USDC_OFFICIAL'], tokenAddresses['USDC_CUSTOM']];
         for (const usdcAddress of usdcAddresses) {
           if (usdcAddress) {
             promises.push(
