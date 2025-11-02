@@ -241,7 +241,7 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
               step="0.1"
               value={localAllocation}
               onChange={(e) => handleAllocationChange(parseFloat(e.target.value) || 0)}
-              className="w-16 px-2 py-1 text-sm text-right bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+              className="w-16 px-2 py-1 text-sm text-right bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
               %

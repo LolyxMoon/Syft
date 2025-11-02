@@ -176,7 +176,7 @@ export function CreateListing({ nftId, onListingCreated }: CreateListingProps) {
                   step="1"
                   min="1"
                   max="100"
-                  className="flex-1 px-3 py-2 bg-neutral-900 border border-default rounded-md text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="flex-1 px-3 py-2 bg-neutral-900 border border-default rounded-md text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="text-neutral-400 text-sm">%</span>
               </div>

@@ -436,7 +436,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
             })}
           </div>
           <p className="text-xs text-neutral-400 mt-2">
-            You can deposit any token with a liquidity pool. After depositing, the vault will automatically rebalance to maintain the target allocation.
+            After depositing XLM, the vault will automatically rebalance to maintain the target allocation.
           </p>
         </div>
       )}

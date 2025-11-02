@@ -860,7 +860,7 @@ const Backtests = () => {
                               disabled={isRunning}
                               min="1"
                               step="100"
-                              className="w-full pl-12 pr-4 py-3 border border-default rounded-lg bg-neutral-900 text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-all"
+                              className="w-full pl-12 pr-4 py-3 border border-default rounded-lg bg-neutral-900 text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
                           {errors.initialCapital && (

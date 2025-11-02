@@ -140,7 +140,7 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
                     step="0.1"
                     value={localTargetAllocation}
                     onChange={(e) => handleTargetAllocationChange(parseFloat(e.target.value) || 0)}
-                    className="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-white"
+                    className="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="flex items-center text-sm text-gray-600 dark:text-gray-400">%</span>
                 </div>
@@ -221,7 +221,7 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
                       step="1"
                       value={localTargetAllocation}
                       onChange={(e) => handleTargetAllocationChange(parseFloat(e.target.value) || 0)}
-                      className="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-white"
+                      className="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <span className="flex items-center text-sm text-gray-600 dark:text-gray-400">%</span>
                   </div>

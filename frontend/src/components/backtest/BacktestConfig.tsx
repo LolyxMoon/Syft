@@ -167,7 +167,7 @@ const BacktestConfig: React.FC<BacktestConfigProps> = ({ onStart, isLoading, dis
             id="initialCapital"
             value={config.initialCapital}
             onChange={(e) => setConfig({ ...config, initialCapital: parseFloat(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             disabled={disabled || isLoading}
             min="1"
             step="1"
