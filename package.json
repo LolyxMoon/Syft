@@ -2,10 +2,6 @@
   "name": "syft-defi-platform",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "heroku-postbuild": "cd backend && npm install && npm run build",
-    "start": "cd backend && node dist/index.js"
-  },
   "engines": {
     "node": ">=20.x",
     "npm": ">=10.x"
