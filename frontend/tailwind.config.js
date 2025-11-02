@@ -109,6 +109,11 @@ export default {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-in': 'slideIn 0.3s ease-out',
         'shimmer': 'shimmer 2s linear infinite',
+        'spin-slow': 'spin 4s linear infinite',
+        'shimmer-rotate': 'shimmerRotate 4s linear infinite',
+        'marquee': 'marquee 40s linear infinite',
+        'marquee-ltr': 'marqueeLtr 30s linear infinite',
+        'marquee-rtl': 'marqueeRtl 30s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -122,6 +127,22 @@ export default {
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        shimmerRotate: {
+          '0%': { transform: 'translate(-50%, -50%) rotate(0deg)' },
+          '100%': { transform: 'translate(-50%, -50%) rotate(360deg)' },
+        },
+        marquee: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        marqueeLtr: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        marqueeRtl: {
+          '0%': { transform: 'translateX(-50%)' },
+          '100%': { transform: 'translateX(0)' },
         },
       },
     },

@@ -224,7 +224,7 @@ const Home = () => {
             >
               <Button
                 size="lg"
-                variant="primary"
+                variant="shimmer"
                 rightIcon={<ArrowRight size={18} />}
                 onClick={() => navigate('/app/builder')}
               >
@@ -395,12 +395,12 @@ const Home = () => {
                     Advanced automation, risk management, and portfolio rebalancing that keeps your strategy optimized 24/7.
                   </p>
                   <Button
-                    variant="primary"
+                    variant="outline"
                     className="mt-4"
                     onClick={() => navigate('/app/vaults')}
                   >
                     Explore vaults
-                    <span className="inline-flex h-2 w-2 rounded-full bg-[#090a0a] ml-2"></span>
+                    <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
               </div>
@@ -482,7 +482,7 @@ const Home = () => {
           >
             <Button
               size="lg"
-              variant="primary"
+              variant="shimmer"
               rightIcon={<ArrowRight size={18} />}
               onClick={() => navigate('/app/builder')}
             >
@@ -601,7 +601,7 @@ const Home = () => {
               </p>
               <Button
                 size="lg"
-                variant="primary"
+                variant="shimmer"
                 rightIcon={<ArrowRight size={18} />}
                 onClick={() => navigate('/app/builder')}
               >

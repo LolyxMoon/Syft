@@ -175,6 +175,26 @@ body {
   }
 }
 
+@keyframes rotate-border {
+  0% {
+    --angle: 0deg;
+    transform: rotate(0deg);
+  }
+  100% {
+    --angle: 360deg;
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rotate-gradient {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
 .animate-marquee {
   animation: marquee 40s linear infinite;
 }
