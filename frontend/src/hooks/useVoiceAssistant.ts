@@ -110,30 +110,36 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     };
 
     const handleFunctionCall = async (data: { name: string; parameters: any; messageId: string }) => {
-      console.log('[useVoiceAssistant] Function call received:', data);
+      console.log('[useVoiceAssistant] Function call received (server-side execution):', data);
+      // Note: VAPI executes these as server-side tools. We don't need to call the backend again.
+      // The results will come via the functionCallResult event handler.
+    };
+
+    const handleFunctionCallResult = async (data: { name: string; result: any; messageId: string }) => {
+      console.log('[useVoiceAssistant] Function call result received:', data);
       
       try {
         switch (data.name) {
           case 'generate_vault_strategy':
-            await handleGenerateVault(data.parameters);
+            handleGenerateVaultResult(data.result);
             break;
           case 'modify_vault_strategy':
-            await handleModifyVault(data.parameters);
+            handleModifyVaultResult(data.result);
             break;
           case 'explain_contract':
-            await handleExplainContract(data.parameters);
+            handleExplainContractResult(data.result);
             break;
           case 'get_vault_templates':
-            await handleGetTemplates(data.parameters);
+            handleGetTemplatesResult(data.result);
             break;
           case 'analyze_strategy':
-            await handleAnalyzeStrategy(data.parameters);
+            handleAnalyzeStrategyResult(data.result);
             break;
           default:
-            console.warn('[useVoiceAssistant] Unknown function:', data.name);
+            console.warn('[useVoiceAssistant] Unknown function result:', data.name);
         }
       } catch (error) {
-        console.error('[useVoiceAssistant] Error handling function call:', error);
+        console.error('[useVoiceAssistant] Error handling function call result:', error);
       }
     };
 
@@ -146,6 +152,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     vapiService.on('error', handleError);
     vapiService.on('transcript', handleTranscript);
     vapiService.on('functionCall', handleFunctionCall);
+    vapiService.on('functionCallResult', handleFunctionCallResult);
 
     // Cleanup
     return () => {
@@ -157,75 +164,63 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
       vapiService.off('error', handleError);
       vapiService.off('transcript', handleTranscript);
       vapiService.off('functionCall', handleFunctionCall);
+      vapiService.off('functionCallResult', handleFunctionCallResult);
     };
   }, []);
 
-  // Function call handlers
-  const handleGenerateVault = async (params: any) => {
+  // Function call result handlers - these receive the results from VAPI server-side tool execution
+  const handleGenerateVaultResult = (result: any) => {
     try {
-      console.log('[useVoiceAssistant] handleGenerateVault called with params:', params);
+      console.log('[useVoiceAssistant] handleGenerateVaultResult called with result:', result);
       
-      // Extract and validate the prompt
-      const prompt = params.prompt || params.description || '';
+      // The backend returns either {success: true, data: {...}} or VAPI format {results: [...]}
+      // After parsing in vapiService, we should have the actual data
+      const vaultData = result.data || result;
       
-      if (!prompt || prompt.trim().length === 0) {
-        console.error('[useVoiceAssistant] No prompt provided in params:', params);
+      if (!vaultData) {
+        console.error('[useVoiceAssistant] No vault data in result:', result);
         vapiService.sendMessage(
-          `Error: I didn't receive a vault strategy description. Could you please describe the vault strategy you'd like to create?`
+          `Error: I couldn't generate the vault strategy. Please try describing it again.`
+        );
+        return;
+      }
+
+      const { nodes, edges, metadata } = vaultData;
+      
+      if (!nodes || !edges) {
+        console.error('[useVoiceAssistant] Missing nodes or edges in result:', vaultData);
+        vapiService.sendMessage(
+          `Error: The vault data was incomplete. Please try again.`
         );
         return;
       }
       
-      // Ensure the params have the correct structure for the backend
-      const requestBody = {
-        prompt,
-        riskLevel: params.riskLevel,
-        strategyType: params.strategyType,
-        conversationContext: conversationHistoryRef.current.slice(-5).map(msg => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-      };
-
-      console.log('[useVoiceAssistant] Sending request to backend:', requestBody);
-
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const response = await fetch(`${backendUrl}/api/nl/generate-vault`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+      // Notify all registered callbacks
+      vaultGeneratedCallbacks.current.forEach(callback => {
+        callback(nodes, edges, metadata);
       });
 
-      const result = await response.json();
+      console.log('[useVoiceAssistant] Successfully processed vault with', nodes.length, 'nodes');
 
-      if (result.success) {
-        const { nodes, edges, metadata } = result.data;
-        
-        // Notify all registered callbacks
-        vaultGeneratedCallbacks.current.forEach(callback => {
-          callback(nodes, edges, metadata);
-        });
-
-        // Send success message back to assistant
-        vapiService.sendMessage(
-          `Successfully generated vault strategy: "${metadata.name}". The vault has ${nodes.length} blocks configured.`
-        );
-      } else {
-        throw new Error(result.message || 'Failed to generate vault');
-      }
+      // Send success message back to assistant
+      vapiService.sendMessage(
+        `Successfully generated vault strategy: "${metadata?.name || 'Custom Strategy'}". The vault has ${nodes.length} blocks configured.`
+      );
     } catch (error) {
-      console.error('[useVoiceAssistant] Error generating vault:', error);
+      console.error('[useVoiceAssistant] Error processing vault result:', error);
       vapiService.sendMessage(
         `Error generating vault: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   };
 
-  const handleModifyVault = async (params: any) => {
+  const handleModifyVaultResult = (result: any) => {
     try {
+      const modificationData = result.data || result;
+      
       // Notify callbacks with modification data
       strategyRefinementCallbacks.current.forEach(callback => {
-        callback(params.modifications);
+        callback(modificationData.modifications || modificationData);
       });
 
       vapiService.sendMessage(
@@ -239,46 +234,32 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     }
   };
 
-  const handleExplainContract = async (params: any) => {
+  const handleExplainContractResult = (result: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const response = await fetch(`${backendUrl}/api/nl/explain-contract`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+      const explanationData = result.data || result;
+      
+      // Notify callbacks with contract explanation
+      contractExplanationCallbacks.current.forEach(callback => {
+        callback(explanationData.explanation || explanationData);
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        // Notify callbacks
-        contractExplanationCallbacks.current.forEach(callback => {
-          callback(result.data.explanation);
-        });
-
-        // Assistant will speak the explanation naturally
-        vapiService.sendMessage(
-          `Here's the explanation: ${result.data.explanation}`
-        );
-      } else {
-        throw new Error(result.message || 'Failed to explain contract');
-      }
+      // Assistant will speak the explanation naturally
+      vapiService.sendMessage(
+        `Here's the explanation: ${explanationData.explanation || 'See the interface for details.'}`
+      );
     } catch (error) {
-      console.error('[useVoiceAssistant] Error explaining contract:', error);
+      console.error('[useVoiceAssistant] Error with contract explanation:', error);
       vapiService.sendMessage(
         `Error explaining contract: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   };
 
-  const handleGetTemplates = async (params: any) => {
+  const handleGetTemplatesResult = (result: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const response = await fetch(`${backendUrl}/api/nl/vault-templates?category=${params.category || 'all'}`);
-      const result = await response.json();
-
-      if (result.success) {
-        const templates = result.data;
+      const templates = result.data || result;
+      
+      if (templates && Array.isArray(templates)) {
         vapiService.sendMessage(
           `I found ${templates.length} vault templates. ${templates.map((t: any) => t.name).join(', ')}`
         );
@@ -288,20 +269,13 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     }
   };
 
-  const handleAnalyzeStrategy = async (params: any) => {
+  const handleAnalyzeStrategyResult = (result: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const response = await fetch(`${backendUrl}/api/nl/analyze-strategy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
+      const analysis = result.data || result;
+      
+      if (analysis && analysis.summary) {
         vapiService.sendMessage(
-          `Strategy analysis: ${result.data.summary}`
+          `Strategy analysis: ${analysis.summary}`
         );
       }
     } catch (error) {

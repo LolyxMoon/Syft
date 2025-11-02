@@ -162,6 +162,7 @@ class VapiService {
         break;
       case 'function-call-result':
         console.log('[VAPI] Function call result:', message);
+        this.handleFunctionCallResult(message);
         break;
       case 'conversation-update':
         console.log('[VAPI] Conversation update:', message);
@@ -213,6 +214,56 @@ class VapiService {
 
     } catch (error) {
       console.error('[VAPI] Error handling function call:', error);
+      this.emit('error', error);
+    }
+  }
+
+  private handleFunctionCallResult(message: any) {
+    console.log('[VAPI] Processing function call result:', message);
+    
+    try {
+      const { functionCall } = message;
+      if (!functionCall) return;
+
+      const { name, result } = functionCall;
+
+      // Parse the result - VAPI returns it in the format: {results: [{result: "..."}]}
+      let parsedResult = result;
+      
+      if (typeof result === 'string') {
+        try {
+          parsedResult = JSON.parse(result);
+        } catch (e) {
+          console.warn('[VAPI] Could not parse result as JSON:', result);
+        }
+      }
+
+      // Extract the actual data from the VAPI response format
+      let functionData = parsedResult;
+      
+      // If it's in VAPI's results array format, extract it
+      if (parsedResult?.results?.[0]?.result) {
+        try {
+          functionData = typeof parsedResult.results[0].result === 'string'
+            ? JSON.parse(parsedResult.results[0].result)
+            : parsedResult.results[0].result;
+        } catch (e) {
+          console.warn('[VAPI] Could not parse nested result:', e);
+          functionData = parsedResult.results[0].result;
+        }
+      }
+
+      console.log('[VAPI] Emitting function result for:', name, functionData);
+
+      // Emit the function result with parsed data
+      this.emit('functionCallResult', {
+        name,
+        result: functionData,
+        messageId: message.id,
+      });
+
+    } catch (error) {
+      console.error('[VAPI] Error handling function call result:', error);
       this.emit('error', error);
     }
   }
