@@ -494,20 +494,18 @@ Syft is the first DeFi platform to offer **voice-controlled vault creation**:
 - Real-time visual feedback
 - Multi-turn conversation refinement
 
-**Innovation Level**: ⭐⭐⭐⭐⭐ (Very High)
-
 ### 2. Cross-Protocol Yield Aggregation
 
 Automatically routes assets across multiple Stellar protocols:
 
 - Soroswap DEX integration
+- Aquarius protocol support
 - Blend Protocol lending
 - Liquid staking (stXLM)
-- Phoenix DEX support
 
 ### 3. AI-Powered Strategy Optimization
 
-- GPT-4 analyzes market conditions
+- GPT-5-Nano analyzes market conditions
 - Market sentiment via Tavily API
 - Historical performance data
 - Risk-adjusted return optimization
