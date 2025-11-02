@@ -4,7 +4,7 @@
  * Analyzes configuration and performance to suggest optimizations
  */
 
-import { VaultConfig, RebalanceRule } from '../../../shared/types/vault';
+import { VaultConfig, RebalanceRule } from '../types/vault.js';
 
 export interface StrategyIssue {
   severity: 'low' | 'medium' | 'high';
@@ -421,7 +421,7 @@ export class StrategyAnalyzer {
     const assets = config.assets || [];
     
     // Normalize assets to handle both string[] and AssetAllocation[] formats
-    const normalizedAssets = assets.map(asset => {
+    const normalizedAssets = assets.map((asset: any) => {
       if (typeof asset === 'string') {
         return {
           assetCode: asset,

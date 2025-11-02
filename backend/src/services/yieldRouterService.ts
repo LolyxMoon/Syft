@@ -3,7 +3,7 @@
  * Smart routing logic to optimize yield by splitting funds across multiple protocols
  */
 
-import type { YieldAllocation, YieldRoutingStrategy, YieldOpportunity } from '../../../shared/types/protocol';
+import type { YieldAllocation, YieldRoutingStrategy, YieldOpportunity } from '../types/protocol.js';
 import { getYieldOpportunities, calculateBlendedAPY } from './protocolYieldService.js';
 import { getAllUSDCAddresses, getAssetAddress as getTokenAddress } from '../config/tokenAddresses.js';
 
@@ -168,7 +168,7 @@ function sortOpportunities(
     }
 
     // Otherwise, prefer lower risk
-    const riskWeight: { low: number; medium: number; high: number } = { low: 3, medium: 2, high: 1 };
+    const riskWeight: Record<'low' | 'medium' | 'high', number> = { low: 3, medium: 2, high: 1 };
     return riskWeight[b.risk] - riskWeight[a.risk];
   });
 }

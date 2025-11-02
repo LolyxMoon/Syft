@@ -5,7 +5,7 @@
  * PRODUCTION VERSION - Uses real contract data
  */
 
-import type { ProtocolYield, YieldOpportunity, ProtocolComparison } from '../../../shared/types/protocol';
+import type { ProtocolYield, YieldOpportunity, ProtocolComparison } from '../types/protocol.js';
 import {
   getPoolInfo,
   calculatePoolAPY,

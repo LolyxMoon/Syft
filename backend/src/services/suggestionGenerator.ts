@@ -7,7 +7,7 @@ import { openai } from '../lib/openaiClient';
 import { strategyAnalyzer, StrategyAnalysis } from './strategyAnalyzer';
 import { sentimentAnalysisService, SentimentAnalysis } from './sentimentAnalysisService';
 import { tavilyService, MarketNewsResult } from './tavilyService';
-import { VaultConfig } from '../../../shared/types/vault';
+import { VaultConfig } from '../types/vault.js';
 
 export interface Suggestion {
   id: string;
