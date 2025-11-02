@@ -171,6 +171,8 @@ class VapiService {
         break;
       case 'conversation-update':
         console.log('[VAPI] Conversation update:', message);
+        // Check for tool call results in the messages array
+        this.handleConversationUpdate(message);
         break;
       case 'status-update':
         console.log('[VAPI] Status update:', message);
@@ -182,6 +184,51 @@ class VapiService {
 
     // Emit all messages to subscribers
     this.emit('message', message);
+  }
+
+  private handleConversationUpdate(message: any) {
+    // Check if there are any tool_call_result messages in the conversation
+    if (message.messages && Array.isArray(message.messages)) {
+      const toolResults = message.messages.filter((msg: any) => msg.role === 'tool_call_result');
+      
+      toolResults.forEach((toolResult: any) => {
+        console.log('[VAPI] Found tool call result in conversation:', toolResult);
+        
+        // Extract and parse the result
+        let parsedResult = toolResult.result;
+        
+        // Try to parse if it's a string
+        if (typeof parsedResult === 'string' && !parsedResult.includes('No result returned')) {
+          try {
+            parsedResult = JSON.parse(parsedResult);
+            console.log('[VAPI] Parsed tool result:', parsedResult);
+          } catch (e) {
+            console.warn('[VAPI] Could not parse tool result as JSON:', parsedResult);
+          }
+        }
+        
+        // Check if this is an error message
+        if (typeof parsedResult === 'string' && parsedResult.includes('No result returned')) {
+          console.error('[VAPI] Tool call failed:', parsedResult);
+          return;
+        }
+        
+        // Extract the actual data if it's in the expected format
+        let functionData = parsedResult;
+        if (parsedResult?.success && parsedResult?.data) {
+          functionData = parsedResult.data;
+        }
+        
+        console.log('[VAPI] Emitting tool result for:', toolResult.name);
+        
+        // Emit the function result
+        this.emit('functionCallResult', {
+          name: toolResult.name,
+          result: functionData,
+          toolCallId: toolResult.toolCallId,
+        });
+      });
+    }
   }
 
   private handleTranscript(message: any) {

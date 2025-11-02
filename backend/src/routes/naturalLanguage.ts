@@ -81,12 +81,33 @@ router.post('/generate-vault', async (req, res) => {
       responseType: result.responseType,
     });
 
-    // Return the EXACT same format as /api/vaults/generate-from-prompt
-    // This ensures AI Chat and VAPI get identical responses
-    res.json({
-      success: true,
-      data: result, // Return the raw result, no extra wrapping
-    });
+    // VAPI requires a COMPLETELY different format than AI Chat
+    // VAPI expects: { results: [{ toolCallId, result }] }
+    // The result must be a JSON string (not an object)
+    
+    // Check if this is a VAPI request (has message.toolCallId)
+    const isVAPIRequest = req.body.message?.toolCallId;
+    
+    if (isVAPIRequest) {
+      // VAPI format: return as required by VAPI docs
+      res.json({
+        results: [
+          {
+            toolCallId: req.body.message.toolCallId,
+            result: JSON.stringify({
+              success: true,
+              data: result
+            })
+          }
+        ]
+      });
+    } else {
+      // Regular API format (for AI Chat compatibility)
+      res.json({
+        success: true,
+        data: result,
+      });
+    }
 
   } catch (error: any) {
     console.error('[NL API] Error generating vault:', error);
@@ -96,11 +117,27 @@ router.post('/generate-vault', async (req, res) => {
       console.error('[NL API] Validation error details:', JSON.stringify(error.issues, null, 2));
     }
     
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to generate vault strategy',
-      ...(error.name === 'ZodError' && { validationErrors: error.issues }),
-    });
+    // Check if this is a VAPI request
+    const isVAPIRequest = req.body.message?.toolCallId;
+    
+    if (isVAPIRequest) {
+      // VAPI format for errors (still return 200 with error in result)
+      res.status(200).json({
+        results: [
+          {
+            toolCallId: req.body.message.toolCallId,
+            error: error.message || 'Failed to generate vault strategy'
+          }
+        ]
+      });
+    } else {
+      // Regular error response
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to generate vault strategy',
+        ...(error.name === 'ZodError' && { validationErrors: error.issues }),
+      });
+    }
   }
 });
 
