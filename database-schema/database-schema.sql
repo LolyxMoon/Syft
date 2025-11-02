@@ -48,12 +48,47 @@ CREATE TABLE public.backtest_results (
   CONSTRAINT backtest_results_pkey PRIMARY KEY (id),
   CONSTRAINT backtest_results_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id)
 );
+CREATE TABLE public.chat_messages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  message_id text NOT NULL UNIQUE CHECK (length(message_id) > 0),
+  session_id uuid NOT NULL,
+  role USER-DEFINED NOT NULL,
+  content text NOT NULL CHECK (length(content) > 0),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  tokens_used integer,
+  model text,
+  response_type text,
+  vault_snapshot jsonb,
+  market_context text,
+  web_search_used boolean DEFAULT false,
+  sequence_number integer NOT NULL CHECK (sequence_number >= 0),
+  CONSTRAINT chat_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT chat_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.chat_sessions(id)
+);
+CREATE TABLE public.chat_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  session_id text NOT NULL UNIQUE CHECK (length(session_id) > 0),
+  user_id uuid,
+  vault_id uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  completed_at timestamp with time zone,
+  status USER-DEFINED NOT NULL DEFAULT 'active'::chat_session_status,
+  network text,
+  initial_prompt text,
+  total_messages integer NOT NULL DEFAULT 0,
+  vault_generated boolean NOT NULL DEFAULT false,
+  vault_deployed boolean NOT NULL DEFAULT false,
+  CONSTRAINT chat_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT chat_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT chat_sessions_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id)
+);
 CREATE TABLE public.marketplace_listings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   listing_id text NOT NULL UNIQUE CHECK (length(listing_id) > 0),
   nft_id uuid NOT NULL,
   seller_wallet_address text NOT NULL CHECK (length(seller_wallet_address) > 0),
-  price numeric NOT NULL CHECK (price > 0::numeric),
+  price numeric,
   price_asset text NOT NULL DEFAULT 'USDC'::text,
   status USER-DEFINED NOT NULL DEFAULT 'active'::listing_status,
   title text NOT NULL CHECK (length(title) > 0),
@@ -66,6 +101,7 @@ CREATE TABLE public.marketplace_listings (
   buyer_wallet_address text,
   sale_price numeric,
   metadata jsonb DEFAULT '{}'::jsonb,
+  profit_share_percentage numeric DEFAULT 0,
   CONSTRAINT marketplace_listings_pkey PRIMARY KEY (id),
   CONSTRAINT marketplace_listings_nft_id_fkey FOREIGN KEY (nft_id) REFERENCES public.vault_nfts(id)
 );
@@ -79,13 +115,28 @@ CREATE TABLE public.users (
   last_login_at timestamp with time zone,
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.vault_liquidity_positions (
+  id integer NOT NULL DEFAULT nextval('vault_liquidity_positions_id_seq'::regclass),
+  vault_id character varying NOT NULL,
+  contract_address character varying NOT NULL,
+  pool_address character varying NOT NULL,
+  token_a character varying NOT NULL,
+  token_b character varying NOT NULL,
+  lp_tokens bigint NOT NULL,
+  amount_a_provided bigint NOT NULL,
+  amount_b_provided bigint NOT NULL,
+  timestamp bigint NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT vault_liquidity_positions_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_vault_liquidity FOREIGN KEY (vault_id) REFERENCES public.vaults(vault_id)
+);
 CREATE TABLE public.vault_nfts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   nft_id text NOT NULL UNIQUE CHECK (length(nft_id) > 0),
   vault_id uuid NOT NULL,
   token_id text NOT NULL UNIQUE CHECK (length(token_id) > 0),
   contract_address text NOT NULL,
-  ownership_percentage numeric NOT NULL CHECK (ownership_percentage > 0::numeric AND ownership_percentage <= 100::numeric),
   original_owner text NOT NULL,
   current_holder text NOT NULL,
   metadata jsonb DEFAULT '{}'::jsonb,
@@ -110,6 +161,34 @@ CREATE TABLE public.vault_performance (
   metadata jsonb DEFAULT '{}'::jsonb,
   CONSTRAINT vault_performance_pkey PRIMARY KEY (id),
   CONSTRAINT vault_performance_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id)
+);
+CREATE TABLE public.vault_staking_positions (
+  id integer NOT NULL DEFAULT nextval('vault_staking_positions_id_seq'::regclass),
+  vault_id character varying NOT NULL,
+  contract_address character varying NOT NULL,
+  staking_pool character varying NOT NULL,
+  original_token character varying NOT NULL,
+  staked_amount bigint NOT NULL,
+  st_token_amount bigint NOT NULL,
+  timestamp bigint NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT vault_staking_positions_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_vault_staking FOREIGN KEY (vault_id) REFERENCES public.vaults(vault_id)
+);
+CREATE TABLE public.vault_subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  original_vault_id uuid NOT NULL,
+  subscribed_vault_id uuid NOT NULL,
+  subscriber_wallet_address text NOT NULL,
+  profit_share_percentage numeric NOT NULL CHECK (profit_share_percentage > 0::numeric AND profit_share_percentage <= 100::numeric),
+  total_profits_shared numeric DEFAULT 0,
+  last_profit_share_at timestamp with time zone,
+  subscribed_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT vault_subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT vault_subscriptions_original_vault_id_fkey FOREIGN KEY (original_vault_id) REFERENCES public.vaults(id),
+  CONSTRAINT vault_subscriptions_subscribed_vault_id_fkey FOREIGN KEY (subscribed_vault_id) REFERENCES public.vaults(id),
+  CONSTRAINT vault_subscriptions_subscriber_wallet_address_fkey FOREIGN KEY (subscriber_wallet_address) REFERENCES public.users(wallet_address)
 );
 CREATE TABLE public.vault_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

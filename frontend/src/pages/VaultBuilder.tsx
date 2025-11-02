@@ -1,13 +1,14 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useCallback, useEffect } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Eye, EyeOff, Sparkles, Grid3x3, TrendingUp } from 'lucide-react';
+import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Eye, EyeOff, Sparkles, Grid3x3, TrendingUp, Mic } from 'lucide-react';
 import { Button, useModal } from '../components/ui';
 import BlockPalette from '../components/builder/BlockPalette';
 import VaultCanvas from '../components/builder/VaultCanvas';
 import ValidationFeedback from '../components/builder/ValidationFeedback';
 import StrategyPreview from '../components/builder/StrategyPreview';
 import { NaturalLanguageBuilder } from '../components/builder/NaturalLanguageBuilder';
+import { VoiceToVault } from '../components/voice/VoiceToVault';
 import { YieldComparison } from '../components/yield/YieldComparison';
 import { BlockValidator } from '../lib/blockValidator';
 import { ConfigSerializer } from '../lib/configSerializer';
@@ -42,7 +43,7 @@ const VaultBuilder = () => {
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [savedVaults, setSavedVaults] = useState<SavedVault[]>([]);
   const [loadingVaults, setLoadingVaults] = useState(false);
-  const [builderMode, setBuilderMode] = useState<'visual' | 'chat'>('visual');
+  const [builderMode, setBuilderMode] = useState<'visual' | 'chat' | 'voice'>('visual');
   
   // Vault metadata state
   const [vaultName, setVaultName] = useState('');
@@ -651,7 +652,7 @@ const VaultBuilder = () => {
                   `}
                 >
                   <Grid3x3 className="w-4 h-4" />
-                  <span>Visual Builder</span>
+                  <span>Visual</span>
                 </button>
                 <button
                   onClick={() => setBuilderMode('chat')}
@@ -665,6 +666,19 @@ const VaultBuilder = () => {
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>AI Chat</span>
+                </button>
+                <button
+                  onClick={() => setBuilderMode('voice')}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-all
+                    ${builderMode === 'voice'
+                      ? 'bg-primary-500 text-dark-950 font-semibold'
+                      : 'text-neutral-400 hover:text-neutral-300'
+                    }
+                  `}
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>Voice</span>
                 </button>
               </div>
               
@@ -940,7 +954,7 @@ const VaultBuilder = () => {
               </div>
             </div>
           </>
-        ) : (
+        ) : builderMode === 'chat' ? (
           /* AI Chat Builder Mode */
           <div className="flex-1 flex overflow-hidden">
             {/* Chat Interface - Takes most of the space */}
@@ -1039,6 +1053,98 @@ const VaultBuilder = () => {
                     <span>{validation.errors.length} error(s) found</span>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Voice Builder Mode */
+          <div className="flex-1 flex overflow-hidden">
+            {/* Voice Interface - Takes most of the space */}
+            <div className="flex-1 overflow-hidden">
+              <VoiceToVault
+                onVaultGenerated={handleVaultGenerated}
+                onStrategyModified={(modifications) => {
+                  console.log('Strategy modifications:', modifications);
+                  // Apply modifications to nodes/edges
+                }}
+                onContractExplained={(explanation) => {
+                  console.log('Contract explanation:', explanation);
+                  modal.message(explanation, 'Contract Explanation', 'info');
+                }}
+                currentNodes={nodes}
+                currentEdges={edges}
+              />
+            </div>
+
+            {/* Right Sidebar - Preview & Validation (same as chat mode) */}
+            <div className="w-96 flex-shrink-0 border-l border-default bg-card overflow-hidden flex flex-col">
+              {/* Vault Settings */}
+              <div className="border-b border-default">
+                <div className="p-4 bg-neutral-900">
+                  <h2 className="text-sm font-semibold text-neutral-50 mb-3">Vault Settings</h2>
+                  
+                  {/* Description */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-neutral-400 mb-1.5">
+                      Description
+                    </label>
+                    <textarea
+                      value={vaultDescription}
+                      onChange={(e) => setVaultDescription(e.target.value)}
+                      placeholder="Voice AI will auto-fill this..."
+                      maxLength={500}
+                      rows={3}
+                      className="w-full px-3 py-2 bg-neutral-800 border border-default rounded-md text-neutral-50 placeholder-neutral-500 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                    />
+                    <div className="flex justify-end mt-1">
+                      <span className="text-xs text-neutral-500">
+                        {vaultDescription.length}/500
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Visibility */}
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-400 mb-1.5">
+                      Visibility
+                    </label>
+                    <button
+                      onClick={() => setIsPublic(!isPublic)}
+                      className={`
+                        w-full px-3 py-2.5 rounded-md text-sm font-medium transition-all flex items-center justify-between
+                        ${isPublic 
+                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50 hover:bg-primary-500/30' 
+                          : 'bg-neutral-800 text-neutral-400 border border-default hover:bg-neutral-700'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        <span>{isPublic ? 'Public' : 'Private'}</span>
+                      </div>
+                      <span className="text-xs opacity-70">
+                        {isPublic ? 'Visible on marketplace' : 'Only you can see'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Validation Status */}
+              <div className="border-b border-default">
+                <div className="p-4 bg-neutral-900">
+                  {validation.valid ? (
+                    <div className="flex items-center gap-2 text-xs text-success-400">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Ready to deploy</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs text-error-400">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{validation.errors.length} error(s) found</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

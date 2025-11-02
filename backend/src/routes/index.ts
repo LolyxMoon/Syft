@@ -13,6 +13,7 @@ import analyticsRoutes from './analytics.js';
 import tokenRoutes from './tokens.js';
 import chatRoutes from './chatRoutes.js';
 import protocolRoutes from './protocols.js';
+import naturalLanguageRoutes from './naturalLanguage.js';
 
 const router = Router();
 
@@ -46,6 +47,7 @@ router.get('/', (_req, res) => {
       tokens: '/api/tokens',
       chat: '/api/chat',
       protocols: '/api/protocols',
+      naturalLanguage: '/api/nl',
     },
   });
 });
@@ -64,5 +66,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/tokens', tokenRoutes);
 router.use('/chat', chatRoutes);
 router.use('/protocols', protocolRoutes);
+router.use('/nl', naturalLanguageRoutes);
 
 export default router;
