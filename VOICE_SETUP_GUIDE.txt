@@ -1,5 +1,14 @@
 # 🎙️ Natural Language Smart Contracts - Voice-to-Vault Setup Guide
 
+## 🔄 Recent Updates (Nov 2, 2025)
+
+✅ **System Prompt Enhanced** - Added CRITICAL section with explicit function-calling instructions and examples
+✅ **Function Descriptions Improved** - Now more explicit about parameter requirements with concrete examples
+✅ **Production URLs Updated** - All function URLs now point to Heroku production (`https://syft-f6ad696f49ee.herokuapp.com`)
+✅ **Frontend Backend URL Fixed** - Frontend now connects to production backend
+✅ **Better Error Handling** - Added detailed logging for Zod validation errors
+✅ **Prompt Parameter Validation** - Client-side validation ensures prompt is never undefined
+
 ## Overview
 
 This implementation adds **Voice-to-Vault** capabilities to Syft, allowing users to create DeFi vault strategies using natural voice commands powered by VAPI (Voice AI Platform).
@@ -115,12 +124,25 @@ Conversation Guidelines:
 - Explain risks and expected yields
 - Use analogies to simplify complex concepts
 
-When user describes a strategy:
-1. Clarify any ambiguities
-2. Suggest improvements based on best practices
-3. Call generate_vault_strategy function
-4. Summarize what was created
-5. Offer to make adjustments
+CRITICAL - When user describes a strategy:
+1. ALWAYS extract their complete vault description and pass it as the 'prompt' parameter
+2. Infer the risk level from keywords: 'safe/conservative/stable' = low, 'balanced/moderate' = medium, 'aggressive/high-yield/risky' = high
+3. Identify strategy type from context: look for 'staking', 'farming', 'liquidity', 'balanced'
+4. IMMEDIATELY call generate_vault_strategy function with these extracted parameters
+5. After successful generation, summarize what was created
+6. Offer to make adjustments
+
+Function Calling Examples:
+User: 'Create a conservative stablecoin vault'
+-> Call generate_vault_strategy(prompt='Create a conservative stablecoin vault', riskLevel='low', strategyType='stablecoin staking')
+
+User: 'Build me a high yield farming strategy with USDC'
+-> Call generate_vault_strategy(prompt='Build me a high yield farming strategy with USDC', riskLevel='high', strategyType='yield farming')
+
+User: 'I want a balanced portfolio'
+-> Call generate_vault_strategy(prompt='I want a balanced portfolio', riskLevel='medium', strategyType='balanced portfolio')
+
+ALWAYS pass the user's exact words as the 'prompt' parameter. Never leave it empty.
 ```
 
 **Voice Settings:**
@@ -142,7 +164,7 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
 
 #### Function 1: `generate_vault_strategy`
 
-**Description**: Generate a complete vault strategy configuration from natural language description.
+**Description**: IMMEDIATELY call this function when user describes a vault they want to create. Extract the user's vault description and pass it in the 'prompt' parameter. CRITICAL: The 'prompt' field must ALWAYS contain the user's request in their own words. Examples: 'Create a conservative stablecoin strategy', 'Build a high-yield farming vault with USDC and XLM', 'I want a balanced portfolio'. Never call this function with an empty prompt.
 
 **Parameters Schema**:
 ```json
@@ -151,23 +173,23 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
   "properties": {
     "prompt": {
       "type": "string",
-      "description": "The user's description of the vault strategy"
+      "description": "REQUIRED: The user's exact vault description in their own words. This is what they said they want to create. Example: 'Create a conservative stablecoin vault with 70% USDC staking'. NEVER leave this empty."
     },
     "riskLevel": {
       "type": "string",
       "enum": ["low", "medium", "high"],
-      "description": "Risk level: low (<10% APY), medium (10-30% APY), high (>30% APY)"
+      "description": "OPTIONAL: Infer from user's words - 'safe/conservative/stable' = low, 'balanced/moderate' = medium, 'aggressive/high-yield/risky' = high"
     },
     "strategyType": {
       "type": "string",
-      "description": "Type: stablecoin staking, yield farming, liquidity provision, balanced"
+      "description": "OPTIONAL: Identify from context - 'stablecoin staking', 'yield farming', 'liquidity provision', 'balanced portfolio'"
     }
   },
   "required": ["prompt"]
 }
 ```
 
-**Server URL**: `http://localhost:3001/api/nl/generate-vault`
+**Server URL**: `https://syft-f6ad696f49ee.herokuapp.com/api/nl/generate-vault`
 **Method**: POST
 
 ---
@@ -232,7 +254,7 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
 }
 ```
 
-**Server URL**: `http://localhost:3001/api/nl/explain-contract`
+**Server URL**: `https://syft-f6ad696f49ee.herokuapp.com/api/nl/explain-contract`
 **Method**: POST
 
 ---
@@ -254,7 +276,7 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
 }
 ```
 
-**Server URL**: `http://localhost:3001/api/nl/vault-templates`
+**Server URL**: `https://syft-f6ad696f49ee.herokuapp.com/api/nl/vault-templates`
 **Method**: GET
 
 ---
@@ -281,7 +303,7 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
 }
 ```
 
-**Server URL**: `http://localhost:3001/api/nl/analyze-strategy`
+**Server URL**: `https://syft-f6ad696f49ee.herokuapp.com/api/nl/analyze-strategy`
 **Method**: POST
 
 ---

@@ -100,8 +100,12 @@ Guidelines:
  */
 router.post('/generate-vault', async (req, res) => {
   try {
+    console.log('[NL API] Received request body:', JSON.stringify(req.body, null, 2));
+    
     const validated = GenerateVaultSchema.parse(req.body);
     const { prompt, riskLevel, conversationContext } = validated;
+
+    console.log('[NL API] Validated params - prompt:', prompt, 'riskLevel:', riskLevel);
 
     // Build conversation messages
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -169,9 +173,16 @@ router.post('/generate-vault', async (req, res) => {
 
   } catch (error: any) {
     console.error('[NL API] Error generating vault:', error);
+    
+    // Log additional context for debugging
+    if (error.name === 'ZodError') {
+      console.error('[NL API] Validation error details:', JSON.stringify(error.issues, null, 2));
+    }
+    
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to generate vault strategy',
+      ...(error.name === 'ZodError' && { validationErrors: error.issues }),
     });
   }
 });

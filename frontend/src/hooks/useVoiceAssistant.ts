@@ -53,6 +53,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
   const vaultGeneratedCallbacks = useRef<Set<(nodes: Node[], edges: Edge[], metadata: any) => void>>(new Set());
   const strategyRefinementCallbacks = useRef<Set<(modifications: any) => void>>(new Set());
   const contractExplanationCallbacks = useRef<Set<(explanation: string) => void>>(new Set());
+  const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   // Setup event listeners
   useEffect(() => {
@@ -98,10 +99,14 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     };
 
     const handleTranscript = (message: ConversationMessage) => {
-      setState(prev => ({
-        ...prev,
-        conversationHistory: [...prev.conversationHistory, message],
-      }));
+      setState(prev => {
+        const newHistory = [...prev.conversationHistory, message];
+        conversationHistoryRef.current = newHistory;
+        return {
+          ...prev,
+          conversationHistory: newHistory,
+        };
+      });
     };
 
     const handleFunctionCall = async (data: { name: string; parameters: any; messageId: string }) => {
@@ -158,11 +163,37 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
   // Function call handlers
   const handleGenerateVault = async (params: any) => {
     try {
+      console.log('[useVoiceAssistant] handleGenerateVault called with params:', params);
+      
+      // Extract and validate the prompt
+      const prompt = params.prompt || params.description || '';
+      
+      if (!prompt || prompt.trim().length === 0) {
+        console.error('[useVoiceAssistant] No prompt provided in params:', params);
+        vapiService.sendMessage(
+          `Error: I didn't receive a vault strategy description. Could you please describe the vault strategy you'd like to create?`
+        );
+        return;
+      }
+      
+      // Ensure the params have the correct structure for the backend
+      const requestBody = {
+        prompt,
+        riskLevel: params.riskLevel,
+        strategyType: params.strategyType,
+        conversationContext: conversationHistoryRef.current.slice(-5).map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+      };
+
+      console.log('[useVoiceAssistant] Sending request to backend:', requestBody);
+
       const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nl/generate-vault`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
