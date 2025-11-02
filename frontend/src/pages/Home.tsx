@@ -46,29 +46,6 @@ const Home = () => {
     { label: 'Avg APY', value: '15.2%', change: '+2.1%', icon: Zap },
   ], []);
 
-  const features = useMemo(() => [
-    {
-      icon: Box,
-      title: 'Visual Vault Builder',
-      description: 'Create sophisticated yield strategies with no code using our intuitive drag-and-drop interface.',
-    },
-    {
-      icon: Zap,
-      title: 'Automated Execution',
-      description: 'Your vaults run 24/7, automatically executing strategies based on your configured rules.',
-    },
-    {
-      icon: Shield,
-      title: 'Security First',
-      description: 'Built on Stellar with audited smart contracts and non-custodial architecture.',
-    },
-    {
-      icon: TrendingUp,
-      title: 'AI Optimization',
-      description: 'Get AI-powered suggestions to optimize your vault performance and maximize yields.',
-    },
-  ], []);
-
   const platformFeatures = useMemo(() => [
     { icon: Activity, tag: 'Monitoring', title: 'Live tracking', color: 'text-primary-500' },
     { icon: ShieldCheck, tag: 'Security', title: 'Audited contracts', color: 'text-primary-500' },
@@ -449,48 +426,60 @@ const Home = () => {
       {/* Feature Showcase Section */}
       <section className="py-16 relative bg-[#090a0a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <div className="bg-[#16181a]/60 border border-white/[0.06] rounded-3xl p-6 sm:p-8 backdrop-blur">
-            <div className="grid grid-cols-1 lg:grid-cols-2 sm:gap-10 gap-x-8 gap-y-8 items-start">
+          <div className="glass-card sm:p-10 transition-all duration-300 group rounded-3xl pt-6 pr-6 pb-6 pl-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 items-start">
               <div className="flex flex-col min-h-full justify-between">
                 <div>
-                  <span className="text-sm font-normal text-[#a1a1aa]">Platform</span>
-                  <h2 className="text-5xl sm:text-6xl lg:text-7xl leading-[0.9] text-white tracking-tighter mt-2">
+                  <span className="text-sm font-normal text-[#a1a1aa] inline-block transition-all duration-300 group-hover:text-[#dce85d]">Platform</span>
+                  <h2 className="text-5xl sm:text-6xl lg:text-7xl leading-[0.9] text-white tracking-tighter mt-2 transition-all duration-500 group-hover:text-[#dce85d]">
                     A vault platform built for speed and precision.
                   </h2>
                   <div className="mt-8 relative">
                     <div className="flex flex-col gap-4 relative text-[#fafafa] pr-4 pl-4">
-                      <div className="relative">
-                        <div className="absolute left-2 top-8 bottom-0 w-px bg-gradient-to-b from-[#dce85d] via-[#a8c93a] to-[#74b97f]"></div>
-                        <div className="flex gap-4 items-start">
-                          <div className="flex-shrink-0 w-4 h-4 z-10 relative bg-[#090a0a] border-[#dce85d] border-2 rounded-full mt-0.5">
-                            <div className="w-1.5 h-1.5 absolute top-0.5 left-0.5 bg-[#dce85d] rounded-full"></div>
+                      <div className="relative group/item">
+                        <div className="absolute left-2 top-8 bottom-0 w-px bg-gradient-to-b from-[#dce85d] via-[#a8c93a] to-[#74b97f] transition-all duration-300 group-hover/item:w-0.5 group-hover/item:shadow-[0_0_8px_rgba(220,232,93,0.6)]"></div>
+                        <div className="flex gap-4 items-start transition-all duration-300 hover:translate-x-2">
+                          <div className="flex-shrink-0 w-4 h-4 z-10 relative bg-[#090a0a] border-[#dce85d] border-2 rounded-full mt-0.5 transition-all duration-300 group-hover/item:scale-125 group-hover/item:shadow-[0_0_12px_rgba(220,232,93,0.8)]">
+                            <div className="w-1.5 h-1.5 absolute top-0.5 left-0.5 bg-[#dce85d] rounded-full transition-all duration-300 group-hover/item:animate-pulse"></div>
                           </div>
                           <div className="flex-1 pb-6">
-                            <span className="text-sm font-medium text-[#dce85d]">Smart Strategy Builder</span>
-                            <p className="text-xs text-[#a1a1aa] mt-1">Visual interface for complex yield strategies</p>
+                            <span className="text-sm font-medium text-[#dce85d] transition-all duration-300 group-hover/item:text-white">
+                              Smart Strategy Builder
+                            </span>
+                            <p className="text-xs text-[#a1a1aa] mt-1 transition-all duration-300 group-hover/item:text-[#fafafa]">
+                              Visual interface for complex yield strategies
+                            </p>
                           </div>
                         </div>
                       </div>
-                      <div className="relative">
-                        <div className="absolute left-2 top-8 bottom-0 w-px bg-gradient-to-b from-[#dce85d] via-[#a8c93a] to-[#74b97f]"></div>
-                        <div className="flex gap-4 items-start">
-                          <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#a8c93a] bg-[#090a0a] z-10 relative mt-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#a8c93a] absolute top-0.5 left-0.5"></div>
+                      <div className="relative group/item">
+                        <div className="absolute left-2 top-8 bottom-0 w-px bg-gradient-to-b from-[#dce85d] via-[#a8c93a] to-[#74b97f] transition-all duration-300 group-hover/item:w-0.5 group-hover/item:shadow-[0_0_8px_rgba(168,201,58,0.6)]"></div>
+                        <div className="flex gap-4 items-start transition-all duration-300 hover:translate-x-2">
+                          <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#a8c93a] bg-[#090a0a] z-10 relative mt-0.5 transition-all duration-300 group-hover/item:scale-125 group-hover/item:shadow-[0_0_12px_rgba(168,201,58,0.8)]">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#a8c93a] absolute top-0.5 left-0.5 transition-all duration-300 group-hover/item:animate-pulse"></div>
                           </div>
                           <div className="flex-1 pb-6">
-                            <span className="text-sm font-medium text-[#a8c93a]">Real-time Analytics</span>
-                            <p className="text-xs text-[#a1a1aa] mt-1">Monitor performance across all positions</p>
+                            <span className="text-sm font-medium text-[#a8c93a] transition-all duration-300 group-hover/item:text-white">
+                              Real-time Analytics
+                            </span>
+                            <p className="text-xs text-[#a1a1aa] mt-1 transition-all duration-300 group-hover/item:text-[#fafafa]">
+                              Monitor performance across all positions
+                            </p>
                           </div>
                         </div>
                       </div>
-                      <div className="relative">
-                        <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#74b97f] bg-[#090a0a] z-10 relative mt-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#74b97f] absolute top-0.5 left-0.5"></div>
+                      <div className="relative group/item">
+                        <div className="flex items-start gap-4 transition-all duration-300 hover:translate-x-2">
+                          <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#74b97f] bg-[#090a0a] z-10 relative mt-0.5 transition-all duration-300 group-hover/item:scale-125 group-hover/item:shadow-[0_0_12px_rgba(116,185,127,0.8)]">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#74b97f] absolute top-0.5 left-0.5 transition-all duration-300 group-hover/item:animate-pulse"></div>
                           </div>
                           <div className="flex-1">
-                            <span className="text-sm font-medium text-[#74b97f]">Gas Optimization</span>
-                            <p className="text-xs text-[#a1a1aa] mt-1">Minimize fees with smart batching</p>
+                            <span className="text-sm font-medium text-[#74b97f] transition-all duration-300 group-hover/item:text-white">
+                              Gas Optimization
+                            </span>
+                            <p className="text-xs text-[#a1a1aa] mt-1 transition-all duration-300 group-hover/item:text-[#fafafa]">
+                              Minimize fees with smart batching
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -498,18 +487,19 @@ const Home = () => {
                   </div>
                 </div>
                 <div className="w-full mt-10">
-                  <p className="text-sm font-medium text-white tracking-tight">Maximize every opportunity</p>
-                  <p className="text-sm text-[#a1a1aa] mt-1 max-w-sm">
+                  <p className="text-sm font-medium text-white tracking-tight transition-all duration-300 group-hover:text-[#dce85d]">
+                    Maximize every opportunity
+                  </p>
+                  <p className="text-sm text-[#a1a1aa] mt-1 max-w-sm transition-all duration-300 group-hover:text-[#fafafa]">
                     Advanced automation, risk management, and portfolio rebalancing that keeps your strategy optimized 24/7.
                   </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
+                  <button
                     onClick={() => navigate('/app/vaults')}
+                    className="inline-flex items-center justify-center gap-2 h-10 hover:bg-[#e8f06d] transition-all duration-300 text-sm font-normal text-[#090a0a] bg-[#dce85d] rounded-full mt-4 px-4 hover:scale-105 hover:shadow-[0_0_20px_rgba(220,232,93,0.6)]"
                   >
                     Explore vaults
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
+                    <span className="inline-flex h-2 w-2 rounded-full bg-[#090a0a] transition-all duration-300 group-hover:animate-pulse"></span>
+                  </button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 relative">
@@ -519,22 +509,24 @@ const Home = () => {
                   return (
                     <div 
                       key={idx}
-                      className={`relative overflow-hidden ${idx >= 2 ? 'aspect-[4/5]' : 'aspect-[4/3]'} bg-gradient-to-br from-neutral-800 to-neutral-900 bg-center bg-cover border border-white/[0.06] rounded-2xl`}
+                      className={`relative overflow-hidden ${idx >= 2 ? 'aspect-[4/5]' : 'aspect-[4/3]'} bg-center bg-cover border border-white/[0.06] rounded-2xl group/card transition-all duration-500 hover:scale-[1.05] hover:border-[#dce85d]/30 hover:shadow-[0_0_30px_rgba(220,232,93,0.3)]`}
                       style={bgImage ? { backgroundImage: `url('${bgImage}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     >
-                      <div className="bg-gradient-to-b from-black/0 via-black/15 to-black/60 absolute top-0 right-0 bottom-0 left-0"></div>
-                      <div className="absolute top-3 left-3">
-                        <span className="inline-flex items-center gap-2 text-xs text-white/90 bg-white/10 border border-white/15 rounded-full py-1.5 px-1.5 backdrop-blur">
-                          <Icon className="w-3.5 h-3.5" />
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/20 to-black/60 group-hover/card:from-black/10 group-hover/card:to-black/50 transition-all duration-500"></div>
+                      <div className="absolute top-3 left-3 transition-all duration-300 group-hover/card:scale-110">
+                        <span className="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-1.5 transition-all duration-300 group-hover/card:bg-[#dce85d]/20">
+                          <Icon className="w-3.5 h-3.5 transition-all duration-300 group-hover/card:text-[#dce85d]" />
                         </span>
                       </div>
-                      <div className="absolute top-3 right-3">
-                        <span className="inline-flex items-center gap-2 text-xs text-white/90 bg-white/10 border border-white/15 rounded-full py-1.5 px-3 backdrop-blur">
+                      <div className="absolute top-3 right-3 transition-all duration-300 group-hover/card:scale-110">
+                        <span className="inline-flex items-center gap-2 text-xs text-white/90 glass-card rounded-full py-1.5 px-3 transition-all duration-300 group-hover/card:bg-[#dce85d]/20 group-hover/card:text-white">
                           {feature.tag}
                         </span>
                       </div>
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <p className="text-white text-lg font-medium tracking-tight leading-tight">{feature.title}</p>
+                      <div className="absolute bottom-3 left-3 right-3 transition-all duration-300 group-hover/card:bottom-4">
+                        <p className="text-white text-lg font-medium tracking-tight leading-tight transition-all duration-300 group-hover/card:text-[#dce85d]">
+                          {feature.title}
+                        </p>
                       </div>
                     </div>
                   );
@@ -546,57 +538,85 @@ const Home = () => {
       </section>
 
       {/* How It Works Section */}
-      <section id="how-it-works" className="py-16 relative bg-secondary">
-        <div className="container mx-auto px-4 max-w-4xl">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-5xl font-bold mb-3 text-white tracking-tight">
+      <section id="how-it-works" className="bg-[#161a1d] pt-24 pb-24 relative">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <div className="text-center mb-16">
+            <h2 className="md:text-6xl text-4xl font-bold text-white tracking-tight mb-4">
               Get Started in <span className="text-[#dce85d]">3 Steps</span>
             </h2>
-            <p className="text-lg text-[#a1a1aa]">
-              From zero to earning in minutes
-            </p>
-          </motion.div>
+            <p className="text-lg text-[#a1a1aa]">From zero to earning in minutes</p>
+          </div>
 
-          <div className="space-y-8">
+          <div className="space-y-4 max-w-2xl mx-auto">
             {steps.map((step) => (
-              <div key={step.step}>
-                <Card className="p-6 bg-card hover:border-primary-500/30 transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 rounded-lg bg-primary-500 flex items-center justify-center">
-                        <span className="text-lg font-bold text-dark-950">{step.step}</span>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold mb-1 text-neutral-50">{step.title}</h3>
-                      <p className="text-base text-[#a1a1aa]">{step.description}</p>
+              <div key={step.step} className="glass-card rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02]">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-[#dce85d] flex items-center justify-center">
+                      <span className="text-lg font-bold text-[#090a0a]">{step.step}</span>
                     </div>
                   </div>
-                </Card>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold mb-1 text-white">
+                      {step.title}
+                    </h3>
+                    <p className="text-sm text-[#a1a1aa]">
+                      {step.description}
+                    </p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mt-10"
-          >
-            <Button
-              size="lg"
-              variant="shimmer"
-              rightIcon={<ArrowRight size={18} />}
+          <div className="text-center mt-12">
+            <button
               onClick={() => navigate('/app/builder')}
+              className="group isolate inline-flex cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_8px_rgba(220,232,93,0.35)] rounded-full relative shadow-[0_8px_40px_rgba(220,232,93,0.25)]"
+              style={{ 
+                '--spread': '90deg',
+                '--shimmer-color': 'rgba(255,255,255,0.6)',
+                '--radius': '9999px',
+                '--speed': '4s',
+                '--cut': '1px',
+                '--bg': 'rgba(220, 232, 93, 0.1)'
+              } as React.CSSProperties}
             >
-              Create Your First Vault
-            </Button>
-          </motion.div>
+              <div className="absolute inset-0">
+                <div className="absolute inset-[-200%] w-[400%] h-[400%] animate-[rotate-gradient_var(--speed)_linear_infinite]">
+                  <div className="absolute inset-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]"></div>
+                </div>
+              </div>
+              <div className="absolute rounded-full [background:var(--bg)] [inset:var(--cut)] backdrop-blur"></div>
+              <div className="z-10 flex gap-3 sm:w-auto overflow-hidden text-base font-medium text-white w-full pt-3 pr-5 pb-3 pl-5 relative gap-x-3 gap-y-3 items-center" style={{ borderRadius: '9999px' }}>
+                <div style={{ 
+                  position: 'absolute', 
+                  content: ' ', 
+                  display: 'block', 
+                  width: '200%', 
+                  height: '200%', 
+                  background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), transparent)', 
+                  animation: 'rotate-gradient 4s infinite linear', 
+                  top: '50%', 
+                  left: '50%', 
+                  transform: 'translate(-50%, -50%)'
+                }}></div>
+                <div style={{ 
+                  position: 'absolute', 
+                  inset: '1px', 
+                  background: 'rgba(10, 11, 20, 0.8)', 
+                  borderRadius: '9999px', 
+                  backdropFilter: 'blur(8px)'
+                }}></div>
+                <span className="whitespace-nowrap relative z-10 font-sans">
+                  Create Your First Vault
+                </span>
+                <span className="inline-flex items-center justify-center z-10 bg-white/10 w-7 h-7 rounded-full relative">
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -693,30 +713,70 @@ const Home = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 relative bg-secondary">
+      <section className="py-24 relative bg-[#161a1d]">
         <div className="container mx-auto px-4 max-w-4xl">
-          <Card className="p-10 md:p-12 text-center bg-[#1a1e21] border-primary-500/20">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white tracking-tight">
-                Ready to <span className="text-[#dce85d]">Maximize</span> Your Yields?
+          <div className="glass-card rounded-3xl p-12 md:p-16 text-center relative overflow-hidden">
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 right-1/4 w-64 h-64 bg-[#dce85d] rounded-full blur-[100px]"></div>
+              <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-[#74b97f] rounded-full blur-[100px]"></div>
+            </div>
+            <div className="relative z-10">
+              <h2 className="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight">
+                Ready to{' '}
+                <span className="text-[#dce85d]">Maximize</span>
+                {' '}Your Yields?
               </h2>
-              <p className="text-lg text-[#a1a1aa] mb-6 max-w-2xl mx-auto">
+              <p className="text-lg text-[#a1a1aa] mb-8 max-w-2xl mx-auto">
                 Join thousands of users who are already earning with Syft's automated yield vaults
               </p>
-              <Button
-                size="lg"
-                variant="shimmer"
-                rightIcon={<ArrowRight size={18} />}
+              <button
                 onClick={() => navigate('/app/builder')}
+                className="group isolate inline-flex cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_8px_rgba(220,232,93,0.35)] rounded-full relative shadow-[0_8px_40px_rgba(220,232,93,0.25)]"
+                style={{ 
+                  '--spread': '90deg',
+                  '--shimmer-color': 'rgba(255,255,255,0.6)',
+                  '--radius': '9999px',
+                  '--speed': '4s',
+                  '--cut': '1px',
+                  '--bg': 'rgba(220, 232, 93, 0.1)'
+                } as React.CSSProperties}
               >
-                Launch App
-              </Button>
-            </motion.div>
-          </Card>
+                <div className="absolute inset-0">
+                  <div className="absolute inset-[-200%] w-[400%] h-[400%] animate-[rotate-gradient_var(--speed)_linear_infinite]">
+                    <div className="absolute inset-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]"></div>
+                  </div>
+                </div>
+                <div className="absolute rounded-full [background:var(--bg)] [inset:var(--cut)] backdrop-blur"></div>
+                <div className="z-10 flex gap-3 sm:w-auto overflow-hidden text-base font-medium text-white w-full pt-3 pr-5 pb-3 pl-5 relative gap-x-3 gap-y-3 items-center" style={{ borderRadius: '9999px' }}>
+                  <div style={{ 
+                    position: 'absolute', 
+                    content: ' ', 
+                    display: 'block', 
+                    width: '200%', 
+                    height: '200%', 
+                    background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2), transparent)', 
+                    animation: 'rotate-gradient 4s infinite linear', 
+                    top: '50%', 
+                    left: '50%', 
+                    transform: 'translate(-50%, -50%)'
+                  }}></div>
+                  <div style={{ 
+                    position: 'absolute', 
+                    inset: '1px', 
+                    background: 'rgba(10, 11, 20, 0.8)', 
+                    borderRadius: '9999px', 
+                    backdropFilter: 'blur(8px)'
+                  }}></div>
+                  <span className="whitespace-nowrap relative z-10 font-sans">
+                    Launch App
+                  </span>
+                  <span className="inline-flex items-center justify-center z-10 bg-white/10 w-7 h-7 rounded-full relative">
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
