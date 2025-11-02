@@ -3,7 +3,7 @@
  * Caches AI suggestions to reduce API costs and improve response times
  */
 
-import { Suggestion } from './suggestionGenerator';
+import { Suggestion } from './suggestionGenerator.js';
 
 interface CacheEntry {
   suggestions: Suggestion[];

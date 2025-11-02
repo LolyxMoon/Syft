@@ -2,9 +2,9 @@
 // Purpose: REST API for initiating and retrieving backtest results
 
 import { Router, Request, Response } from 'express';
-import { runBacktest } from '../services/backtestEngine';
-import type { BacktestRequest, BacktestResult } from '../services/backtestEngine';
-import { supabase } from '../lib/supabase';
+import { runBacktest } from '../services/backtestEngine.js';
+import type { BacktestRequest, BacktestResult } from '../services/backtestEngine.js';
+import { supabase } from '../lib/supabase.js';
 
 const router = Router();
 

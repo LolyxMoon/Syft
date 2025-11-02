@@ -4,8 +4,8 @@
  * Searches X (Twitter) and Reddit via Tavily for comprehensive social sentiment
  */
 
-import { openai } from '../lib/openaiClient';
-import { tavilyService } from './tavilyService';
+import { openai } from '../lib/openaiClient.js';
+import { tavilyService } from './tavilyService.js';
 
 export type SentimentScore = 'very_negative' | 'negative' | 'neutral' | 'positive' | 'very_positive';
 

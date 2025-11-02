@@ -4,9 +4,9 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { suggestionGenerator, SuggestionRequest } from '../services/suggestionGenerator';
-import { suggestionCacheService } from '../services/suggestionCacheService';
-import { supabase } from '../lib/supabase';
+import { suggestionGenerator, SuggestionRequest } from '../services/suggestionGenerator.js';
+import { suggestionCacheService } from '../services/suggestionCacheService.js';
+import { supabase } from '../lib/supabase.js';
 
 const router = Router();
 

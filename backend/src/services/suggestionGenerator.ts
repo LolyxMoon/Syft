@@ -3,10 +3,10 @@
  * Combines historical data, sentiment, and Prophet forecasts to generate AI-powered suggestions
  */
 
-import { openai } from '../lib/openaiClient';
-import { strategyAnalyzer, StrategyAnalysis } from './strategyAnalyzer';
-import { sentimentAnalysisService, SentimentAnalysis } from './sentimentAnalysisService';
-import { tavilyService, MarketNewsResult } from './tavilyService';
+import { openai } from '../lib/openaiClient.js';
+import { strategyAnalyzer, StrategyAnalysis } from './strategyAnalyzer.js';
+import { sentimentAnalysisService, SentimentAnalysis } from './sentimentAnalysisService.js';
+import { tavilyService, MarketNewsResult } from './tavilyService.js';
 import { VaultConfig } from '../types/vault.js';
 
 export interface Suggestion {

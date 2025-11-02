@@ -4,8 +4,8 @@
  * into structured vault configurations (nodes and edges for React Flow)
  */
 
-import { openai } from '../lib/openaiClient';
-import { tavilyService } from './tavilyService';
+import { openai } from '../lib/openaiClient.js';
+import { tavilyService } from './tavilyService.js';
 
 // Define Node and Edge types to match React Flow structure
 export interface Node {

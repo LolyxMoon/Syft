@@ -4,7 +4,7 @@
  */
 
 import express, { Request, Response } from 'express';
-import { chatHistoryService } from '../services/chatHistoryService';
+import { chatHistoryService } from '../services/chatHistoryService.js';
 
 const router = express.Router();
 

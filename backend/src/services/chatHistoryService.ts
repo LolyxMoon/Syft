@@ -3,7 +3,7 @@
  * Manages AI chat conversation history and sessions
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase.js';
 import { randomUUID } from 'crypto';
 
 export type ChatMessageRole = 'user' | 'assistant' | 'system';

@@ -3,7 +3,7 @@
 // ARCHITECTURE: Always fetches price data from mainnet for accuracy,
 // regardless of user's execution network (testnet/futurenet/mainnet)
 
-import { mainnetPriceServer } from '../lib/horizonClient';
+import { mainnetPriceServer } from '../lib/horizonClient.js';
 import { Asset } from '@stellar/stellar-sdk';
 
 export interface PricePoint {

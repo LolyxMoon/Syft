@@ -3,7 +3,7 @@
 
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Request, Response, NextFunction } from 'express';
-import { UnauthorizedError } from '../middleware/errorHandler';
+import { UnauthorizedError } from '../middleware/errorHandler.js';
 
 /**
  * Verify a signed message from a Stellar wallet

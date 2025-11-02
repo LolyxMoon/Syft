@@ -2,7 +2,7 @@
 // Purpose: Provides live mainnet price updates with configurable refresh intervals
 // ARCHITECTURE: Always uses mainnet for accurate, up-to-date pricing
 
-import { getCurrentPrice } from './historicalDataService';
+import { getCurrentPrice } from './historicalDataService.js';
 
 export interface PriceSubscription {
   assetCode: string;

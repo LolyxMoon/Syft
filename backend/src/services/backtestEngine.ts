@@ -3,7 +3,7 @@
 // ARCHITECTURE: Uses real mainnet price data for accurate backtesting,
 // regardless of user's execution network (testnet/futurenet/mainnet)
 
-import { fetchHistoricalPrices } from './historicalDataService';
+import { fetchHistoricalPrices } from './historicalDataService.js';
 import { getTokenSymbol } from './tokenService.js';
 
 // Import types from shared - using relative path to avoid rootDir issues

@@ -2,7 +2,7 @@
 // Purpose: API routes for wallet asset fetching and management
 
 import { Router, Request, Response, NextFunction } from 'express';
-import assetService from '../services/assetService';
+import assetService from '../services/assetService.js';
 
 const router = Router();
 

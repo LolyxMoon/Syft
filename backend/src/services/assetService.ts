@@ -1,7 +1,7 @@
 // T040: Asset balance fetching service using Horizon SDK
 // Purpose: Fetch user asset balances from Stellar Horizon API
 
-import { horizonServer } from '../lib/horizonClient';
+import { horizonServer } from '../lib/horizonClient.js';
 
 export interface AssetBalance {
   asset_code: string;

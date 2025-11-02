@@ -1,8 +1,8 @@
 // T101: Backtest result caching service
 // Purpose: Cache backtest results in Supabase to avoid recomputation
 
-import { supabase } from '../lib/supabase';
-import type { BacktestRequest, BacktestResult } from './backtestEngine';
+import { supabase } from '../lib/supabase.js';
+import type { BacktestRequest, BacktestResult } from './backtestEngine.js';
 import crypto from 'crypto';
 
 /**
