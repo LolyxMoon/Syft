@@ -29,7 +29,7 @@ export const WalletButton = () => {
         size="md" 
         onClick={() => void connectWallet()}
         isLoading={isPending}
-        className="inline-flex items-center gap-2 bg-[#dce85d] hover:bg-[#e8f06d] text-[#090a0a] px-4 py-2 rounded-lg text-sm font-medium transition"
+        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#dce85d] hover:bg-[#e8f06d] text-[#090a0a] px-4 py-2.5 rounded-lg text-sm font-medium transition"
       >
         <Wallet size={16} />
         {buttonLabel}
@@ -169,7 +169,7 @@ export const WalletButton = () => {
 
       <button
         onClick={() => setShowDisconnectModal(true)}
-        className="px-3 py-1.5 rounded-md bg-card border border-default hover:bg-hover hover:border-hover transition-all flex items-center gap-2"
+        className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-card border border-default hover:bg-hover hover:border-hover transition-all flex items-center justify-center gap-2"
       >
         <div className="w-1.5 h-1.5 rounded-full bg-success-400" />
         <span className="text-sm font-medium text-neutral-50">

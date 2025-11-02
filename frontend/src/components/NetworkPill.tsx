@@ -37,14 +37,16 @@ const NetworkPill: React.FC = () => {
       style={{
         backgroundColor: bgColor,
         color: textColor,
-        padding: "4px 10px",
+        padding: "8px 14px",
         borderRadius: "16px",
-        fontSize: "12px",
-        fontWeight: "bold",
+        fontSize: "13px",
+        fontWeight: "600",
         display: "flex",
         alignItems: "center",
-        gap: "4px",
+        justifyContent: "center",
+        gap: "6px",
         cursor: isNetworkMismatch ? "help" : "default",
+        minHeight: "36px",
       }}
       title={title}
     >
