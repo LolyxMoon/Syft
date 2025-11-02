@@ -58,7 +58,7 @@ async function initializeVaultContract(
         ? 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT'
         : 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
     } else if (asset === 'USDC') {
-      return 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+      return 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5'; // Official Stellar testnet USDC
     }
     return asset; // Assume it's already an address
   }).map((addr: string) => StellarSdk.Address.fromString(addr).toScVal());
@@ -764,7 +764,7 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       const tokenAddresses: { [key: string]: { [key: string]: string } } = {
         'XLM': nativeXLMAddresses,
         'USDC': {
-          'testnet': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+          'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
           'futurenet': process.env.FUTURENET_USDC_ADDRESS || nativeXLMAddresses['futurenet'],
           'mainnet': '',
           'public': '',
@@ -1055,11 +1055,12 @@ router.post('/submit-set-router', async (req: Request, res: Response) => {
 /**
  * POST /api/vaults/:vaultId/build-deposit
  * Build unsigned deposit transaction for user to sign
+ * NOW WITH AUTOMATIC PROTOCOL ROUTING
  */
 router.post('/:vaultId/build-deposit', async (req: Request, res: Response) => {
   try {
     const { vaultId } = req.params;
-    const { userAddress, amount, network, depositToken } = req.body;
+    const { userAddress, amount, network, depositToken, enableProtocolRouting = true } = req.body;
 
     if (!userAddress || !amount) {
       return res.status(400).json({
@@ -1068,7 +1069,61 @@ router.post('/:vaultId/build-deposit', async (req: Request, res: Response) => {
       });
     }
 
-    // Build unsigned transaction with optional depositToken for auto-swap
+    // Check if user wants automatic protocol routing (default: enabled)
+    if (enableProtocolRouting) {
+      try {
+        console.log(`[Build Deposit] Checking protocol routing for optimal yields...`);
+        
+        // Get vault config to determine asset
+        const { data: vault } = await supabase
+          .from('vaults')
+          .select('config')
+          .eq('vault_id', vaultId)
+          .single();
+
+        const vaultConfig = vault?.config;
+        const firstAsset = vaultConfig?.assets?.[0];
+        const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset?.code || 'XLM';
+        
+        // Import yield routing service
+        const { calculateOptimalRouting } = await import('../services/yieldRouterService.js');
+        
+        // Calculate optimal routing strategy
+        const strategy = await calculateOptimalRouting(
+          assetCode,
+          parseFloat(amount),
+          network,
+          {
+            maxProtocols: 3,
+            riskTolerance: 'medium',
+            preferLiquidity: true,
+            gasOptimization: true,
+          }
+        );
+
+        console.log(`[Build Deposit] Protocol routing strategy:`, {
+          allocations: strategy.allocations.length,
+          blendedAPY: strategy.expectedBlendedApy,
+        });
+
+        // If routing suggests multiple protocols, return the strategy
+        if (strategy.allocations.length > 1) {
+          return res.json({
+            success: true,
+            data: {
+              routingEnabled: true,
+              strategy,
+              message: `Funds will be optimally split across ${strategy.allocations.length} protocols for ${strategy.expectedBlendedApy.toFixed(2)}% blended APY`,
+            },
+          });
+        }
+      } catch (routingError) {
+        console.warn('[Build Deposit] Protocol routing failed, falling back to standard deposit:', routingError);
+        // Fall through to standard deposit
+      }
+    }
+
+    // Standard single-vault deposit (fallback or if routing disabled)
     const { xdr, contractAddress } = await buildDepositTransaction(
       vaultId,
       userAddress,
@@ -1082,6 +1137,7 @@ router.post('/:vaultId/build-deposit', async (req: Request, res: Response) => {
       data: {
         xdr,
         contractAddress,
+        routingEnabled: false,
       },
     });
   } catch (error) {

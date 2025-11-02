@@ -21,7 +21,7 @@ function getAssetAddressFromCode(assetCode: string, network?: string): string {
   const tokenAddresses: { [key: string]: { [key: string]: string } } = {
     'XLM': nativeXLMAddresses,
     'USDC': {
-      'testnet': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
       'futurenet': process.env.FUTURENET_USDC_ADDRESS || nativeXLMAddresses['futurenet'],
       'mainnet': '',
       'public': '',
@@ -1237,7 +1237,7 @@ function getAssetSymbolFromAddress(address: string): string {
     'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC': 'XLM',
     'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT': 'XLM',
     'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA': 'XLM',
-    'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA': 'USDC',
+    'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5': 'USDC', // Official Stellar testnet USDC
   };
   return knownAssets[address] || 'XLM';
 }

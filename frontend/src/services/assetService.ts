@@ -144,8 +144,16 @@ function getFallbackTokens(network: Network): TokenInfo[] {
       },
       {
         symbol: 'USDC',
-        name: 'USD Coin',
-        address: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+        name: 'USD Coin (Official)',
+        address: 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC (Aquarius)
+        decimals: 6,
+        type: 'stablecoin',
+        network: 'testnet',
+      },
+      {
+        symbol: 'USDC',
+        name: 'USD Coin (Soroswap)',
+        address: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA', // Custom USDC (Soroswap)
         decimals: 6,
         type: 'stablecoin',
         network: 'testnet',

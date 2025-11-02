@@ -31,6 +31,7 @@ export interface YieldOpportunity {
 
 export interface YieldAllocation {
   protocolId: string;
+  protocolName: string;
   amount: number;
   percentage: number;
   expectedApy: number;

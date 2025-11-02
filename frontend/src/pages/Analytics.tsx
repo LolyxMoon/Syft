@@ -14,6 +14,7 @@ import { Card, Button, Skeleton } from '../components/ui';
 import { useWallet } from '../providers/WalletProvider';
 import { Link } from 'react-router-dom';
 import { resolveAssetNames } from '../services/tokenService';
+import { YieldComparison } from '../components/yield/YieldComparison';
 
 interface VaultBreakdown {
   vaultId: string;
@@ -932,6 +933,28 @@ const Analytics = () => {
               </motion.div>
             </div>
           )}
+
+          {/* Protocol Yield Opportunities */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.1 }}
+          >
+            <Card className="p-6 bg-card border border-default">
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-neutral-50 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-primary-500" />
+                  Protocol Yield Opportunities
+                </h2>
+                <p className="text-sm text-neutral-400 mt-1">Compare yields across DeFi protocols</p>
+              </div>
+              <YieldComparison 
+                asset="USDC"
+                amount={1000}
+                network={normalizeNetwork(network, networkPassphrase)}
+              />
+            </Card>
+          </motion.div>
         </motion.div>
       </div>
     </div>

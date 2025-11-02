@@ -7,6 +7,7 @@ import { logger, requestId } from './middleware/logger.js';
 import apiRoutes from './routes/index.js';
 import { startRuleMonitoring } from './services/ruleTriggerService.js';
 import { startVaultSync } from './services/vaultSyncService.js';
+import { startYieldMonitoring } from './services/protocolYieldMonitor.js';
 import { executeRebalance } from './services/vaultActionService.js';
 import { wsService } from './services/websocketService.js';
 
@@ -133,6 +134,10 @@ server.listen(port, () => {
   });
   console.log('✅ Rule monitoring service started');
   
+  // Start protocol yield monitoring service (checks yields every 60 minutes)
+  const yieldInterval = startYieldMonitoring(60);
+  console.log('✅ Protocol yield monitoring started (every 60 minutes)');
+  
   console.log('\n🎉 All services operational!\n');
   
   // Graceful shutdown
@@ -140,6 +145,9 @@ server.listen(port, () => {
     console.log('\n🛑 Shutting down gracefully...');
     clearInterval(syncInterval);
     clearInterval(ruleInterval);
+    if (typeof yieldInterval === 'function') {
+      yieldInterval(); // Call cleanup function
+    }
     process.exit(0);
   });
 });

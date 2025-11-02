@@ -1,7 +1,7 @@
 # Add USDC Trustline and Get Test USDC on Testnet
 # This allows your wallet to hold USDC tokens
 
-$USDC_ADDRESS = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
+$USDC_ADDRESS = "CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5"  # Official Stellar testnet USDC
 $NETWORK = "testnet"
 
 Write-Host "Adding USDC trustline to your wallet..." -ForegroundColor Yellow

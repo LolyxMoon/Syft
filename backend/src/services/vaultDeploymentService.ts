@@ -108,7 +108,7 @@ function getAssetAddress(asset: string, network?: string): string {
   const tokenAddresses: { [key: string]: { [key: string]: string } } = {
     'XLM': nativeXLMAddresses,
     'USDC': {
-      'testnet': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
       'futurenet': process.env.FUTURENET_USDC_ADDRESS || nativeXLMAddresses['futurenet'], // Use env var if set, otherwise fallback to XLM
       'mainnet': '', // TODO: Add mainnet USDC address when available
       'public': '',

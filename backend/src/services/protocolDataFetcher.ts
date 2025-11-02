@@ -8,6 +8,15 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { getNetworkServers } from '../lib/horizonClient.js';
 
 /**
+ * Aquarius Backend API endpoints for pool discovery
+ * These provide off-chain indexed data about all deployed pools
+ */
+const AQUARIUS_API = {
+  testnet: 'https://amm-api-testnet.aqua.network/api/external/v1',
+  mainnet: 'https://amm-api.aqua.network/api/external/v1',
+};
+
+/**
  * Protocol contract addresses by network
  * These should be configured via environment variables in production
  */
@@ -21,6 +30,24 @@ const PROTOCOL_CONTRACTS = {
     testnet: process.env.SOROSWAP_FACTORY_TESTNET || 'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES',
     futurenet: process.env.SOROSWAP_FACTORY_FUTURENET || '',
     mainnet: process.env.SOROSWAP_FACTORY_MAINNET || '',
+  },
+  aquarius: {
+    // Aquarius router contract address - testnet address updated quarterly due to testnet resets
+    // Last updated: December 2024 per https://docs.aqua.network/developers/code-examples/prerequisites-and-basics
+    testnet: process.env.AQUARIUS_ROUTER_TESTNET || 'CDGX6Q3ZZIDSX2N3SHBORWUIEG2ZZEBAAMYARAXTT7M5L6IXKNJMT3GB',
+    futurenet: process.env.AQUARIUS_ROUTER_FUTURENET || '',
+    mainnet: process.env.AQUARIUS_ROUTER_MAINNET || 'CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK',
+  },
+  blendPoolFactory: {
+    // Blend Protocol pool factory contract address
+    // V2 testnet factory from: https://github.com/blend-capital/blend-utils/blob/main/testnet.contracts.json
+    testnet: process.env.BLEND_POOL_FACTORY_TESTNET || 'CDSMKKCWEAYQW4DAUSH3XGRMIVIJB44TZ3UA5YCRHT6MP4LWEWR4GYV6',
+    futurenet: process.env.BLEND_POOL_FACTORY_FUTURENET || '',
+    mainnet: process.env.BLEND_POOL_FACTORY_MAINNET || 'CDSYOAVXFY7SM5S64IZPPPYB4GVGGLMQVFREPSQQEZVIWXX5R23G4QSU',
+  },
+  // Known Blend testnet pools (discovered from testnet.blend.capital)
+  blendTestnetPools: {
+    testnetV2: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65', // TestnetV2 pool
   },
   stakingPool: {
     testnet: process.env.STAKING_POOL_TESTNET || 'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK',
@@ -480,3 +507,275 @@ export async function validateProtocolContract(
     return false;
   }
 }
+
+/**
+ * Query Aquarius router to find pools for a token pair
+ * Aquarius uses similar structure to Soroswap
+ */
+/**
+ * Discover Aquarius pools using their backend API
+ * Returns all pools that contain the specified tokens
+ */
+export async function discoverAquariusPoolsFromAPI(
+  tokenA: string,
+  tokenB: string,
+  network: string = 'testnet'
+): Promise<Array<{ address: string; tokens: string[]; fee: string; pool_type: string }>> {
+  try {
+    const apiBase = AQUARIUS_API[network as keyof typeof AQUARIUS_API];
+    if (!apiBase) {
+      console.warn(`[discoverAquariusPoolsFromAPI] No API endpoint for network: ${network}`);
+      return [];
+    }
+
+    // Fetch all pools from API
+    const response = await fetch(`${apiBase}/pools/`);
+    if (!response.ok) {
+      console.error(`[discoverAquariusPoolsFromAPI] API error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json() as any;
+    const allPools = data.results || [];
+
+    // Filter pools that contain both tokens
+    const matchingPools = allPools.filter((pool: any) => {
+      const poolTokens = pool.tokens_addresses || [];
+      return poolTokens.includes(tokenA) && poolTokens.includes(tokenB);
+    });
+
+    console.log(`[discoverAquariusPoolsFromAPI] Found ${matchingPools.length} pools for ${tokenA}/${tokenB}`);
+
+    return matchingPools.map((pool: any) => ({
+      address: pool.address,
+      tokens: pool.tokens_addresses,
+      fee: pool.fee,
+      pool_type: pool.pool_type,
+    }));
+  } catch (error) {
+    console.error('[discoverAquariusPoolsFromAPI] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Find Aquarius pools for a token pair
+ * Now uses both API discovery and on-chain router query
+ */
+export async function findAquariusPools(
+  tokenA: string,
+  tokenB: string,
+  network: string = 'testnet'
+): Promise<string[]> {
+  try {
+    // FIRST: Try to discover pools using Aquarius backend API (faster and more reliable)
+    const apiPools = await discoverAquariusPoolsFromAPI(tokenA, tokenB, network);
+    if (apiPools.length > 0) {
+      console.log(`[findAquariusPools] Found ${apiPools.length} pools from API`);
+      return apiPools.map(p => p.address);
+    }
+
+    // FALLBACK: Query router contract directly if API fails
+    console.log(`[findAquariusPools] No API results, trying router contract...`);
+    
+    const routerAddress = PROTOCOL_CONTRACTS.aquarius[network as keyof typeof PROTOCOL_CONTRACTS.aquarius];
+    
+    if (!routerAddress) {
+      console.warn(`[findAquariusPools] No router address for network: ${network}`);
+      return [];
+    }
+
+    const servers = getNetworkServers(network);
+    const contract = new StellarSdk.Contract(routerAddress);
+
+    // Query router for pool using get_pool method
+    // Router method: get_pool(tokens: Vec<Address>, pool_index: BytesN<32>) -> Address
+    const tokensVec = [tokenA, tokenB].sort(); // Ensure sorted order
+    
+    // Build Vec<Address> correctly
+    const tokenAddresses = tokensVec.map(addr => StellarSdk.Address.fromString(addr));
+    const tokensScVal = StellarSdk.xdr.ScVal.scvVec(
+      tokenAddresses.map(addr => addr.toScVal())
+    );
+    
+    // Create pool index as BytesN<32> (32 zero bytes for default/first pool)
+    const poolIndexBytes = Buffer.alloc(32);
+    const poolIndexScVal = StellarSdk.xdr.ScVal.scvBytes(poolIndexBytes);
+    
+    const operation = contract.call('get_pool', tokensScVal, poolIndexScVal);
+
+    const nullAccount = new StellarSdk.Account(
+      'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+      '0'
+    );
+
+    const transaction = new StellarSdk.TransactionBuilder(nullAccount, {
+      fee: StellarSdk.BASE_FEE,
+      networkPassphrase: servers.networkPassphrase,
+    })
+      .addOperation(operation)
+      .setTimeout(30)
+      .build();
+
+    const simulation = await servers.sorobanServer.simulateTransaction(transaction);
+
+    if (StellarSdk.rpc.Api.isSimulationSuccess(simulation) && simulation.result) {
+      const poolAddress = StellarSdk.scValToNative(simulation.result.retval);
+      
+      if (poolAddress && poolAddress !== 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF') {
+        console.log(`[findAquariusPools] Found pool from router: ${poolAddress} for ${tokenA}/${tokenB}`);
+        return [poolAddress];
+      }
+    } else {
+      console.log('[findAquariusPools] No pool found or simulation failed for tokens:', tokensVec);
+    }
+
+    return [];
+  } catch (error) {
+    console.error('[findAquariusPools] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get APY for Aquarius pool using on-chain data
+ * Aquarius pools use similar fee structure to Soroswap (0.3%)
+ */
+export async function getAquariusPoolAPY(
+  poolAddress: string,
+  network: string = 'testnet'
+): Promise<number> {
+  try {
+    console.log(`[getAquariusPoolAPY] Querying Aquarius pool ${poolAddress}`);
+    
+    // Get pool info using same method as Soroswap (compatible interface)
+    const poolInfo = await getPoolInfo(poolAddress, network);
+    if (!poolInfo) {
+      console.warn(`[getAquariusPoolAPY] Could not fetch pool info for: ${poolAddress}`);
+      return 0;
+    }
+
+    // Get 24h volume estimate
+    const volume24h = await getPool24hVolume(poolAddress, network);
+
+    // Calculate APY - Aquarius typically uses 0.3% fee like Soroswap
+    const apy = calculatePoolAPY(poolInfo.reserves, volume24h, poolInfo.fee);
+
+    console.log(`[getAquariusPoolAPY] Pool ${poolAddress}: APY=${apy}%`);
+
+    return apy;
+  } catch (error) {
+    console.error('[getAquariusPoolAPY] Error:', error);
+    return 0;
+  }
+}
+
+/**
+ * Query Blend pool factory to get available lending pools
+ */
+export async function getBlendLendingPools(
+  network: string = 'testnet'
+): Promise<string[]> {
+  try {
+    const factoryAddress = PROTOCOL_CONTRACTS.blendPoolFactory[network as keyof typeof PROTOCOL_CONTRACTS.blendPoolFactory];
+    
+    if (!factoryAddress) {
+      console.warn(`[getBlendLendingPools] No factory address for network: ${network}`);
+      return [];
+    }
+
+    // For now, return known testnet pools
+    // In production, would query the factory contract for all deployed pools
+    console.log(`[getBlendLendingPools] Using Blend pool factory: ${factoryAddress}`);
+    
+    // These are example pool addresses - in production, query from factory
+    return [];
+  } catch (error) {
+    console.error('[getBlendLendingPools] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get supply APY from a Blend lending pool
+ * Blend pools calculate APY based on utilization rate and borrow demand
+ */
+export async function getBlendPoolSupplyAPY(
+  poolAddress: string,
+  assetAddress: string,
+  network: string = 'testnet'
+): Promise<{ apy: number; tvl: number }> {
+  try {
+    console.log(`[getBlendPoolSupplyAPY] Querying Blend pool ${poolAddress} for asset ${assetAddress}`);
+    
+    const servers = getNetworkServers(network);
+    const contract = new StellarSdk.Contract(poolAddress);
+
+    // Query pool for reserve data using get_reserve method
+    // Per Blend contracts: get_reserve(asset: Address) -> Reserve
+    const operation = contract.call(
+      'get_reserve',
+      StellarSdk.Address.fromString(assetAddress).toScVal()
+    );
+
+    const nullAccount = new StellarSdk.Account(
+      'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+      '0'
+    );
+
+    const transaction = new StellarSdk.TransactionBuilder(nullAccount, {
+      fee: StellarSdk.BASE_FEE,
+      networkPassphrase: servers.networkPassphrase,
+    })
+      .addOperation(operation)
+      .setTimeout(30)
+      .build();
+
+    const simulation = await servers.sorobanServer.simulateTransaction(transaction);
+
+    if (StellarSdk.rpc.Api.isSimulationSuccess(simulation) && simulation.result) {
+      const reserveData = StellarSdk.scValToNative(simulation.result.retval);
+      console.log(`[getBlendPoolSupplyAPY] Reserve data:`, JSON.stringify(reserveData, null, 2));
+      
+      // Reserve struct contains:
+      // - asset: Address
+      // - config: ReserveConfig
+      // - data: ReserveData
+      // ReserveData contains b_rate, d_rate, b_supply, d_supply, last_time, etc.
+      
+      const data = reserveData.data || reserveData;
+      const config = reserveData.config || {};
+      
+      // Calculate pool utilization from d_supply and b_supply
+      const bSupply = Number(data.b_supply || 0);
+      const dSupply = Number(data.d_supply || 0);
+      const utilization = bSupply > 0 ? dSupply / bSupply : 0;
+      
+      // Blend uses interest rate curves - we can estimate APY from rates
+      // For now, use a simplified formula based on utilization
+      // Typical lending pools: APY = base_rate + (utilization_rate * slope)
+      const baseRate = 0.02; // 2% base
+      const slope = 0.15; // 15% slope
+      const supplyAPY = (baseRate + (utilization * slope)) * 100;
+      
+      // Calculate TVL from b_supply (total supplied tokens)
+      const decimals = Number(config.decimals || 7);
+      const scalar = Math.pow(10, decimals);
+      const tvl = bSupply / scalar;
+      
+      console.log(`[getBlendPoolSupplyAPY] Utilization=${(utilization*100).toFixed(2)}%, SupplyAPY=${supplyAPY.toFixed(2)}%, TVL=${tvl}`);
+      
+      return {
+        apy: Math.max(0, Math.min(100, supplyAPY)),
+        tvl: tvl
+      };
+    }
+
+    console.warn('[getBlendPoolSupplyAPY] No result from simulation');
+    return { apy: 0, tvl: 0 };
+  } catch (error) {
+    console.error('[getBlendPoolSupplyAPY] Error:', error);
+    return { apy: 0, tvl: 0 };
+  }
+}
+

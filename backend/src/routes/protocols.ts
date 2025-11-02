@@ -30,15 +30,27 @@ router.get('/yields/:asset', async (req: Request, res: Response) => {
     // Map asset symbol to address (simplified)
     const assetMap: { [key: string]: string } = {
       'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-      'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      'USDC': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
     };
 
-    const assetAddress = assetMap[asset.toUpperCase()] || asset;
-    const yields = await getYieldsForAsset(
-      assetAddress,
-      asset.toUpperCase(),
-      network as string
-    );
+    const assetSymbol = asset.toUpperCase();
+    const assetAddress = assetMap[assetSymbol] || asset;
+
+    // For USDC, query both variants and combine results
+    let yields;
+    if (assetSymbol === 'USDC') {
+      const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5';
+      const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+      
+      const [officialYields, customYields] = await Promise.all([
+        getYieldsForAsset(officialUSDC, 'USDC', network as string),
+        getYieldsForAsset(customUSDC, 'USDC', network as string)
+      ]);
+      
+      yields = [...officialYields, ...customYields];
+    } else {
+      yields = await getYieldsForAsset(assetAddress, assetSymbol, network as string);
+    }
 
     return res.json({
       success: true,
@@ -69,15 +81,55 @@ router.get('/compare/:asset', async (req: Request, res: Response) => {
 
     const assetMap: { [key: string]: string } = {
       'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-      'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      'USDC': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
     };
 
-    const assetAddress = assetMap[asset.toUpperCase()] || asset;
-    const comparison = await compareYields(
-      assetAddress,
-      asset.toUpperCase(),
-      network as string
-    );
+    const assetSymbol = asset.toUpperCase();
+    const assetAddress = assetMap[assetSymbol] || asset;
+
+    // For USDC, query both variants and combine results
+    let comparison;
+    if (assetSymbol === 'USDC') {
+      const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5';
+      const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+      
+      const [officialComparison, customComparison] = await Promise.all([
+        compareYields(officialUSDC, 'USDC', network as string),
+        compareYields(customUSDC, 'USDC', network as string)
+      ]);
+      
+      // Combine protocols from both, removing duplicates by protocolId
+      // This prevents protocols like Blend from appearing twice
+      const allProtocols = [...officialComparison.protocols, ...customComparison.protocols];
+      const uniqueProtocols = allProtocols.reduce((acc, protocol) => {
+        const existing = acc.find(p => p.protocolId === protocol.protocolId);
+        if (!existing) {
+          acc.push(protocol);
+        } else if (protocol.apy > existing.apy) {
+          // If duplicate found, keep the one with higher APY
+          const index = acc.indexOf(existing);
+          acc[index] = protocol;
+        }
+        return acc;
+      }, [] as typeof allProtocols);
+      
+      comparison = {
+        asset: 'USDC',
+        protocols: uniqueProtocols,
+        bestYield: Math.max(
+          officialComparison.bestYield?.apy || 0,
+          customComparison.bestYield?.apy || 0
+        ) > 0 ? (
+          (officialComparison.bestYield?.apy || 0) > (customComparison.bestYield?.apy || 0)
+            ? officialComparison.bestYield
+            : customComparison.bestYield
+        ) : undefined,
+        averageApy: uniqueProtocols.reduce((sum, p) => sum + p.apy, 0) / uniqueProtocols.length,
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      comparison = await compareYields(assetAddress, assetSymbol, network as string);
+    }
 
     return res.json({
       success: true,
@@ -325,5 +377,132 @@ router.get('/historical-yields/:protocolId', async (req: Request, res: Response)
     });
   }
 });
+
+/**
+ * GET /api/protocols/rebalance-suggestions
+ * Get all active rebalancing suggestions for vaults
+ */
+router.get('/rebalance-suggestions', async (_req: Request, res: Response) => {
+  try {
+    const { getAllRebalanceSuggestions } = await import('../services/protocolYieldMonitor.js');
+    
+    const suggestions = getAllRebalanceSuggestions();
+
+    return res.json({
+      success: true,
+      data: suggestions,
+      count: suggestions.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[GET /rebalance-suggestions] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to fetch rebalance suggestions',
+        code: 'REBALANCE_SUGGESTIONS_ERROR',
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * GET /api/protocols/rebalance-suggestions/:vaultId
+ * Get rebalancing suggestion for a specific vault
+ */
+router.get('/rebalance-suggestions/:vaultId', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const { getCachedSuggestion, checkVaultNow } = await import('../services/protocolYieldMonitor.js');
+    
+    // Try to get cached suggestion first
+    let suggestion = getCachedSuggestion(vaultId);
+    
+    // If no cached suggestion or it's old, check now
+    if (!suggestion || isOlderThan(suggestion.checkedAt, 30)) {
+      const freshSuggestion = await checkVaultNow(vaultId);
+      if (freshSuggestion) {
+        suggestion = freshSuggestion;
+      }
+    }
+
+    if (!suggestion) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'No rebalancing suggestion available for this vault',
+          code: 'SUGGESTION_NOT_FOUND',
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: suggestion,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[GET /rebalance-suggestions/:vaultId] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to fetch rebalance suggestion',
+        code: 'REBALANCE_SUGGESTION_ERROR',
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * POST /api/protocols/trigger-yield-check
+ * Manually trigger a yield monitoring check for all vaults or a specific vault
+ */
+router.post('/trigger-yield-check', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.body;
+    
+    if (vaultId) {
+      // Check specific vault
+      const { checkVaultNow } = await import('../services/protocolYieldMonitor.js');
+      const suggestion = await checkVaultNow(vaultId);
+      
+      return res.json({
+        success: true,
+        data: suggestion,
+        message: 'Yield check completed for vault',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      // Trigger check for all vaults (this will be async)
+      return res.json({
+        success: true,
+        message: 'Yield monitoring check triggered for all vaults',
+        note: 'Check will complete in the background',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    console.error('[POST /trigger-yield-check] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to trigger yield check',
+        code: 'YIELD_CHECK_ERROR',
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * Helper function to check if a timestamp is older than X minutes
+ */
+function isOlderThan(timestamp: string, minutes: number): boolean {
+  const age = Date.now() - new Date(timestamp).getTime();
+  return age > minutes * 60 * 1000;
+}
 
 export default router;

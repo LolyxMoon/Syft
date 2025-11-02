@@ -146,10 +146,14 @@ interface ProtocolComparisonViewProps {
 }
 
 function ProtocolComparisonView({ comparison, onSelect }: ProtocolComparisonViewProps) {
-  const getRiskColor = (apy: number) => {
-    if (apy > 15) return 'text-error-400';
-    if (apy > 10) return 'text-warning-400';
-    return 'text-success-400';
+  const getRiskColor = (apy: number, isBest: boolean = false) => {
+    // For best yield display, always show as positive
+    if (isBest) return 'text-success-400';
+    
+    // For protocol list, indicate risk level
+    if (apy > 15) return 'text-warning-400'; // High yield = higher risk (but not red)
+    if (apy > 10) return 'text-success-400';
+    return 'text-success-500';
   };
 
   // Safety check: ensure protocols array exists
@@ -169,7 +173,7 @@ function ProtocolComparisonView({ comparison, onSelect }: ProtocolComparisonView
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <p className="text-xs text-neutral-400 mb-1">Best APY</p>
-            <p className={`text-xl font-bold ${getRiskColor(comparison.bestYield.apy)}`}>
+            <p className={`text-xl font-bold ${getRiskColor(comparison.bestYield.apy, true)}`}>
               {comparison.bestYield.apy.toFixed(2)}%
             </p>
             <p className="text-xs text-neutral-500 mt-1">{comparison.bestYield.protocolName}</p>
@@ -189,9 +193,11 @@ function ProtocolComparisonView({ comparison, onSelect }: ProtocolComparisonView
         </div>
       </div>
 
-      {/* Protocol List */}
+      {/* Protocol List - Sorted by APY (highest first) */}
       <div className="space-y-2">
-        {comparison.protocols.map((protocol, index) => (
+        {[...comparison.protocols]
+          .sort((a, b) => b.apy - a.apy)
+          .map((protocol, index) => (
           <div
             key={protocol.protocolId}
             className={`bg-neutral-800 rounded-lg p-4 border ${
@@ -216,7 +222,7 @@ function ProtocolComparisonView({ comparison, onSelect }: ProtocolComparisonView
                 </div>
               </div>
               <div className="text-right">
-                <p className={`text-2xl font-bold ${getRiskColor(protocol.apy)}`}>
+                <p className={`text-2xl font-bold ${getRiskColor(protocol.apy, protocol.protocolId === comparison.bestYield.protocolId)}`}>
                   {protocol.apy.toFixed(2)}%
                 </p>
                 <p className="text-xs text-neutral-500 mt-1">
@@ -285,7 +291,7 @@ function SmartRoutingView({ routing, amount: _amount }: SmartRoutingViewProps) {
               <div className="flex items-center gap-2">
                 <div className="w-1 h-12 rounded-full bg-primary-400"></div>
                 <div>
-                  <p className="font-medium text-neutral-100">{allocation.protocolId}</p>
+                  <p className="font-medium text-neutral-100">{allocation.protocolName}</p>
                   <p className="text-xs text-neutral-500">
                     APY: {allocation.expectedApy.toFixed(2)}%
                   </p>

@@ -20,7 +20,7 @@ interface RouterConfig {
 const DEFAULT_CONFIG: RouterConfig = {
   maxProtocols: 3,
   minAllocationPerProtocol: 10, // $10 minimum
-  riskTolerance: 'medium',
+  riskTolerance: 'high', // Accept all risk levels to maximize yield opportunities
   preferLiquidity: true,
   gasOptimization: true,
 };
@@ -35,7 +35,7 @@ function getAssetAddress(asset: string, network: string): string {
       'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
     },
     'USDC': {
-      'testnet': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      'testnet': 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5', // Official Stellar testnet USDC
       'mainnet': 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
     },
   };
@@ -63,19 +63,51 @@ export async function calculateOptimalRouting(
   // Map asset symbol to address (if needed)
   const assetAddress = getAssetAddress(asset, network);
   
-  // Get all available yield opportunities
-  const opportunities = await getYieldOpportunities([assetAddress], network);
+  // For USDC, query both variants and combine results (like the comparison endpoint does)
+  let opportunities: YieldOpportunity[] = [];
+  
+  if (asset.toUpperCase() === 'USDC') {
+    const officialUSDC = 'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5';
+    const customUSDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
+    
+    const [officialOpps, customOpps] = await Promise.all([
+      getYieldOpportunities([officialUSDC], network),
+      getYieldOpportunities([customUSDC], network)
+    ]);
+    
+    // Combine and deduplicate by protocolId (keep highest APY)
+    const allOpps = [...officialOpps, ...customOpps];
+    const uniqueOpps = allOpps.reduce((acc, opp) => {
+      const existing = acc.find(o => o.protocolId === opp.protocolId);
+      if (!existing) {
+        acc.push(opp);
+      } else if (opp.apy > existing.apy) {
+        // If duplicate found, keep the one with higher APY
+        const index = acc.indexOf(existing);
+        acc[index] = opp;
+      }
+      return acc;
+    }, [] as YieldOpportunity[]);
+    
+    opportunities = uniqueOpps;
+  } else {
+    // Get all available yield opportunities
+    opportunities = await getYieldOpportunities([assetAddress], network);
+  }
 
   console.log(`[calculateOptimalRouting] Asset: ${asset}, Address: ${assetAddress}, Opportunities: ${opportunities.length}`);
+  console.log('[calculateOptimalRouting] Raw opportunities:', opportunities.map(o => ({ protocol: o.protocolName, apy: o.apy, risk: o.risk })));
 
   // Filter by risk tolerance
   const filteredOpportunities = filterByRisk(opportunities, routerConfig.riskTolerance);
+  console.log('[calculateOptimalRouting] Filtered opportunities:', filteredOpportunities.map(o => ({ protocol: o.protocolName, apy: o.apy, risk: o.risk })));
 
   // Sort opportunities
   const sortedOpportunities = sortOpportunities(
     filteredOpportunities,
     routerConfig.preferLiquidity
   );
+  console.log('[calculateOptimalRouting] Sorted opportunities:', sortedOpportunities.map(o => ({ protocol: o.protocolName, apy: o.apy, risk: o.risk })));
 
   // Calculate allocations
   const allocations = calculateAllocations(
@@ -86,8 +118,10 @@ export async function calculateOptimalRouting(
 
   console.log(`[calculateOptimalRouting] Allocations:`, allocations.map(a => ({
     protocol: a.protocolId,
+    protocolName: a.protocolName,
     amount: a.amount,
     percentage: a.percentage,
+    apy: a.expectedApy,
   })));
 
   // Calculate blended APY
@@ -170,6 +204,7 @@ function calculateAllocations(
     const best = opportunities[0];
     return [{
       protocolId: best.protocolId,
+      protocolName: best.protocolName,
       amount: totalAmount,
       percentage: 100,
       expectedApy: best.apy,
@@ -199,6 +234,7 @@ function calculateAllocations(
       if (remaining >= config.minAllocationPerProtocol) {
         allocations.push({
           protocolId: protocol.protocolId,
+          protocolName: protocol.protocolName,
           amount: remaining,
           percentage: (remaining / totalAmount) * 100,
           expectedApy: protocol.apy,
@@ -222,6 +258,7 @@ function calculateAllocations(
 
       allocations.push({
         protocolId: protocol.protocolId,
+        protocolName: protocol.protocolName,
         amount,
         percentage: (amount / totalAmount) * 100,
         expectedApy: protocol.apy,
