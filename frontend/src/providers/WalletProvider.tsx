@@ -92,6 +92,23 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Listen to custom wallet connection events from the same tab
+  const handleWalletConnected = (e: CustomEvent) => {
+    console.log("[WalletProvider] Wallet connected event received:", e.detail);
+    
+    const { address: walletAddr, network: walletNetwork, networkPassphrase: passphrase } = e.detail;
+    const normalizedNetwork = walletNetwork?.toLowerCase();
+    
+    if (walletAddr && normalizedNetwork && passphrase) {
+      console.log("[WalletProvider] Updating state from wallet connection");
+      updateState({
+        address: walletAddr,
+        network: normalizedNetwork,
+        networkPassphrase: passphrase,
+      });
+    }
+  };
+
   useEffect(() => {
     // Try to restore wallet connection from localStorage on mount
     // This allows the wallet to stay connected across page refreshes
@@ -138,10 +155,14 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for storage events (for cross-tab sync)
     window.addEventListener('storage', handleStorageChange);
+    
+    // Listen for wallet connection events from the same tab
+    window.addEventListener('walletConnected', handleWalletConnected as EventListener);
 
     // Cleanup
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('walletConnected', handleWalletConnected as EventListener);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- it SHOULD only run once per component mount
 

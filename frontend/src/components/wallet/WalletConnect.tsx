@@ -45,6 +45,16 @@ export const WalletConnect = () => {
       storage.setItem('walletNetwork', networkData.network);
       storage.setItem('networkPassphrase', networkData.networkPassphrase);
 
+      // Dispatch a custom event to notify WalletProvider of the connection
+      // This is necessary because storage events don't fire in the same tab
+      window.dispatchEvent(new CustomEvent('walletConnected', {
+        detail: {
+          address: addressData.address,
+          network: networkData.network,
+          networkPassphrase: networkData.networkPassphrase,
+        }
+      }));
+
       // Close modal on success
       setIsModalOpen(false);
     } catch (err: any) {

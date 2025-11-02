@@ -32,6 +32,25 @@ export const connectWallet = async () => {
           storage.setItem("walletId", selectedId);
           storage.setItem("walletAddress", address.address);
           console.log("[connectWallet] Saved walletId and address to storage");
+          
+          // Also get and save network info
+          void kit.getNetwork().then((network) => {
+            console.log("[connectWallet] Got network:", network.network);
+            if (network.network && network.networkPassphrase) {
+              storage.setItem("walletNetwork", network.network);
+              storage.setItem("networkPassphrase", network.networkPassphrase);
+              console.log("[connectWallet] Saved network info to storage");
+              
+              // Dispatch custom event to notify WalletProvider
+              window.dispatchEvent(new CustomEvent('walletConnected', {
+                detail: {
+                  address: address.address,
+                  network: network.network,
+                  networkPassphrase: network.networkPassphrase,
+                }
+              }));
+            }
+          });
         }
       });
       if (selectedId == "freighter" || selectedId == "hot-wallet") {
