@@ -47,13 +47,15 @@ const Home = () => {
       };
     }
 
-    // Load the script
+    // Load the script immediately (no async to prioritize loading)
     const script = document.createElement('script');
     script.src = '/unicornStudio.umd.js';
-    script.async = true;
+    // Remove async to load immediately and block rendering until ready
+    // script.async = true;
     
     script.onload = () => {
-      setTimeout(initUnicorn, 100);
+      // Reduce delay to init faster
+      requestAnimationFrame(initUnicorn);
     };
     
     document.head.appendChild(script);
@@ -195,7 +197,7 @@ const Home = () => {
     <div className="min-h-screen bg-app">
       {/* Hero Section with Animated Background */}
       <section className="relative overflow-hidden py-24 md:py-32 bg-app">
-        {/* UnicornStudio Animated Background */}
+        {/* UnicornStudio Animated Background with loading fallback */}
         <div 
           data-us-project="4gq2Yrv2p0bIa0hdLPQx" 
           className="absolute inset-0 w-full h-full"
@@ -206,6 +208,7 @@ const Home = () => {
             width: '100%',
             height: '100%',
             zIndex: 0,
+            background: 'radial-gradient(circle at 50% 50%, rgba(220, 232, 93, 0.1) 0%, rgba(9, 10, 10, 0) 50%)',
           }}
         />
 
@@ -213,14 +216,14 @@ const Home = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.3 }}
             className="text-center"
           >
             {/* Heading */}
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              transition={{ delay: 0, duration: 0.3 }}
               className="text-5xl md:text-7xl font-bold mb-4 text-white tracking-tight leading-[0.95]"
             >
               Build Smarter Vaults on{' '}
@@ -231,7 +234,7 @@ const Home = () => {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
               className="text-lg md:text-xl text-[#a1a1aa] mb-8 max-w-2xl mx-auto"
             >
               Create, deploy, and manage automated yield strategies.
@@ -242,7 +245,7 @@ const Home = () => {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.2, duration: 0.3 }}
               className="flex flex-col sm:flex-row gap-3 justify-center mb-16"
             >
               <Button
@@ -259,7 +262,7 @@ const Home = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.3 }}
+              transition={{ delay: 0.3, duration: 0.3 }}
               className="grid grid-cols-2 md:grid-cols-4 gap-3"
             >
               {stats.map((stat) => {
