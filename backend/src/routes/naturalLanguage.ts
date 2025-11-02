@@ -97,7 +97,29 @@ Guidelines:
 function extractVaultParams(body: any) {
   // Check if this is a VAPI message format with toolCalls
   if (body.message?.toolCalls?.[0]?.function?.arguments) {
-    return body.message.toolCalls[0].function.arguments;
+    const args = body.message.toolCalls[0].function.arguments;
+    
+    // If we have conversation history, extract relevant user messages to build context
+    const conversationContext: string[] = [];
+    if (body.message?.artifact?.messages) {
+      const messages = body.message.artifact.messages;
+      
+      // Find all user messages to understand full intent
+      for (const msg of messages) {
+        if (msg.role === 'user' && msg.message) {
+          conversationContext.push(msg.message);
+        }
+      }
+    }
+    
+    // Enhance prompt with conversation context
+    if (conversationContext.length > 1) {
+      // Combine all user messages to preserve full context
+      const fullContext = conversationContext.join(' ');
+      args.prompt = fullContext;
+    }
+    
+    return args;
   }
   
   // Otherwise, assume it's a direct POST with parameters
@@ -170,19 +192,34 @@ router.post('/generate-vault', async (req, res) => {
       type: 'smoothstep',
     }));
 
-    res.json({
-      success: true,
-      data: {
-        nodes,
-        edges,
-        metadata: {
-          name: vaultConfig.name,
-          description: vaultConfig.description,
-          riskLevel: vaultConfig.riskLevel,
-          estimatedAPY: vaultConfig.estimatedAPY,
-        },
+    const result = {
+      nodes,
+      edges,
+      metadata: {
+        name: vaultConfig.name,
+        description: vaultConfig.description,
+        riskLevel: vaultConfig.riskLevel,
+        estimatedAPY: vaultConfig.estimatedAPY,
       },
-    });
+    };
+
+    // Check if this is a VAPI request (has message object)
+    if (req.body.message) {
+      // VAPI format: return result directly with a results array
+      res.json({
+        results: [
+          {
+            result: JSON.stringify(result),
+          }
+        ]
+      });
+    } else {
+      // Direct API call format
+      res.json({
+        success: true,
+        data: result,
+      });
+    }
 
   } catch (error: any) {
     console.error('[NL API] Error generating vault:', error);
@@ -229,8 +266,7 @@ router.post('/explain-contract', async (req, res) => {
       const completion = await openai.chat.completions.create({
         model: 'gpt-5-nano-2025-08-07',
         messages,
-        temperature: 0.7,
-        max_tokens: 1000,
+        temperature: 0.7
       });
 
       explanation = completion.choices[0].message.content || '';
@@ -252,8 +288,7 @@ router.post('/explain-contract', async (req, res) => {
       const completion = await openai.chat.completions.create({
         model: 'gpt-5-nano-2025-08-07',
         messages,
-        temperature: 0.7,
-        max_tokens: 1000,
+        temperature: 0.7
       });
 
       explanation = completion.choices[0].message.content || '';
@@ -306,7 +341,6 @@ router.post('/analyze-strategy', async (req, res) => {
       model: 'gpt-5-nano-2025-08-07',
       messages,
       temperature: 0.7,
-      max_tokens: 1500,
     });
 
     const analysis = completion.choices[0].message.content || '';
