@@ -13,9 +13,6 @@ export const WalletButton = () => {
   const { address, isPending } = useWallet();
   const { xlm, isLoading: isLoadingBalance, error: balanceError, updateBalance } = useWalletBalance();
   const buttonLabel = isPending ? "Connecting..." : "Connect Wallet";
-  
-  // Log balance state for debugging
-  console.log("[WalletButton] Balance state:", { xlm, isLoadingBalance, balanceError, address });
 
   const handleCopyAddress = () => {
     if (address) {

@@ -33,16 +33,36 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
       if (actionType === 'stake') {
         const protocols = await getProtocolsByType('staking', network as any);
         setAvailableProtocols(protocols);
+        // Set default protocol if none selected
+        if (!localProtocol && protocols.length > 0) {
+          const defaultProtocol = protocols[0].name;
+          setLocalProtocol(defaultProtocol);
+          updateNodeData(id, { protocol: defaultProtocol });
+        }
       } else if (actionType === 'provide_liquidity') {
         const protocols = await getProtocolsByType('liquidity', network as any);
         setAvailableProtocols(protocols);
+        // Set Soroswap as default for liquidity (or first available)
+        if (!localProtocol && protocols.length > 0) {
+          const soroswap = protocols.find(p => p.name === 'Soroswap') || protocols.find(p => p.name === 'Aquarius') || protocols[0];
+          const defaultProtocol = soroswap.name;
+          setLocalProtocol(defaultProtocol);
+          updateNodeData(id, { protocol: defaultProtocol });
+        }
       } else if (actionType === 'swap') {
         const protocols = await getProtocolsByType('dex', network as any);
         setAvailableProtocols(protocols);
+        // Set Soroswap as default for swaps (or first available)
+        if (!localProtocol && protocols.length > 0) {
+          const soroswap = protocols.find(p => p.name === 'Soroswap') || protocols[0];
+          const defaultProtocol = soroswap.name;
+          setLocalProtocol(defaultProtocol);
+          updateNodeData(id, { protocol: defaultProtocol });
+        }
       }
     };
     loadProtocols();
-  }, [actionType, network]);
+  }, [actionType, network, localProtocol, id, updateNodeData]);
 
   const handleTargetAssetChange = useCallback((value: string) => {
     setLocalTargetAsset(value);

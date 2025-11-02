@@ -1,4 +1,5 @@
 import express, { Express, Request, Response } from 'express';
+import { createServer } from 'http';
 import dotenv from 'dotenv';
 import corsMiddleware from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -7,6 +8,7 @@ import apiRoutes from './routes/index.js';
 import { startRuleMonitoring } from './services/ruleTriggerService.js';
 import { startVaultSync } from './services/vaultSyncService.js';
 import { executeRebalance } from './services/vaultActionService.js';
+import { wsService } from './services/websocketService.js';
 
 // Load environment variables
 dotenv.config();
@@ -72,8 +74,14 @@ app.use((_req: Request, res: Response) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
+// Create HTTP server for both Express and WebSocket
+const server = createServer(app);
+
+// Initialize WebSocket server
+wsService.initialize(server);
+
 // Start server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`
 ╔═══════════════════════════════════════╗
 ║   🚀 Syft Backend API Server         ║
@@ -84,6 +92,7 @@ app.listen(port, () => {
   `);
   console.log('📡 Server is ready to accept connections');
   console.log('🏥 Health check: http://localhost:' + port + '/health');
+  console.log('🔌 WebSocket: ws://localhost:' + port + '/ws');
   
   // Display transaction mode
   const mvpMode = process.env.MVP_MODE === 'true';

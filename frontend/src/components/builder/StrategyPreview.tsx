@@ -67,7 +67,7 @@ const StrategyPreview = ({ nodes, edges }: StrategyPreviewProps) => {
                 className={`
                   p-2.5 rounded border text-xs leading-relaxed
                   ${isAllocation ? 'bg-blue-500/10 border-blue-500/30 text-blue-100' : ''}
-                  ${isWarning ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-100' : ''}
+                  ${isWarning ? 'bg-yellow-500/10 border-yellow-500/30 text-black' : ''}
                   ${!isAllocation && !isWarning ? 'bg-white/5 border-white/10' : ''}
                 `}
               >

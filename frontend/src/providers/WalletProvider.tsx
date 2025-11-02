@@ -22,8 +22,6 @@ const initialState = {
   networkPassphrase: undefined,
 };
 
-const POLL_INTERVAL = 1000;
-
 export const WalletContext = // eslint-disable-line react-refresh/only-export-components
   createContext<WalletContextType>({ isPending: true });
 
@@ -63,26 +61,25 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
-  const updateCurrentWalletState = () => {
-    // Check storage for wallet data
+  // Listen to storage events from other tabs/windows
+  const handleStorageChange = (e: StorageEvent) => {
+    // Only respond to wallet-related storage changes
+    if (!e.key || !['walletId', 'walletAddress', 'walletNetwork', 'networkPassphrase'].includes(e.key)) {
+      return;
+    }
+
+    console.log("[WalletProvider] Storage change detected:", e.key);
+
+    // Re-check wallet state
     const walletId = storage.getItem("walletId");
     const walletAddr = storage.getItem("walletAddress");
     const walletNetworkRaw = storage.getItem("walletNetwork");
-    // Normalize network to lowercase (Freighter stores as 'TESTNET', we need 'testnet')
     const walletNetwork = walletNetworkRaw?.toLowerCase();
     const passphrase = storage.getItem("networkPassphrase");
 
-    console.log("[WalletProvider] Polling - Storage:", { walletId, walletAddr, walletNetwork: walletNetworkRaw, passphrase });
-    console.log("[WalletProvider] Polling - State:", { address: state.address, network: state.network });
-    console.log("[WalletProvider] Normalized network:", walletNetwork);
-
-    // If storage has wallet data, sync it to state
     if (walletId && walletAddr && walletNetwork && passphrase) {
-      // User has connected wallet, sync to state
-      console.log("[WalletProvider] Storage has wallet data, syncing to state");
-      // Update if address, network, or passphrase changed
       if (state.address !== walletAddr || state.network !== walletNetwork || state.networkPassphrase !== passphrase) {
-        console.log("[WalletProvider] Updating state - address:", walletAddr, "network:", walletNetwork);
+        console.log("[WalletProvider] Syncing state from storage");
         updateState({
           address: walletAddr,
           network: walletNetwork,
@@ -90,17 +87,12 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
     } else if (state.address) {
-      // Storage is empty but state has address = user disconnected
-      // Clear the state
-      console.log("[WalletProvider] Storage empty but state has address - CLEARING STATE");
+      console.log("[WalletProvider] Clearing state - wallet disconnected");
       updateState(initialState);
     }
   };
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    let isMounted = true;
-
     // Try to restore wallet connection from localStorage on mount
     // This allows the wallet to stay connected across page refreshes
     const restoreWalletConnection = async () => {
@@ -144,28 +136,12 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     // Restore connection on mount
     void restoreWalletConnection();
 
-    // Create recursive polling function to check wallet state continuously
-    const pollWalletState = () => {
-      if (!isMounted) return;
+    // Listen for storage events (for cross-tab sync)
+    window.addEventListener('storage', handleStorageChange);
 
-      updateCurrentWalletState();
-
-      if (isMounted) {
-        timer = setTimeout(() => void pollWalletState(), POLL_INTERVAL);
-      }
-    };
-
-    // Start polling after attempting to restore
-    timer = setTimeout(() => {
-      if (isMounted) {
-        pollWalletState();
-      }
-    }, POLL_INTERVAL);
-
-    // Clear the timeout and stop polling when the component unmounts
+    // Cleanup
     return () => {
-      isMounted = false;
-      if (timer) clearTimeout(timer);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- it SHOULD only run once per component mount
 

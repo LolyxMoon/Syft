@@ -62,16 +62,16 @@ const ValidationFeedback = ({ validation }: ValidationFeedbackProps) => {
       {warnings.length > 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-yellow-100 text-sm">
+              <h3 className="font-semibold text-black text-sm">
                 {warnings.length} Warning{warnings.length > 1 ? 's' : ''}
               </h3>
               <ul className="mt-2 space-y-1.5">
                 {warnings.map((warning, index) => (
                   <li
                     key={index}
-                    className="text-xs text-yellow-200"
+                    className="text-xs text-black"
                   >
                     <div>
                       <span className="font-medium">
@@ -80,7 +80,7 @@ const ValidationFeedback = ({ validation }: ValidationFeedbackProps) => {
                       {warning.message}
                     </div>
                     {warning.suggestion && (
-                      <div className="mt-1 text-[10px] italic text-yellow-300/80">
+                      <div className="mt-1 text-[10px] italic text-black/80">
                         💡 {warning.suggestion}
                       </div>
                     )}

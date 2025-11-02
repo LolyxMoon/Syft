@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, DollarSign, Percent, Box, Activity, AlertCircle } from 'lucide-react';
 import { Card, Button, Skeleton } from '../components/ui';
 import { useWallet } from '../providers/WalletProvider';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { Link } from 'react-router-dom';
 import { resolveAssetNames } from '../services/tokenService';
 
@@ -50,30 +51,54 @@ const Dashboard = () => {
   const [resolvedTokenNames, setResolvedTokenNames] = useState<Record<string, string>>({}); // Cache for resolved token names
   const { address, network, networkPassphrase } = useWallet();
 
+  const normalizeNetwork = useCallback((net?: string, passphrase?: string): string => {
+    if (!net) return 'testnet';
+    if (passphrase) {
+      if (passphrase.includes('Test SDF Future')) return 'futurenet';
+      if (passphrase.includes('Test SDF Network')) return 'testnet';
+      if (passphrase.includes('Public Global')) return 'mainnet';
+    }
+    const normalized = net.toLowerCase();
+    if (normalized === 'standalone' || normalized === 'futurenet') return 'futurenet';
+    if (normalized === 'testnet') return 'testnet';
+    if (normalized === 'mainnet' || normalized === 'public') return 'mainnet';
+    return 'testnet';
+  }, []);
+
+  // Memoize WebSocket callbacks to prevent infinite reconnections
+  const handleVaultUpdate = useCallback((vaultId: string, data: any) => {
+    console.log("[Dashboard] 🔔 Received vault update via WebSocket:", vaultId, data);
+  }, []);
+
+  const handleRebalanceComplete = useCallback((vaultId: string, data: any) => {
+    console.log("[Dashboard] 🔔 Received rebalance complete via WebSocket:", vaultId, data);
+  }, []);
+
+  const handlePriceUpdate = useCallback((asset: string, price: number) => {
+    console.log("[Dashboard] 🔔 Received price update via WebSocket:", asset, price);
+    if (asset === 'XLM') {
+      setXlmPrice(price);
+    }
+  }, []);
+
+  // WebSocket integration for real-time updates
+  useWebSocket({
+    onVaultUpdate: handleVaultUpdate,
+    onRebalanceComplete: handleRebalanceComplete,
+    onPriceUpdate: handlePriceUpdate,
+  });
+
   useEffect(() => {
-    // Fetch XLM price on mount
+    // Fetch XLM price on mount (real-time updates via WebSocket)
     fetchXLMPrice();
-
-    // Auto-refresh XLM price every 60 seconds
-    const priceInterval = setInterval(() => {
-      fetchXLMPrice();
-    }, 60000);
-
-    return () => clearInterval(priceInterval);
   }, []);
 
   useEffect(() => {
     if (address) {
+      // Initial data fetch
       fetchVaults(false);
       fetchPortfolioAnalytics();
-
-      // Auto-refresh vaults and analytics every 15 seconds (background updates)
-      const refreshInterval = setInterval(() => {
-        fetchVaults(true);
-        fetchPortfolioAnalytics();
-      }, 15000);
-
-      return () => clearInterval(refreshInterval);
+      // Real-time updates handled by WebSocket
     } else {
       setLoading(false);
       setIsInitialLoad(false);
@@ -233,26 +258,6 @@ const Dashboard = () => {
     } catch (err) {
       console.error('[Dashboard] Failed to fetch user positions:', err);
     }
-  };
-
-  // Map Freighter network names to our backend format
-  const normalizeNetwork = (net?: string, passphrase?: string): string => {
-    if (!net) return 'testnet';
-    
-    // Check network passphrase for accurate detection
-    if (passphrase) {
-      if (passphrase.includes('Test SDF Future')) return 'futurenet';
-      if (passphrase.includes('Test SDF Network')) return 'testnet';
-      if (passphrase.includes('Public Global')) return 'mainnet';
-    }
-    
-    // Fallback to network name mapping
-    const normalized = net.toLowerCase();
-    if (normalized === 'standalone' || normalized === 'futurenet') return 'futurenet';
-    if (normalized === 'testnet') return 'testnet';
-    if (normalized === 'mainnet' || normalized === 'public') return 'mainnet';
-    
-    return 'testnet'; // Default fallback
   };
 
   const fetchVaults = async (isBackground = false) => {

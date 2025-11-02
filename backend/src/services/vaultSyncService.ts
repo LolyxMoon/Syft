@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase.js';
 import { monitorVaultState, recordPerformanceSnapshot } from './vaultMonitorService.js';
 import { stroopsToUSD } from './priceService.js';
+import { wsService } from './websocketService.js';
 
 /**
  * Sync vault state from blockchain to Supabase
@@ -50,6 +51,14 @@ export async function syncVaultState(vaultId: string): Promise<boolean> {
     const totalValueInUSD = await stroopsToUSD(totalValueInStroops);
     
     await recordPerformanceSnapshot(vaultId, totalValueInUSD);
+
+    // Broadcast vault update via WebSocket
+    wsService.broadcastVaultUpdate(vaultId, {
+      totalValue: totalValueInUSD,
+      totalShares: state.totalShares,
+      lastRebalance: state.lastRebalance,
+      assetBalances: state.assetBalances,
+    });
 
     return true;
   } catch (error) {

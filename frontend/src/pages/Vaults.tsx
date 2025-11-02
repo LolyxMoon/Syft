@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Box, DollarSign, TrendingUp, AlertCircle, 
@@ -9,6 +9,7 @@ import {
 import { Card, Button, Skeleton } from '../components/ui';
 import { useWallet } from '../providers/WalletProvider';
 import { resolveAssetNames } from '../services/tokenService';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Vault {
   vault_id: string;
@@ -61,7 +62,7 @@ const Vaults = () => {
   const [resolvedTokenNames, setResolvedTokenNames] = useState<Record<string, string>>({});
   const { address, network, networkPassphrase } = useWallet();
 
-  const normalizeNetwork = (net?: string, passphrase?: string): string => {
+  const normalizeNetwork = useCallback((net?: string, passphrase?: string): string => {
     if (!net) return 'testnet';
     if (passphrase) {
       if (passphrase.includes('Test SDF Future')) return 'futurenet';
@@ -73,25 +74,11 @@ const Vaults = () => {
     if (normalized === 'testnet') return 'testnet';
     if (normalized === 'mainnet' || normalized === 'public') return 'mainnet';
     return 'testnet';
-  };
-
-  useEffect(() => {
-    fetchXLMPrice();
-    const priceInterval = setInterval(() => {
-      fetchXLMPrice();
-    }, 60000);
-    return () => clearInterval(priceInterval);
   }, []);
 
-  useEffect(() => {
-    if (address) {
-      fetchVaults();
-    }
-  }, [address, network]);
-
-  const fetchXLMPrice = async () => {
+  const fetchXLMPrice = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
       const response = await fetch(`${backendUrl}/api/price/xlm`);
       if (response.ok) {
         const data = await response.json();
@@ -102,9 +89,9 @@ const Vaults = () => {
     } catch (err) {
       console.error('[Vaults] Failed to fetch XLM price:', err);
     }
-  };
+  }, []); // No dependencies - stable function
 
-  const fetchVaults = async () => {
+  const fetchVaults = useCallback(async () => {
     if (!address) return;
     
     setLoading(true);
@@ -112,7 +99,7 @@ const Vaults = () => {
 
     try {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
       // Fetch owned vaults
       const ownedResponse = await fetch(
@@ -143,7 +130,35 @@ const Vaults = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [address, network, networkPassphrase, normalizeNetwork]); // Stable dependencies now
+
+  // Memoize callbacks to prevent infinite WebSocket re-subscriptions
+  const handleVaultUpdate = useCallback((vaultId: string, _data: any) => {
+    console.log('🔄 Vault update received:', vaultId);
+    void fetchVaults();
+  }, [fetchVaults]);
+
+  const handleRebalanceComplete = useCallback((vaultId: string, data: any) => {
+    console.log('✅ Rebalance complete:', vaultId, data);
+    void fetchVaults();
+  }, [fetchVaults]);
+
+  // WebSocket for real-time updates
+  useWebSocket({
+    onVaultUpdate: handleVaultUpdate,
+    onRebalanceComplete: handleRebalanceComplete,
+  });
+
+  // Fetch initial data
+  useEffect(() => {
+    void fetchXLMPrice();
+  }, []); // Only once on mount
+
+  useEffect(() => {
+    if (address) {
+      void fetchVaults();
+    }
+  }, [address, network, fetchVaults]); // Only refetch when address or network changes
 
   const getResolvedAssetNames = (vault: Vault) => {
     const vaultKey = vault.vault_id;

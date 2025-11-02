@@ -3,6 +3,7 @@ import { horizonServer, getNetworkServers } from '../lib/horizonClient.js';
 import { supabase } from '../lib/supabase.js';
 import { invokeVaultMethod } from './vaultDeploymentService.js';
 import { invalidateVaultCache } from './vaultMonitorService.js';
+import { wsService } from './websocketService.js';
 
 /**
  * Helper to get asset contract address from asset code
@@ -709,6 +710,13 @@ export async function executeRebalance(
     const { syncVaultState } = await import('./vaultSyncService.js');
     await syncVaultState(vaultId);
     console.log(`✅ Performance snapshot recorded after rebalance for vault ${vaultId}`);
+
+    // Broadcast rebalance completion via WebSocket
+    wsService.broadcastRebalanceComplete(vaultId, {
+      ruleIndex,
+      transactionHash: txHash || `fallback_tx_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    });
 
     return {
       success: true,

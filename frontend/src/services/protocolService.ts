@@ -77,6 +77,20 @@ function getProtocolRegistry(): ProtocolInfo[] {
       docs: 'https://docs.soroswap.finance',
     },
     {
+      id: 'soroswap-liquidity',
+      name: 'Soroswap',
+      description: 'Add liquidity to Soroswap AMM pools',
+      type: 'liquidity',
+      networks: ['testnet', 'futurenet', 'mainnet'],
+      contractAddress: {
+        testnet: process.env.PUBLIC_SOROSWAP_ROUTER_TESTNET || '',
+        futurenet: process.env.PUBLIC_SOROSWAP_ROUTER_FUTURENET || '',
+        mainnet: process.env.PUBLIC_SOROSWAP_ROUTER_MAINNET || '',
+      },
+      website: 'https://soroswap.finance',
+      docs: 'https://docs.soroswap.finance',
+    },
+    {
       id: 'aquarius',
       name: 'Aquarius',
       description: 'Liquidity protocol and AMM',

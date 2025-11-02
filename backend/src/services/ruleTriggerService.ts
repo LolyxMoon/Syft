@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import { monitorVaultState } from './vaultMonitorService.js';
+import { wsService } from './websocketService.js';
 
 export interface RuleTrigger {
   vaultId: string;
@@ -39,12 +40,21 @@ export async function evaluateVaultRules(vaultId: string): Promise<RuleTrigger[]
       const triggered = await evaluateRule(rule, state, vault);
 
       if (triggered) {
-        triggers.push({
+        const triggerData: RuleTrigger = {
           vaultId,
           ruleIndex: i,
           triggered: true,
           triggerTime: new Date().toISOString(),
           conditionMet: rule.condition_type,
+        };
+        
+        triggers.push(triggerData);
+        
+        // Broadcast rule trigger via WebSocket
+        wsService.broadcastRuleTrigger(vaultId, i, {
+          condition: rule.condition_type,
+          action: rule.action,
+          triggered: true,
         });
       }
     }

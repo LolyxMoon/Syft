@@ -23,14 +23,14 @@ export const Button = ({
   disabled,
   ...props
 }: ButtonProps) => {
-  const baseStyles = 'font-medium rounded-md transition-all duration-200 inline-flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseStyles = 'font-medium rounded-md transition-all duration-200 inline-flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed active:scale-95';
   
   const variants = {
-    primary: 'bg-primary-500 hover:bg-primary-600 text-dark-950 border-transparent font-semibold',
+    primary: 'bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-black border-transparent font-semibold [&>*]:text-black',
     secondary: 'bg-neutral-800 hover:bg-neutral-700 text-neutral-50 border-neutral-700',
     outline: 'bg-transparent hover:bg-neutral-900 text-neutral-50 border-default hover:border-hover',
     ghost: 'bg-transparent hover:bg-neutral-900 text-neutral-300 hover:text-neutral-50 border-transparent',
-    gradient: 'bg-primary-500 hover:bg-primary-600 text-dark-950 border-transparent font-semibold',
+    gradient: 'bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-black border-transparent font-semibold [&>*]:text-black',
   };
   
   const sizes = {

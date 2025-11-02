@@ -47,13 +47,15 @@ export const MessageModal: React.FC<MessageModalProps> = ({
       size="md"
       closeButton={true}
     >
-      <div className="flex flex-col items-center text-center gap-4">
-        <div className={textColorVariants[variant]}>
+      <div className="flex flex-col items-center gap-4">
+        <div className={`${textColorVariants[variant]} flex-shrink-0`}>
           {iconVariants[variant]}
         </div>
-        <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap">
-          {message}
-        </p>
+        <div className="text-center w-full max-h-[50vh] overflow-y-auto px-2">
+          <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap break-words word-break">
+            {message}
+          </p>
+        </div>
       </div>
 
       <div className="mt-6 flex justify-center gap-3">

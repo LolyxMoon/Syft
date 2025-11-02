@@ -143,8 +143,8 @@ export const TransactionApproval = ({
         {/* Warning banner */}
         <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
           <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-yellow-300">
+            <Shield className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-black">
               <p className="font-semibold mb-1">Review carefully</p>
               <p>Make sure you trust this transaction before approving.</p>
             </div>

@@ -419,8 +419,8 @@ export function MintAndListModal({
                 <div className="p-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-2">
                   <Package className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs text-yellow-400 font-medium mb-0.5">No NFTs Available</p>
-                    <p className="text-xs text-yellow-400/80">
+                    <p className="text-xs text-black font-medium mb-0.5">No NFTs Available</p>
+                    <p className="text-xs text-black/80">
                       Go back and mint an NFT first
                     </p>
                   </div>

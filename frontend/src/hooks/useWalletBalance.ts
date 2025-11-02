@@ -19,8 +19,8 @@ type WalletBalance = {
   error: Error | null;
 };
 
-// Fallback polling interval (30 seconds) - only used if streaming fails
-const FALLBACK_POLL_INTERVAL = 30000;
+// Reconnect delay after stream error (5 seconds)
+const RECONNECT_DELAY = 5000;
 
 export const useWalletBalance = () => {
   const { address, network } = useWallet();
@@ -32,9 +32,7 @@ export const useWalletBalance = () => {
     error: null,
   });
   const streamCloseRef = useRef<(() => void) | null>(null);
-  const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isStreamingRef = useRef<boolean>(false);
 
   const updateBalance = useCallback(async () => {
     if (!address) {
@@ -125,7 +123,6 @@ export const useWalletBalance = () => {
           .stream({
             onmessage: (account) => {
               console.log("[useWalletBalance] ✅ Real-time update received via stream");
-              isStreamingRef.current = true;
               
               const balances = account.balances;
               const isFunded = checkFunding(balances);
@@ -142,13 +139,12 @@ export const useWalletBalance = () => {
             },
             onerror: (error) => {
               console.error("[useWalletBalance] ❌ Stream error:", error);
-              isStreamingRef.current = false;
               
-              // Try to reconnect after 5 seconds
+              // Try to reconnect after delay
               reconnectTimeoutRef.current = setTimeout(() => {
                 console.log("[useWalletBalance] 🔄 Attempting to reconnect stream...");
                 setupStream();
-              }, 5000);
+              }, RECONNECT_DELAY);
             },
           });
 
@@ -156,42 +152,25 @@ export const useWalletBalance = () => {
         console.log("[useWalletBalance] 📡 Stream established successfully");
       } catch (error) {
         console.error("[useWalletBalance] Failed to setup stream:", error);
-        isStreamingRef.current = false;
       }
     };
 
     // Setup the stream
     setupStream();
 
-    // Setup fallback polling as backup (in case streaming fails)
-    fallbackIntervalRef.current = setInterval(() => {
-      // Only poll if streaming seems to be inactive
-      if (!isStreamingRef.current) {
-        console.log("[useWalletBalance] 🔄 Fallback poll - streaming inactive");
-        void updateBalance();
-      }
-    }, FALLBACK_POLL_INTERVAL);
-
     // Cleanup on unmount or when address/network changes
     return () => {
-      console.log("[useWalletBalance] 🧹 Cleaning up stream and intervals");
+      console.log("[useWalletBalance] 🧹 Cleaning up stream");
       
       if (streamCloseRef.current) {
         streamCloseRef.current();
         streamCloseRef.current = null;
       }
       
-      if (fallbackIntervalRef.current) {
-        clearInterval(fallbackIntervalRef.current);
-        fallbackIntervalRef.current = null;
-      }
-      
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      
-      isStreamingRef.current = false;
     };
   }, [address, network, updateBalance]);
 

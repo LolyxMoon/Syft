@@ -23,8 +23,8 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const sizeClasses = {
     sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
+    md: 'max-w-2xl',
+    lg: 'max-w-4xl',
   };
 
   return (
@@ -47,14 +47,14 @@ export const Modal: React.FC<ModalProps> = ({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
             onClick={(e) => e.stopPropagation()}
-            className={`fixed inset-0 z-50 flex items-center justify-center p-4`}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className={`${sizeClasses[size]} w-full bg-card border border-default rounded-lg shadow-lg overflow-hidden`}
+              className={`${sizeClasses[size]} w-full bg-card border border-default rounded-lg shadow-lg my-auto max-h-[90vh] flex flex-col`}
             >
               {/* Header */}
               {(title || closeButton) && (
-                <div className="flex items-center justify-between p-6 border-b border-default">
+                <div className="flex items-center justify-between p-6 border-b border-default flex-shrink-0">
                   {title && (
                     <h2 className="text-lg font-semibold text-text-primary">
                       {title}
@@ -72,13 +72,13 @@ export const Modal: React.FC<ModalProps> = ({
               )}
 
               {/* Content */}
-              <div className="p-6 text-text-primary">
+              <div className="p-6 text-text-primary overflow-y-auto overflow-x-hidden flex-1 min-h-0">
                 {children}
               </div>
 
               {/* Footer */}
               {footer && (
-                <div className="px-6 py-4 bg-secondary border-t border-default flex gap-3 justify-end">
+                <div className="px-6 py-4 bg-secondary border-t border-default flex gap-3 justify-end flex-shrink-0">
                   {footer}
                 </div>
               )}
