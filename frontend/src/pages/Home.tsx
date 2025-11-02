@@ -199,14 +199,17 @@ const Home = () => {
               transition={{ delay: 0.2, duration: 0.3 }}
               className="flex flex-col sm:flex-row gap-3 justify-center mb-16"
             >
-              <Button
-                size="lg"
-                variant="shimmer"
-                rightIcon={<ArrowRight size={18} />}
-                onClick={() => navigate('/app/builder')}
-              >
-                Start Building
-              </Button>
+              {/* Constrain CTA width on small screens so it doesn't stretch full-width */}
+              <div className="w-full sm:w-auto max-w-[360px] mx-auto">
+                <Button
+                  size="lg"
+                  variant="shimmer"
+                  rightIcon={<ArrowRight size={18} />}
+                  onClick={() => navigate('/app/builder')}
+                >
+                  Start Building
+                </Button>
+              </div>
             </motion.div>
 
             {/* Stats Bar */}
