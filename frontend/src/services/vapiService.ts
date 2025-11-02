@@ -152,16 +152,21 @@ class VapiService {
   }
 
   private handleMessage(message: any) {
+    console.log('[VAPI] ===== MESSAGE RECEIVED =====');
+    console.log('[VAPI] Message type:', message.type);
+    console.log('[VAPI] Full message:', JSON.stringify(message, null, 2));
+    
     // Handle different message types
     switch (message.type) {
       case 'transcript':
         this.handleTranscript(message);
         break;
       case 'function-call':
+        console.log('[VAPI] Handling function-call');
         this.handleFunctionCall(message);
         break;
       case 'function-call-result':
-        console.log('[VAPI] Function call result:', message);
+        console.log('[VAPI] Handling function-call-result');
         this.handleFunctionCallResult(message);
         break;
       case 'conversation-update':
@@ -172,7 +177,7 @@ class VapiService {
         this.emit('statusUpdate', message);
         break;
       default:
-        console.log('[VAPI] Unknown message type:', message);
+        console.log('[VAPI] Unknown message type:', message.type);
     }
 
     // Emit all messages to subscribers
