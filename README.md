@@ -70,7 +70,15 @@ Create yield vaults using three powerful interfaces:
 - Track community vault performance
 - Creator badges and reputation system
 
-### 6. Enterprise-Grade Infrastructure
+### 6. Best Yield Opportunities Dashboard
+
+- Real-time protocol comparison (Blend, Soroswap, Aquarius)
+- Live APY rates across multiple protocols
+- Smart routing for optimal yield opportunities
+- TVL and liquidity information for each protocol
+- One-click protocol selection for vault strategies
+
+### 7. Enterprise-Grade Infrastructure
 
 - Built with Soroban (Stellar's smart contract platform)
 - PostgreSQL database via Supabase
