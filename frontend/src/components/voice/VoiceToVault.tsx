@@ -7,7 +7,7 @@
 import { motion } from 'framer-motion';
 import { Mic, MicOff, Phone, PhoneOff, Volume2, MessageSquare, Loader2, Activity, Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
+import { useVoiceAssistantContext } from '../../providers/VoiceAssistantProvider';
 import type { Node, Edge } from '@xyflow/react';
 
 interface VoiceToVaultProps {
@@ -32,7 +32,7 @@ export function VoiceToVault({
     onVaultGenerated: registerVaultCallback,
     onStrategyRefinement: registerRefinementCallback,
     onContractExplanation: registerExplanationCallback,
-  } = useVoiceAssistant();
+  } = useVoiceAssistantContext();
 
   const showTranscript = true;
   const [textInput, setTextInput] = useState('');

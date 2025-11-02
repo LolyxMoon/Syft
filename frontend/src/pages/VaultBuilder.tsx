@@ -15,6 +15,7 @@ import { ConfigSerializer } from '../lib/configSerializer';
 import { useBuilderHistory } from '../hooks/useBuilderHistory';
 import { vaultTemplates } from '../data/vaultTemplates';
 import { useWallet } from '../providers/WalletProvider';
+import { VoiceAssistantProvider } from '../providers/VoiceAssistantProvider';
 import { useNavigate } from 'react-router-dom';
 import type { PaletteItem, ValidationResult } from '../types/blocks';
 
@@ -626,22 +627,23 @@ const VaultBuilder = () => {
   }, [pushState, vaultDescription, modal]);
 
   return (
-    <div className="h-full bg-app flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-default bg-secondary">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Left: Title & Vault Name */}
-            <div className="flex items-center gap-4">
-              <h1 className="text-lg font-bold text-neutral-50 flex items-center gap-3">
-                <Box className="w-8 h-8 text-primary-500" />
-                Vault Builder
-              </h1>
-              <div className="h-6 w-px bg-default"></div>
-              
-              {/* Builder Mode Toggle */}
-              <div className="flex items-center gap-2 bg-neutral-900 border border-default rounded-md p-1">
-                <button
+    <VoiceAssistantProvider>
+      <div className="h-full bg-app flex flex-col">
+        {/* Header */}
+        <div className="flex-shrink-0 border-b border-default bg-secondary">
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between">
+              {/* Left: Title & Vault Name */}
+              <div className="flex items-center gap-4">
+                <h1 className="text-lg font-bold text-neutral-50 flex items-center gap-3">
+                  <Box className="w-8 h-8 text-primary-500" />
+                  Vault Builder
+                </h1>
+                <div className="h-6 w-px bg-default"></div>
+                
+                {/* Builder Mode Toggle */}
+                <div className="flex items-center gap-2 bg-neutral-900 border border-default rounded-md p-1">
+                  <button
                   onClick={() => setBuilderMode('visual')}
                   className={`
                     flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-all
@@ -751,10 +753,10 @@ const VaultBuilder = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
-        {/* Visual Builder Mode */}
-        <div className={`flex-1 flex overflow-hidden ${builderMode === 'visual' ? '' : 'hidden'}`}>
-          {/* Left Sidebar - Block Palette */}
-          <div className="w-72 flex-shrink-0 border-r border-default bg-card overflow-hidden flex flex-col">
+        {builderMode === 'visual' ? (
+          <>
+            {/* Left Sidebar - Block Palette */}
+            <div className="w-72 flex-shrink-0 border-r border-default bg-card overflow-hidden flex flex-col">
               <div className="flex-1 overflow-y-auto">
                 <BlockPalette onBlockSelect={handleBlockSelect} />
               </div>
@@ -953,9 +955,10 @@ const VaultBuilder = () => {
                 </div>
               </div>
             </div>
-
-        {/* AI Chat Builder Mode */}
-        <div className={`flex-1 flex overflow-hidden ${builderMode === 'chat' ? '' : 'hidden'}`}>
+          </>
+        ) : builderMode === 'chat' ? (
+          /* AI Chat Builder Mode */
+          <div className="flex-1 flex overflow-hidden">
             {/* Chat Interface - Takes most of the space */}
             <div className="flex-1 overflow-hidden">
               <NaturalLanguageBuilder 
@@ -1055,9 +1058,9 @@ const VaultBuilder = () => {
               </div>
             </div>
           </div>
-
-        {/* Voice Builder Mode */}
-        <div className={`flex-1 flex overflow-hidden ${builderMode === 'voice' ? '' : 'hidden'}`}>
+        ) : (
+          /* Voice Builder Mode */
+          <div className="flex-1 flex overflow-hidden">
             {/* Voice Interface - Takes most of the space */}
             <div className="flex-1 overflow-hidden">
               <VoiceToVault
@@ -1162,7 +1165,7 @@ const VaultBuilder = () => {
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Load Saved Vaults Modal */}
@@ -1386,7 +1389,8 @@ const VaultBuilder = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </VoiceAssistantProvider>
   );
 };
 
