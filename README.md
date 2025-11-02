@@ -565,7 +565,7 @@ Private strategy testing without revealing:
 2. Set environment variables
 3. Deploy with one click
 
-**Live URL**: https://syft-defi-platform.vercel.app
+**Live URL**: https://syft-stellar.vercel.app
 
 ### Heroku (Backend)
 
@@ -574,7 +574,7 @@ Private strategy testing without revealing:
 3. Set environment variables
 4. Deploy via Git push
 
-**API URL**: https://syft-defi-backend.herokuapp.com
+**API URL**: https://syft-f6ad696f49ee.herokuapp.com
 
 ### Contract Deployment
 
