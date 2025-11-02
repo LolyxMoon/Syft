@@ -27,7 +27,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
       try {
         const response = await fetch(
-          `http://localhost:3001/api/vaults/${vaultId}/history?limit=${limit}`
+          `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/history?limit=${limit}`
         );
         const data = await response.json();
 

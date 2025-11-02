@@ -65,7 +65,7 @@ export const VaultDeployment: React.FC<VaultDeploymentProps> = ({
       setDeploymentStatus('Deploying vault contract...');
 
       // Call backend API to deploy vault
-      const response = await fetch('http://localhost:3001/api/vaults', {
+      const response = await fetch('https://syft-f6ad696f49ee.herokuapp.com/api/vaults', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

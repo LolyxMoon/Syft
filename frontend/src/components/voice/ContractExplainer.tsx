@@ -29,7 +29,7 @@ export function ContractExplainer({ vaultConfig, vaultId, contractCode }: Contra
       setLoading(true);
       setError('');
       
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nl/explain-contract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

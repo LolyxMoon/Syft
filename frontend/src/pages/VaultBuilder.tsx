@@ -97,7 +97,7 @@ const VaultBuilder = () => {
     try {
       setLoadingVaults(true);
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/user/${address}?status=draft&network=${normalizedNetwork}`);
       const data = await response.json();
 
@@ -204,7 +204,7 @@ const VaultBuilder = () => {
       
       // Save to backend
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/drafts`, {
         method: 'POST',
         headers: {
@@ -343,7 +343,7 @@ const VaultBuilder = () => {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       console.log(`[VaultBuilder] Deploying vault on network: ${normalizedNetwork}`);
       
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
       // Step 1: Build unsigned transaction from backend
       console.log(`[VaultBuilder] Building unsigned deployment transaction...`);

@@ -47,7 +47,7 @@ export const VaultDashboard: React.FC<VaultDashboardProps> = ({
 
   const fetchXLMPrice = async () => {
     try {
-      const backendUrl = 'http://localhost:3001';
+      const backendUrl = 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/price/xlm`);
       if (response.ok) {
         const data = await response.json();
@@ -66,7 +66,7 @@ export const VaultDashboard: React.FC<VaultDashboardProps> = ({
 
     try {
       const response = await fetch(
-        `http://localhost:3001/api/vaults/${vaultId}`
+        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}`
       );
       const data = await response.json();
 

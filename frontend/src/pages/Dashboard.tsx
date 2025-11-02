@@ -118,7 +118,7 @@ const Dashboard = () => {
 
   const fetchXLMPrice = async () => {
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/price/xlm`);
       if (response.ok) {
         const data = await response.json();
@@ -136,7 +136,7 @@ const Dashboard = () => {
   const fetchPortfolioAnalytics = async () => {
     try {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(
         `${backendUrl}/api/analytics/portfolio/${address}?network=${normalizedNetwork}`
       );
@@ -156,7 +156,7 @@ const Dashboard = () => {
   const fetchPortfolioPerformanceHistory = async () => {
     try {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
       // Map selected period to days
       const daysMap: Record<string, number> = {
@@ -186,7 +186,7 @@ const Dashboard = () => {
   const fetchPortfolioAllocation = async () => {
     try {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(
         `${backendUrl}/api/analytics/portfolio/${address}/allocation?network=${normalizedNetwork}`
       );
@@ -205,7 +205,7 @@ const Dashboard = () => {
 
   const fetchVaultAnalytics = async () => {
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const analyticsMap: Record<string, any> = {};
       
       await Promise.all(
@@ -235,7 +235,7 @@ const Dashboard = () => {
     if (!address || vaults.length === 0) return;
     
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const positionsMap: Record<string, any> = {};
       
       await Promise.all(
@@ -272,7 +272,7 @@ const Dashboard = () => {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       console.log(`[Dashboard] Fetching vaults for network: ${normalizedNetwork}${isBackground ? ' (background)' : ''}`);
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/user/${address}?network=${normalizedNetwork}`);
       
       if (!response.ok) {

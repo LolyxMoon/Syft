@@ -86,7 +86,7 @@ const Analytics = () => {
     setError(null);
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       
       // Fetch all analytics data in parallel

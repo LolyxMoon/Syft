@@ -35,7 +35,7 @@ export function RebalancingAlert({ vaultId, network = 'testnet', onRebalance }: 
   const { address, signTransaction } = useWallet();
   const notification = useContext(NotificationContext);
 
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
   useEffect(() => {
     fetchSuggestion();
@@ -321,7 +321,7 @@ export function RebalancingSuggestionsList() {
   const [suggestions, setSuggestions] = useState<RebalanceSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
   useEffect(() => {
     fetchAllSuggestions();

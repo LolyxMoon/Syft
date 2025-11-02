@@ -158,7 +158,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
   // Function call handlers
   const handleGenerateVault = async (params: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nl/generate-vault`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,7 +210,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
 
   const handleExplainContract = async (params: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nl/explain-contract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -242,7 +242,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
 
   const handleGetTemplates = async (params: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nl/vault-templates?category=${params.category || 'all'}`);
       const result = await response.json();
 
@@ -259,7 +259,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
 
   const handleAnalyzeStrategy = async (params: any) => {
     try {
-      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nl/analyze-strategy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

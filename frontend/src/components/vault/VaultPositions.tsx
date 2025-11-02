@@ -47,7 +47,7 @@ export const VaultPositions: React.FC<VaultPositionsProps> = ({ vaultId }) => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/vaults/${vaultId}/positions`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://syft-f6ad696f49ee.herokuapp.com'}/api/vaults/${vaultId}/positions`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch positions');

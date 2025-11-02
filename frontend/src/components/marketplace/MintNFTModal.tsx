@@ -35,7 +35,7 @@ export function MintNFTModal({ isOpen, onClose, vaultId, vaultName, onSuccess }:
         throw new Error('NFT name is required');
       }
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nfts/${vaultId}/nft`, {
         method: 'POST',
         headers: {

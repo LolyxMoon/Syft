@@ -33,7 +33,7 @@ export function SentimentIndicator({ assetCode, assetName, compact = false }: Se
     setError(null);
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/suggestions/sentiment/${assetCode}`);
       
       if (!response.ok) {

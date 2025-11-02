@@ -61,7 +61,7 @@ export function MintAndListModal({
       const walletAddress = localStorage.getItem('walletAddress');
       if (!walletAddress) return;
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/nfts`);
       const data = await response.json();
 
@@ -97,7 +97,7 @@ export function MintAndListModal({
         throw new Error('NFT name is required');
       }
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/nfts/${vaultId}/nft`, {
         method: 'POST',
         headers: {
@@ -151,7 +151,7 @@ export function MintAndListModal({
         throw new Error('Please select an NFT to list');
       }
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/marketplace/listings`, {
         method: 'POST',
         headers: {

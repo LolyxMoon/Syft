@@ -83,7 +83,7 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
     setError('');
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const params = new URLSearchParams({
         status: 'active',
         sortBy,
@@ -157,7 +157,7 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
       setSubscribing(listing.listing_id);
 
       // Backend URL (local fallback)
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
       // Call subscribe endpoint
       console.log(`[Subscribe] Sending request with network: "${effectiveNetwork}"`);

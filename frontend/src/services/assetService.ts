@@ -23,7 +23,7 @@ export interface TokenValidationResult {
  */
 export async function fetchPopularTokens(network: Network = 'testnet'): Promise<TokenInfo[]> {
   try {
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const response = await fetch(`${backendUrl}/api/tokens/popular?network=${network}`);
     const data = await response.json();
 
@@ -55,7 +55,7 @@ export async function validateTokenContract(
       };
     }
 
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const response = await fetch(
       `${backendUrl}/api/tokens/validate/${address}?network=${network}`
     );
@@ -96,7 +96,7 @@ export async function searchTokens(
 ): Promise<TokenInfo[]> {
   try {
     // First try server-side search (will query Horizon API by asset_code)
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const response = await fetch(`${backendUrl}/api/tokens/popular?network=${network}&search=${encodeURIComponent(query)}`);
     const data = await response.json();
 

@@ -49,7 +49,7 @@ export function ChatHistoryPanel({
     setError(null);
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       // Filter by wallet address if available
       const url = walletAddress 
         ? `${backendUrl}/api/chat/sessions?walletAddress=${encodeURIComponent(walletAddress)}`
@@ -90,7 +90,7 @@ export function ChatHistoryPanel({
     }
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/chat/sessions/${sessionId}`, {
         method: 'DELETE',
       });

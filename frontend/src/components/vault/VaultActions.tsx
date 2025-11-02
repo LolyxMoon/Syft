@@ -35,7 +35,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       
       setLoadingShares(true);
       try {
-        const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:3001';
+        const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
         const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/position/${address}`);
         const data = await response.json();
         
@@ -110,7 +110,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       // Step 1: Build unsigned transaction from backend
       console.log(`[VaultActions] 🎯 Optimal routing calculated, building transaction...`);
       const buildResponse = await fetch(
-        `http://localhost:3001/api/vaults/${vaultId}/build-deposit`,
+        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/build-deposit`,
         {
           method: 'POST',
           headers: {
@@ -146,7 +146,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       // Step 3: Submit signed transaction
       const submitResponse = await fetch(
-        `http://localhost:3001/api/vaults/${vaultId}/submit-deposit`,
+        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/submit-deposit`,
         {
           method: 'POST',
           headers: {
@@ -176,7 +176,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
         
         // Build rebalance transaction
         const rebalanceResponse = await fetch(
-          `http://localhost:3001/api/vaults/${vaultId}/build-rebalance`,
+          `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/build-rebalance`,
           {
             method: 'POST',
             headers: {
@@ -205,7 +205,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
           // Submit rebalance transaction
           const submitRebalanceResponse = await fetch(
-            `http://localhost:3001/api/vaults/${vaultId}/submit-rebalance`,
+            `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/submit-rebalance`,
             {
               method: 'POST',
               headers: {
@@ -290,7 +290,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       // Step 1: Build unsigned transaction from backend
       console.log(`[VaultActions] Building unsigned withdrawal transaction...`);
       const buildResponse = await fetch(
-        `http://localhost:3001/api/vaults/${vaultId}/build-withdraw`,
+        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/build-withdraw`,
         {
           method: 'POST',
           headers: {
@@ -323,7 +323,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       // Step 3: Submit signed transaction
       const submitResponse = await fetch(
-        `http://localhost:3001/api/vaults/${vaultId}/submit-withdraw`,
+        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/submit-withdraw`,
         {
           method: 'POST',
           headers: {

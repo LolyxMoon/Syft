@@ -12,7 +12,7 @@ export const FeeEstimator: React.FC = () => {
     const fetchFees = async () => {
       try {
         const response = await fetch(
-          'http://localhost:3001/api/vaults/estimate-fees',
+          'https://syft-f6ad696f49ee.herokuapp.com/api/vaults/estimate-fees',
           {
             method: 'POST',
             headers: {

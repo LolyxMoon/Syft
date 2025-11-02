@@ -33,7 +33,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
       return;
     }
 
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const wsUrl = backendUrl.replace(/^http/, 'ws') + '/ws';
 
     console.log('🔌 Connecting to WebSocket:', wsUrl);
