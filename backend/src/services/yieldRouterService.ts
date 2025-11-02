@@ -26,6 +26,30 @@ const DEFAULT_CONFIG: RouterConfig = {
 };
 
 /**
+ * Map asset symbol to contract address
+ */
+function getAssetAddress(asset: string, network: string): string {
+  const assetMap: { [key: string]: { [network: string]: string } } = {
+    'XLM': {
+      'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+      'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+    },
+    'USDC': {
+      'testnet': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      'mainnet': 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
+    },
+  };
+
+  // If it's already an address (starts with C), return as is
+  if (asset.startsWith('C')) {
+    return asset;
+  }
+
+  // Otherwise look up by symbol
+  return assetMap[asset]?.[network] || asset;
+}
+
+/**
  * Calculate optimal yield routing strategy
  */
 export async function calculateOptimalRouting(
@@ -36,8 +60,13 @@ export async function calculateOptimalRouting(
 ): Promise<YieldRoutingStrategy> {
   const routerConfig = { ...DEFAULT_CONFIG, ...config };
 
+  // Map asset symbol to address (if needed)
+  const assetAddress = getAssetAddress(asset, network);
+  
   // Get all available yield opportunities
-  const opportunities = await getYieldOpportunities([asset], network);
+  const opportunities = await getYieldOpportunities([assetAddress], network);
+
+  console.log(`[calculateOptimalRouting] Asset: ${asset}, Address: ${assetAddress}, Opportunities: ${opportunities.length}`);
 
   // Filter by risk tolerance
   const filteredOpportunities = filterByRisk(opportunities, routerConfig.riskTolerance);
@@ -54,6 +83,12 @@ export async function calculateOptimalRouting(
     totalAmount,
     routerConfig
   );
+
+  console.log(`[calculateOptimalRouting] Allocations:`, allocations.map(a => ({
+    protocol: a.protocolId,
+    amount: a.amount,
+    percentage: a.percentage,
+  })));
 
   // Calculate blended APY
   const expectedBlendedApy = calculateBlendedAPY(
@@ -168,6 +203,7 @@ function calculateAllocations(
           percentage: (remaining / totalAmount) * 100,
           expectedApy: protocol.apy,
         });
+        remaining = 0; // Mark as fully allocated
       }
     } else {
       // Calculate weighted allocation

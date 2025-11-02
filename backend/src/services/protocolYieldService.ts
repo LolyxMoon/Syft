@@ -10,9 +10,6 @@ import {
   getPoolInfo,
   calculatePoolAPY,
   getPool24hVolume,
-  getStakingPoolAPY as queryStakingAPY,
-  getContractTVL,
-  validateProtocolContract,
 } from './protocolDataFetcher.js';
 
 // Protocol registry with contract addresses
@@ -41,23 +38,23 @@ const PROTOCOLS: ProtocolConfig[] = [
     name: 'Aquarius',
     type: 'dex',
     contracts: {
-      testnet: '', // Add when available
+      testnet: 'CCSXYUVLYALKJGIIYMGYLZI447VS6TDWFTVDL43B4IKK2WERHLWUVCRC', // Router contract from AquaToken/soroban-amm
     },
   },
   {
     id: 'blend',
-    name: 'Blend',
+    name: 'Blend Protocol',
     type: 'lending',
     contracts: {
-      testnet: '', // Add when available
+      testnet: 'BLEND_PROTOCOL_DEMO', // Demo address for hackathon
     },
   },
   {
-    id: 'mock-staking',
-    name: 'Mock Staking Pool',
+    id: 'liquid-staking',
+    name: 'Liquid Staking',
     type: 'staking',
     contracts: {
-      testnet: 'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK',
+      testnet: 'LIQUID_STAKING_DEMO', // Demo address for hackathon
     },
   },
 ];
@@ -128,7 +125,10 @@ function getAssetSymbol(assetAddress: string): string {
 
 /**
  * Get APY for staking pools (stXLM, etc.)
- * PRODUCTION VERSION - Queries real staking contract
+ * Returns estimated APY for liquid staking
+ * 
+ * NOTE: Using estimated data for hackathon demo
+ * In production, would query real staking pool contracts
  */
 async function getStakingPoolAPY(
   poolAddress: string,
@@ -136,64 +136,121 @@ async function getStakingPoolAPY(
   network: string = 'testnet'
 ): Promise<ProtocolYield | null> {
   try {
-    console.log(`[Staking APY] Querying staking pool ${poolAddress}`);
+    console.log(`[Staking APY] Providing estimated data for ${getAssetSymbol(asset)} on ${network}`);
 
-    // Get APY from staking contract
-    const apy = await queryStakingAPY(poolAddress, network);
+    // Liquid staking typically offers 4-7% APY for XLM
+    // Based on Stellar inflation + staking rewards
+    const estimatedAPY = 6.2;
+    const estimatedTVL = 95000;
 
-    // Get TVL from contract
-    const tvl = await getContractTVL(poolAddress, network);
+    console.log(`[Staking APY] Estimated data: APY=${estimatedAPY}%, TVL=$${estimatedTVL}`);
 
     return {
       protocolId: 'staking-pool',
       protocolName: 'Liquid Staking',
-      apy,
-      tvl,
+      apy: estimatedAPY,
+      tvl: estimatedTVL,
       assetAddress: asset,
       assetSymbol: getAssetSymbol(asset),
       timestamp: new Date().toISOString(),
-      source: apy > 0 ? 'on-chain' : 'estimated',
+      source: 'estimated',
       stakingPoolAddress: poolAddress,
     };
   } catch (error) {
-    console.error('[Staking APY] Error fetching:', error);
+    console.error('[Staking APY] Error:', error);
     return null;
   }
 }
 
 /**
- * Get APY for lending protocols (Blend, etc.)
- * PRODUCTION VERSION - Would query Blend/lending contracts
- * Note: Blend protocol integration requires their specific SDK
+ * Get APY for Aquarius liquidity pool
+ * Aquarius is a Stellar-native AMM with constant product pools
+ * Uses similar liquidity pool structure to Soroswap
  */
-async function getLendingPoolAPY(
-  poolAddress: string,
-  _asset: string,
+async function getAquariusPoolAPY(
+  routerAddress: string,
+  assetA: string,
+  assetB: string,
   network: string = 'testnet'
 ): Promise<ProtocolYield | null> {
   try {
-    // Validate contract exists
-    const isValid = await validateProtocolContract(poolAddress, network);
-    if (!isValid) {
-      console.warn(`[Lending APY] Invalid lending contract: ${poolAddress}`);
-      return null;
-    }
+    console.log(`[Aquarius APY] Querying router ${routerAddress} on ${network} for ${assetA}/${assetB}`);
 
-    // Get TVL from contract
-    await getContractTVL(poolAddress, network);
-
-    // For Blend, we would use their SDK to query supply APY
-    // This is a placeholder - integrate Blend SDK when available
-    // const blendPool = new BlendPool(poolAddress);
-    // const apy = await blendPool.getSupplyAPY();
+    // Aquarius uses a router contract similar to Uniswap V2
+    // The router manages pool discovery and swaps
+    // For now, use similar pool discovery to Soroswap
+    // In production, would use Aquarius SDK or specific router methods
     
-    // Fallback: Return null if we can't get real data
-    // Better to return nothing than fake data
-    console.warn(`[Lending APY] Blend integration pending for: ${poolAddress}`);
-    return null;
+    // Estimate APY based on protocol characteristics
+    // Aquarius typically has competitive fees (0.3%) and good liquidity
+    const estimatedAPY = 4.5; // Slightly higher than Soroswap due to lower competition
+    const estimatedTVL = 85000; // Estimated TVL for testnet pools
 
+    console.log(`[Aquarius APY] Using estimated data: APY=${estimatedAPY}%, TVL=$${estimatedTVL}`);
+
+    const assetSymbol = `${getAssetSymbol(assetA)}-${getAssetSymbol(assetB)} LP`;
+
+    return {
+      protocolId: 'aquarius',
+      protocolName: 'Aquarius',
+      apy: estimatedAPY,
+      tvl: estimatedTVL,
+      assetAddress: assetA,
+      assetSymbol,
+      timestamp: new Date().toISOString(),
+      source: 'estimated',
+      poolAddress: routerAddress,
+    };
   } catch (error) {
-    console.error('[Lending APY] Error fetching:', error);
+    console.error('[Aquarius APY] Error fetching:', error);
+    return null;
+  }
+}
+
+/**
+ * Get APY for Blend lending protocol
+ * Blend is an overcollateralized lending protocol on Stellar
+ * Returns supply APY for lenders
+ * 
+ * NOTE: Using estimated data for testnet demo
+ * In production, would integrate with real Blend pool factory
+ */
+async function getBlendLendingAPY(
+  poolFactoryAddress: string,
+  asset: string,
+  network: string = 'testnet'
+): Promise<ProtocolYield | null> {
+  try {
+    console.log(`[Blend APY] Providing estimated data for ${getAssetSymbol(asset)} on ${network}`);
+
+    // Blend Protocol provides overcollateralized lending
+    // APY is based on utilization rate and borrower demand
+    // Typical supply APYs: 2-8% depending on utilization
+    
+    // For hackathon demo, use realistic estimates
+    // In production, would query actual Blend contracts:
+    // - Pool utilization rate
+    // - Borrow APY
+    // - Calculate supply APY = borrow_apy * utilization * (1 - protocol_fee)
+    
+    const estimatedAPY = 5.8; // Attractive lending rate
+    const estimatedTVL = 120000; // Estimated protocol TVL
+
+    console.log(`[Blend APY] Estimated data: APY=${estimatedAPY}%, TVL=$${estimatedTVL}`);
+
+    return {
+      protocolId: 'blend',
+      protocolName: 'Blend Protocol',
+      apy: estimatedAPY,
+      tvl: estimatedTVL,
+      assetAddress: asset,
+      assetSymbol: getAssetSymbol(asset),
+      timestamp: new Date().toISOString(),
+      source: 'estimated',
+      poolAddress: poolFactoryAddress,
+    };
+  } catch (error) {
+    console.error('[Blend APY] Error:', error);
     return null;
   }
 }
@@ -211,19 +268,18 @@ export async function getYieldsForAsset(
   // Fetch from all protocols in parallel
   const promises: Promise<ProtocolYield | null>[] = [];
 
+  // Token address mapping for pair discovery
+  const tokenAddresses: Record<string, string> = {
+    'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+    'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+  };
+
   // Soroswap liquidity pools
   if (assetSymbol === 'XLM' || assetSymbol === 'USDC') {
     const soroswapFactory = PROTOCOLS.find(p => p.id === 'soroswap')?.contracts[network as 'testnet'];
     if (soroswapFactory) {
       // Discover actual pools from factory
       console.log(`[getYieldsForAsset] Finding Soroswap pools for ${assetSymbol}...`);
-      
-      // For Soroswap, we need a trading pair. Try common pairs:
-      // XLM/USDC, USDC/XLM
-      const tokenAddresses: Record<string, string> = {
-        'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-        'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
-      };
       
       if (assetSymbol === 'XLM') {
         // Try XLM/USDC pool
@@ -259,19 +315,41 @@ export async function getYieldsForAsset(
     }
   }
 
-  // Staking pools (XLM only)
-  if (assetSymbol === 'XLM') {
-    const stakingPool = PROTOCOLS.find(p => p.id === 'mock-staking')?.contracts[network as 'testnet'];
-    if (stakingPool) {
-      promises.push(getStakingPoolAPY(stakingPool, assetAddress, network));
+  // Aquarius liquidity pools
+  if (assetSymbol === 'XLM' || assetSymbol === 'USDC') {
+    const aquariusRouter = PROTOCOLS.find(p => p.id === 'aquarius')?.contracts[network as 'testnet'];
+    if (aquariusRouter) {
+      console.log(`[getYieldsForAsset] Checking Aquarius pools for ${assetSymbol}...`);
+      
+      if (assetSymbol === 'XLM') {
+        const usdcAddress = tokenAddresses['USDC'];
+        if (usdcAddress) {
+          promises.push(getAquariusPoolAPY(aquariusRouter, assetAddress, usdcAddress, network));
+        }
+      } else if (assetSymbol === 'USDC') {
+        const xlmAddress = tokenAddresses['XLM'];
+        if (xlmAddress) {
+          promises.push(getAquariusPoolAPY(aquariusRouter, assetAddress, xlmAddress, network));
+        }
+      }
     }
   }
 
-  // Lending pools (USDC, XLM)
+  // Blend lending protocol
   if (assetSymbol === 'USDC' || assetSymbol === 'XLM') {
-    const blendPool = PROTOCOLS.find(p => p.id === 'blend')?.contracts[network as 'testnet'];
-    if (blendPool) {
-      promises.push(getLendingPoolAPY(blendPool, assetAddress, network));
+    const blendFactory = PROTOCOLS.find(p => p.id === 'blend')?.contracts[network as 'testnet'];
+    if (blendFactory) {
+      console.log(`[getYieldsForAsset] Checking Blend lending for ${assetSymbol}...`);
+      promises.push(getBlendLendingAPY(blendFactory, assetAddress, network));
+    }
+  }
+
+  // Staking pools (XLM only)
+  if (assetSymbol === 'XLM') {
+    const stakingPool = PROTOCOLS.find(p => p.id === 'liquid-staking')?.contracts[network as 'testnet'];
+    if (stakingPool) {
+      console.log(`[getYieldsForAsset] Checking liquid staking for ${assetSymbol}...`);
+      promises.push(getStakingPoolAPY(stakingPool, assetAddress, network));
     }
   }
 
@@ -281,6 +359,9 @@ export async function getYieldsForAsset(
   results.forEach(result => {
     if (result) yields.push(result);
   });
+
+  console.log(`[getYieldsForAsset] Found ${yields.length} opportunities for ${assetSymbol}:`, 
+    yields.map(y => `${y.protocolName}: ${y.apy}%`));
 
   return yields;
 }

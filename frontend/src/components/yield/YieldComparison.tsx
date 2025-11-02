@@ -300,10 +300,10 @@ function SmartRoutingView({ routing, amount: _amount }: SmartRoutingViewProps) {
             </div>
 
             {/* Visual percentage bar */}
-            <div className="w-full bg-neutral-700 rounded-full h-2 mt-2">
+            <div className="w-full bg-neutral-700 rounded-full h-2 mt-2 overflow-hidden">
               <div
                 className="bg-primary-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${allocation.percentage}%` }}
+                style={{ width: `${Math.min(allocation.percentage, 100)}%` }}
               ></div>
             </div>
           </div>

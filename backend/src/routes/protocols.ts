@@ -163,6 +163,13 @@ router.post('/route', async (req: Request, res: Response) => {
       config
     );
 
+    console.log(`[POST /route] Strategy calculated:`, {
+      asset,
+      amount,
+      allocations: strategy.allocations.length,
+      expectedAPY: strategy.expectedBlendedApy,
+    });
+
     // Calculate gas costs
     const gasCost = estimateRoutingGasCost(strategy.allocations.length, network);
 
