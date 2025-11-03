@@ -297,6 +297,9 @@ export class ConfigSerializer {
       });
     });
 
+    // Group rules by action signature to detect shared actions
+    const actionMap = new Map<string, string>(); // action signature -> action node ID
+    
     // Create condition and action blocks for each rule
     config.rules.forEach((rule: any, index) => {
       // Handle both old flat format and new nested format
@@ -306,10 +309,26 @@ export class ConfigSerializer {
       if ('condition_type' in rule && !rule.condition) {
         // Convert old format to new format
         console.log('[ConfigSerializer] Converting old flat format rule:', rule);
+        
+        // Use monitored_asset if available, otherwise infer from threshold
+        let assetForCondition = rule.monitored_asset;
+        
+        if (!assetForCondition) {
+          // Legacy fallback: Try to infer which asset based on threshold
+          // If we have multiple rules with different thresholds, map them to different assets
+          const ruleIndex = config.rules.indexOf(rule);
+          if (ruleIndex < config.assets.length) {
+            assetForCondition = config.assets[ruleIndex]?.code;
+          } else {
+            assetForCondition = config.assets[0]?.code || 'USDC';
+          }
+          console.warn('[ConfigSerializer] No monitored_asset found, inferring:', assetForCondition);
+        }
+        
         condition = {
           type: rule.condition_type,
           parameters: {
-            asset: config.assets[0]?.code || 'USDC', // Default to first asset
+            asset: assetForCondition,
             operator: 'gt',
             threshold: rule.threshold || 0
           }
@@ -333,7 +352,36 @@ export class ConfigSerializer {
       }
 
       const conditionId = `condition-${nodeIdCounter++}`;
-      const actionId = `action-${nodeIdCounter++}`;
+      
+      // Create a signature for the action to detect duplicates
+      const actionSignature = JSON.stringify({
+        type: action.type,
+        params: action.parameters
+      });
+      
+      // Reuse existing action node if same action already exists
+      let actionId = actionMap.get(actionSignature);
+      
+      if (!actionId) {
+        // Create new action block
+        actionId = `action-${nodeIdCounter++}`;
+        actionMap.set(actionSignature, actionId);
+        
+        nodes.push({
+          id: actionId,
+          type: 'action',
+          position: { x: 700, y: 100 + actionMap.size * 200 },
+          data: {
+            actionType: action?.type || 'custom',
+            ...(action?.parameters || {}),
+            label: action?.type || 'custom',
+          },
+        });
+        
+        console.log('[ConfigSerializer] Created new action node:', actionId, action.type);
+      } else {
+        console.log('[ConfigSerializer] Reusing existing action node:', actionId);
+      }
 
       // Find matching asset block
       const assetNode = nodes.find((n) => {
@@ -351,18 +399,6 @@ export class ConfigSerializer {
           conditionType: condition?.type || 'custom',
           ...(condition?.parameters || {}),
           label: condition?.type || 'custom',
-        },
-      });
-
-      // Create action block
-      nodes.push({
-        id: actionId,
-        type: 'action',
-        position: { x: 700, y: 100 + index * 150 },
-        data: {
-          actionType: action?.type || 'custom',
-          ...(action?.parameters || {}),
-          label: action?.type || 'custom',
         },
       });
 
