@@ -13,7 +13,7 @@ interface AssetBlockProps {
 
 const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
   const { assetType, assetCode, allocation, icon } = data;
-  const { updateNodeData } = useReactFlow();
+  const { updateNodeData, getNodes } = useReactFlow();
   const { network } = useWallet();
   
   const [localAllocation, setLocalAllocation] = useState(allocation);
@@ -25,6 +25,17 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
   const [isValidating, setIsValidating] = useState(false);
   const [isValid, setIsValid] = useState<boolean | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Calculate total allocation across all asset nodes (excluding this one)
+  const getTotalAllocationExcludingSelf = useCallback(() => {
+    const nodes = getNodes();
+    return nodes
+      .filter(node => node.type === 'asset' && node.id !== id)
+      .reduce((sum, node) => {
+        const nodeAllocation = typeof node.data.allocation === 'number' ? node.data.allocation : 0;
+        return sum + nodeAllocation;
+      }, 0);
+  }, [getNodes, id]);
 
   // Sync local state with data prop when it changes externally
   useEffect(() => {
@@ -248,6 +259,28 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
             </span>
           </div>
         </div>
+        
+        {/* Allocation Warning */}
+        {(() => {
+          const othersTotal = getTotalAllocationExcludingSelf();
+          const newTotal = othersTotal + localAllocation;
+          const remaining = 100 - othersTotal;
+          
+          if (newTotal > 100.01) {
+            return (
+              <div className="text-xs text-error-100 bg-error-500/20 border border-error-500/50 px-2 py-1 rounded">
+                ⚠ Exceeds 100% by {(newTotal - 100).toFixed(2)}%
+              </div>
+            );
+          } else if (othersTotal > 0 && localAllocation < remaining - 0.01) {
+            return (
+              <div className="text-xs text-primary-100 bg-primary-500/20 border border-primary-500/50 px-2 py-1 rounded">
+                💡 {remaining.toFixed(2)}% available
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Allocation slider */}
         <input

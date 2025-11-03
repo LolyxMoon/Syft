@@ -286,11 +286,24 @@ pub fn get_pool_for_pair(
     
     let factory_client = FactoryClient::new(env, factory_address);
     
-    // Call get_pair - in Soroban, when the contract returns a Result,
-    // the client call will panic if it's an Err
-    // We return the result directly since we can't catch panics in Soroban
-    // The calling code should handle missing pairs gracefully
-    let pool_address = factory_client.get_pair(token_a, token_b);
+    // Use try_get_pair to handle errors gracefully without panicking
+    // This allows us to catch PairDoesNotExist errors and return a proper Result
+    // The return type is Result<Result<Address, ConversionError>, Result<FactoryError, ConversionError>>
+    let pool_result = factory_client.try_get_pair(token_a, token_b);
     
-    Ok(pool_address)
+    match pool_result {
+        // Success case: pool exists
+        Ok(Ok(pool_address)) => Ok(pool_address),
+        // Conversion error on success
+        Ok(Err(_)) => Err(VaultError::InvalidConfiguration),
+        // Factory returned an error
+        Err(Ok(factory_error)) => {
+            match factory_error {
+                FactoryError::PairDoesNotExist => Err(VaultError::PoolNotFound),
+                _ => Err(VaultError::InvalidConfiguration),
+            }
+        },
+        // Conversion error on error
+        Err(Err(_)) => Err(VaultError::InvalidConfiguration),
+    }
 }

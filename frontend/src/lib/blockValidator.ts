@@ -85,15 +85,7 @@ export class BlockValidator {
       return sum + allocation;
     }, 0);
 
-    if (totalAllocation !== 100 && assetBlocks.length > 0) {
-      warnings.push({
-        blockId: 'canvas',
-        message: `Total allocation is ${totalAllocation}%, should be 100%`,
-        suggestion: 'Adjust asset allocations to sum to 100%',
-      });
-    }
-
-    // Check each asset block
+    // Check each asset block first
     assetBlocks.forEach((block) => {
       const allocation = typeof block.data.allocation === 'number' ? block.data.allocation : 0;
       
@@ -131,6 +123,41 @@ export class BlockValidator {
         }
       }
     });
+
+    // Strict validation: Total allocation must equal 100% when multiple assets exist
+    if (assetBlocks.length > 1) {
+      const tolerance = 0.01; // Allow 0.01% tolerance for floating point errors
+      
+      if (Math.abs(totalAllocation - 100) > tolerance) {
+        errors.push({
+          blockId: 'canvas',
+          message: `Total allocation must equal 100% (currently ${totalAllocation.toFixed(2)}%)`,
+        });
+        
+        // Add helpful suggestion based on the situation
+        if (totalAllocation > 100) {
+          errors.push({
+            blockId: 'canvas',
+            message: `Allocations exceed 100% by ${(totalAllocation - 100).toFixed(2)}%. Reduce allocations across assets.`,
+          });
+        } else if (totalAllocation < 100) {
+          warnings.push({
+            blockId: 'canvas',
+            message: `Allocations are under 100% by ${(100 - totalAllocation).toFixed(2)}%. Increase allocations to fully utilize vault capacity.`,
+            suggestion: 'Distribute remaining allocation across assets',
+          });
+        }
+      }
+    } else if (assetBlocks.length === 1) {
+      // Single asset must be 100%
+      if (Math.abs(totalAllocation - 100) > 0.01) {
+        warnings.push({
+          blockId: assetBlocks[0].id,
+          message: `Single asset should have 100% allocation (currently ${totalAllocation.toFixed(2)}%)`,
+          suggestion: 'Set allocation to 100%',
+        });
+      }
+    }
 
     // Check condition blocks
     const conditionBlocks = nodes.filter((n) => n.type === 'condition');

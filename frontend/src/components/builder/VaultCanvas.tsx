@@ -196,8 +196,18 @@ const VaultCanvas = ({ initialNodes = [], initialEdges = [], onNodesChange, onEd
     }
   }, [edges, onEdgesChange]);
 
+  // Calculate total allocation for display
+  const totalAllocation = nodes
+    .filter(node => node.type === 'asset')
+    .reduce((sum, node) => {
+      const allocation = typeof node.data.allocation === 'number' ? node.data.allocation : 0;
+      return sum + allocation;
+    }, 0);
+
+  const assetCount = nodes.filter(node => node.type === 'asset').length;
+
   return (
-    <div ref={reactFlowWrapper} className="w-full h-full">
+    <div ref={reactFlowWrapper} className="w-full h-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -232,6 +242,45 @@ const VaultCanvas = ({ initialNodes = [], initialEdges = [], onNodesChange, onEd
           className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
         />
       </ReactFlow>
+      
+      {/* Total Allocation Indicator */}
+      {assetCount > 0 && (
+        <div className="absolute top-4 left-4 z-10">
+          <div
+            className={`
+              px-4 py-2 rounded-lg shadow-lg border transition-all backdrop-blur-sm
+              ${Math.abs(totalAllocation - 100) < 0.01
+                ? 'bg-success-500/90 border-success-500 text-white'
+                : totalAllocation > 100
+                ? 'bg-error-500/90 border-error-500 text-white'
+                : 'bg-warning-500/90 border-warning-500 text-dark-950 font-semibold'
+              }
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">Total Allocation:</span>
+              <span className="text-lg font-bold">
+                {totalAllocation.toFixed(2)}%
+              </span>
+              {Math.abs(totalAllocation - 100) < 0.01 ? (
+                <span className="text-xs">✓</span>
+              ) : totalAllocation > 100 ? (
+                <span className="text-xs">⚠ Exceeds 100%</span>
+              ) : (
+                <span className="text-xs">⚠ Under 100%</span>
+              )}
+            </div>
+            {assetCount > 1 && Math.abs(totalAllocation - 100) >= 0.01 && (
+              <div className="text-xs mt-1 opacity-90">
+                {totalAllocation > 100
+                  ? `Reduce by ${(totalAllocation - 100).toFixed(2)}%`
+                  : `Add ${(100 - totalAllocation).toFixed(2)}% more`
+                }
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
