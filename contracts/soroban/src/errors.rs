@@ -23,4 +23,5 @@ pub enum VaultError {
     InsufficientLiquidity = 16,
     RouterNotSet = 17,
     TrustlineRequired = 18,
+    FactoryNotSet = 19,
 }

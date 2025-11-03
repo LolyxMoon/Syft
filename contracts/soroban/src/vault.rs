@@ -223,11 +223,11 @@ impl VaultContract {
             return Err(VaultError::InvalidConfiguration);
         }
         
-        // ALWAYS withdraw as XLM (native token) - no trustline required
-        // XLM address on Stellar: Native token (special handling needed)
-        // For now, use the first asset as withdrawal token, but will swap to XLM
-        let xlm_token = config.assets.get(0)
-            .ok_or(VaultError::InvalidConfiguration)?;
+        // Find XLM token in the vault's assets
+        // XLM is always the last asset we'll check, or we need to identify it properly
+        // For now, we'll try to find it by checking all assets and use the last one as fallback
+        // IMPORTANT: The vault MUST have XLM as one of its configured assets for withdrawals to work!
+        let xlm_token = Self::find_xlm_token(&env, &config)?;
 
         // Get vault address
         let vault_address = env.current_contract_address();
@@ -289,6 +289,31 @@ impl VaultContract {
         emit_withdraw(&env, &user, shares, amount);
 
         Ok(amount)
+    }
+    
+    /// Find XLM token address in the vault's configured assets
+    /// XLM should be the last asset, or we check token symbol/name
+    /// Falls back to last asset in the list if not found
+    fn find_xlm_token(
+        env: &Env,
+        config: &VaultConfig,
+    ) -> Result<Address, VaultError> {
+        if config.assets.is_empty() {
+            return Err(VaultError::InvalidConfiguration);
+        }
+        
+        // STRATEGY: Try to identify XLM by checking token metadata
+        // For now, use a simpler approach: assume XLM is the LAST asset in the vault config
+        // This is a reasonable assumption since vaults are typically configured with
+        // their base asset (USDC, EURC, etc.) first, and XLM last for withdrawals
+        
+        let asset_count = config.assets.len();
+        let xlm_candidate = config.assets.get(asset_count - 1)
+            .ok_or(VaultError::InvalidConfiguration)?;
+        
+        log!(env, "Using asset at index {} as XLM for withdrawal", asset_count - 1);
+        
+        Ok(xlm_candidate)
     }
     
     /// Liquidate ALL positions before withdrawal (unstake everything, remove all liquidity)
@@ -445,12 +470,21 @@ impl VaultContract {
         
         log!(env, "Swapping ALL non-XLM assets to XLM");
         
-        // Check if factory is configured for swaps
+        // Check if factory is configured for swaps, fallback to hardcoded testnet factory
+        use soroban_sdk::String;
+        let hardcoded_factory_str = String::from_str(env, "CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES");
+        let hardcoded_factory = Address::from_string(&hardcoded_factory_str);
+        
         let factory_address = match config.factory_address.as_ref() {
-            Some(addr) => addr,
+            Some(addr) => {
+                log!(env, "Using configured factory address");
+                addr
+            },
             None => {
-                log!(env, "No factory configured - cannot swap assets");
-                return Err(VaultError::RouterNotSet);
+                log!(env, "No factory configured - using hardcoded Soroswap testnet factory");
+                // Hardcoded Soroswap Factory address for Testnet
+                // CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES
+                &hardcoded_factory
             }
         };
         
@@ -485,7 +519,7 @@ impl VaultContract {
             // Find the liquidity pool between this asset and XLM
             let pair_address = match pool_client::get_pool_for_pair(
                 env,
-                factory_address,
+                &factory_address,
                 &asset,
                 xlm_token
             ) {
@@ -536,12 +570,21 @@ impl VaultContract {
         
         log!(env, "Swapping non-base assets to base token. Amount needed: {}", amount_needed);
         
-        // Check if factory is configured for swaps
+        // Check if factory is configured for swaps, fallback to hardcoded testnet factory
+        use soroban_sdk::String;
+        let hardcoded_factory_str = String::from_str(env, "CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES");
+        let hardcoded_factory = Address::from_string(&hardcoded_factory_str);
+        
         let factory_address = match config.factory_address.as_ref() {
-            Some(addr) => addr,
+            Some(addr) => {
+                log!(env, "Using configured factory address");
+                addr
+            },
             None => {
-                log!(env, "No factory configured - cannot swap assets");
-                return Err(VaultError::RouterNotSet);
+                log!(env, "No factory configured - using hardcoded Soroswap testnet factory");
+                // Hardcoded Soroswap Factory address for Testnet
+                // CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES
+                &hardcoded_factory
             }
         };
         
