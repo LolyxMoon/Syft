@@ -33,14 +33,24 @@ export function SuggestionCard({ suggestion, onApply }: SuggestionCardProps) {
   };
 
   const handleApply = async () => {
+    console.log('[SuggestionCard] Apply button clicked for suggestion:', suggestion.id);
+    console.log('[SuggestionCard] Suggestion data:', {
+      vaultId: suggestion.vaultId,
+      title: suggestion.title,
+      hasActionPrompt: !!suggestion.actionPrompt,
+      actionPrompt: suggestion.actionPrompt,
+    });
+    
     setApplying(true);
     try {
       // If there's a custom onApply handler, use it
       if (onApply) {
+        console.log('[SuggestionCard] Using custom onApply handler');
         await onApply(suggestion);
       } else {
         // Default behavior: Navigate to Vault Builder with suggestion context
         // Use location state to pass the suggestion data
+        console.log('[SuggestionCard] Navigating to /app/builder with state');
         navigate('/app/builder', {
           state: {
             mode: 'chat',
@@ -50,6 +60,8 @@ export function SuggestionCard({ suggestion, onApply }: SuggestionCardProps) {
           }
         });
       }
+    } catch (error) {
+      console.error('[SuggestionCard] Error applying suggestion:', error);
     } finally {
       setApplying(false);
     }
@@ -133,15 +145,13 @@ export function SuggestionCard({ suggestion, onApply }: SuggestionCardProps) {
             </div>
           </div>
 
-          {onApply && (
-            <button
-              className={styles.applyButton}
-              onClick={handleApply}
-              disabled={applying}
-            >
-              {applying ? 'Applying...' : 'Apply Suggestion'}
-            </button>
-          )}
+          <button
+            className={styles.applyButton}
+            onClick={handleApply}
+            disabled={applying}
+          >
+            {applying ? 'Applying...' : 'Apply Suggestion'}
+          </button>
         </div>
       )}
     </div>

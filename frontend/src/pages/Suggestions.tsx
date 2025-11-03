@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Skeleton } from '../components/ui';
 import { Lightbulb, Sparkles, AlertCircle, RefreshCw, X, CheckCircle, TrendingUp, Shield, Zap } from 'lucide-react';
 import { useWallet } from '../providers/WalletProvider';
@@ -45,6 +46,7 @@ interface Suggestion {
     analysis?: any;
   };
   configChanges?: any;
+  actionPrompt?: string; // AI-generated prompt for applying this suggestion
   createdAt: string;
   expiresAt?: string;
 }
@@ -62,6 +64,7 @@ const Suggestions = () => {
   const [showImplementationModal, setShowImplementationModal] = useState(false);
   const [resolvedTokenNames, setResolvedTokenNames] = useState<Record<string, string>>({}); // Cache for resolved token names
   const { address, network, networkPassphrase } = useWallet();
+  const navigate = useNavigate();
 
   const normalizeNetwork = (net?: string, passphrase?: string): string => {
     if (!net) return 'testnet';
@@ -248,6 +251,22 @@ const Suggestions = () => {
   const handleCloseModal = () => {
     setShowImplementationModal(false);
     setSelectedSuggestion(null);
+  };
+
+  const handleApplySuggestion = (suggestion: Suggestion) => {
+    console.log('[Suggestions] Applying suggestion:', suggestion.id);
+    console.log('[Suggestions] Vault ID:', suggestion.vaultId);
+    console.log('[Suggestions] Action prompt:', suggestion.actionPrompt);
+    
+    // Navigate to Vault Builder with suggestion context
+    navigate('/app/builder', {
+      state: {
+        mode: 'chat',
+        vaultId: suggestion.vaultId,
+        actionPrompt: suggestion.actionPrompt || `Apply the following suggestion to the vault: ${suggestion.title}. ${suggestion.description}`,
+        suggestionId: suggestion.id,
+      }
+    });
   };
 
   const getPriorityColor = (priority: string) => {
@@ -706,16 +725,27 @@ const Suggestions = () => {
                                 <span>⏱️ {suggestion.implementation.estimatedTime}</span>
                               </div>
                               
-                              {suggestion.implementation.steps.length > 0 && (
+                              <div className="space-y-2">
+                                {suggestion.implementation.steps.length > 0 && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-full"
+                                    onClick={() => handleViewImplementation(suggestion)}
+                                  >
+                                    View Implementation
+                                  </Button>
+                                )}
                                 <Button 
-                                  variant="outline" 
+                                  variant="primary" 
                                   size="sm" 
-                                  className="w-full"
-                                  onClick={() => handleViewImplementation(suggestion)}
+                                  className="w-full flex items-center justify-center gap-2"
+                                  onClick={() => handleApplySuggestion(suggestion)}
                                 >
-                                  View Implementation
+                                  <Sparkles className="w-4 h-4" />
+                                  Apply Suggestion
                                 </Button>
-                              )}
+                              </div>
                             </div>
                           </Card>
                         </motion.div>
