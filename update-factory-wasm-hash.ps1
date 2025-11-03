@@ -1,12 +1,17 @@
 # Update Factory with New Vault WASM Hash
 
-$NEW_WASM_HASH = "ecc8cb9c36d2af79ed88424a2fa630fa8de14c5a2a3075a3fad214c1523a2ad4"
+$NEW_WASM_HASH = "1e9911e7cbc830ff786640170f2a4f827c5d1f2a8c22ef8f44123f7a95e19056"
 $FACTORY_ID = "CCODOMK6HSVVKX7FP2CCUVL7VKKOYCO3AJPWC5C656RP4FXGFPWU3YM2"
 $NETWORK = "testnet"
 
 Write-Host "Updating factory with new vault WASM hash..." -ForegroundColor Cyan
 Write-Host "Factory: $FACTORY_ID" -ForegroundColor Gray
 Write-Host "New WASM Hash: $NEW_WASM_HASH`n" -ForegroundColor Gray
+
+# Get admin address (deployer)
+$ADMIN_ADDRESS = stellar keys address deployer
+
+Write-Host "Admin address: $ADMIN_ADDRESS`n" -ForegroundColor Gray
 
 # Try to update the WASM hash
 Write-Host "Attempting to call update_wasm..." -ForegroundColor Yellow
@@ -17,6 +22,7 @@ $result = stellar contract invoke `
     --network $NETWORK `
     -- `
     update_wasm `
+    --admin $ADMIN_ADDRESS `
     --new_wasm_hash $NEW_WASM_HASH 2>&1
 
 if ($LASTEXITCODE -eq 0) {

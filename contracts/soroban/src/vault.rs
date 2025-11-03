@@ -178,6 +178,7 @@ impl VaultContract {
     }
 
     /// Withdraw assets from the vault
+    /// This will liquidate active positions proportionally if needed
     pub fn withdraw(env: Env, user: Address, shares: i128) -> Result<i128, VaultError> {
         // Require authorization from the user first
         user.require_auth();
@@ -227,9 +228,48 @@ impl VaultContract {
         // Get vault address
         let vault_address = env.current_contract_address();
         
+        // Check vault's current balance of base token
+        let token_client = token::TokenClient::new(&env, &base_token);
+        let current_balance = token_client.balance(&vault_address);
+        
+        log!(&env, "Withdrawal: shares={}, amount_needed={}, current_balance={}", shares, amount, current_balance);
+        
+        // If vault doesn't have enough liquid balance, we need to:
+        // 1. Liquidate staking/LP positions
+        // 2. Swap other assets back to base token
+        if current_balance < amount {
+            let shortfall = amount.checked_sub(current_balance)
+                .ok_or(VaultError::InvalidAmount)?;
+            
+            log!(&env, "Insufficient liquid balance. Shortfall: {}", shortfall);
+            
+            // Step 1: Liquidate positions (unstake, remove liquidity)
+            Self::liquidate_positions_for_withdrawal(&env, &config, shortfall)?;
+            
+            // Step 2: Check balance again after liquidation
+            let balance_after_liquidation = token_client.balance(&vault_address);
+            log!(&env, "Balance after liquidation: {}", balance_after_liquidation);
+            
+            // Step 3: If still short, swap other assets to base token
+            if balance_after_liquidation < amount {
+                let remaining_shortfall = amount.checked_sub(balance_after_liquidation)
+                    .ok_or(VaultError::InvalidAmount)?;
+                
+                log!(&env, "Still need {} more. Swapping other assets to base token", remaining_shortfall);
+                
+                Self::swap_assets_to_base_token(&env, &config, &base_token, remaining_shortfall)?;
+            }
+            
+            // Verify we now have enough balance
+            let final_balance = token_client.balance(&vault_address);
+            if final_balance < amount {
+                log!(&env, "Insufficient funds after all liquidation attempts: have={}, need={}", final_balance, amount);
+                return Err(VaultError::InsufficientBalance);
+            }
+        }
+        
         // Transfer tokens from vault to user using token contract
         // DO NOT call user.require_auth() - vault doesn't need user auth to send funds to them
-        let token_client = token::TokenClient::new(&env, &base_token);
         token_client.transfer(&vault_address, &user, &amount);
 
         // Update state
@@ -254,6 +294,205 @@ impl VaultContract {
         emit_withdraw(&env, &user, shares, amount);
 
         Ok(amount)
+    }
+    
+    /// Liquidate positions to cover withdrawal shortfall
+    fn liquidate_positions_for_withdrawal(
+        env: &Env,
+        config: &VaultConfig,
+        amount_needed: i128
+    ) -> Result<(), VaultError> {
+        use crate::staking_client;
+        
+        log!(env, "Liquidating positions to cover withdrawal. Amount needed: {}", amount_needed);
+        
+        let vault_address = env.current_contract_address();
+        let mut amount_liquidated: i128 = 0;
+        
+        // Try to unstake from staking pool if configured
+        if let Some(ref staking_pool) = config.staking_pool_address {
+            // Check if vault has any staking position
+            let staking_symbol = symbol_short!("STAKE");
+            
+            if let Some(staking_pos) = env.storage().instance().get::<_, crate::types::StakingPosition>(&staking_symbol) {
+                log!(env, "Found staking position: staked={}, st_tokens={}", 
+                    staking_pos.staked_amount, 
+                    staking_pos.st_token_amount);
+                
+                // Calculate how much to unstake (proportional or all if needed)
+                let amount_to_unstake = if staking_pos.staked_amount <= amount_needed {
+                    staking_pos.staked_amount // Unstake all
+                } else {
+                    amount_needed.checked_sub(amount_liquidated)
+                        .ok_or(VaultError::InvalidAmount)?
+                };
+                
+                if amount_to_unstake > 0 {
+                    log!(env, "Unstaking {} from pool (st_tokens: {})", 
+                        amount_to_unstake, staking_pos.st_token_amount);
+                    
+                    // Calculate proportional st_token amount to burn
+                    // st_tokens_to_burn = (amount_to_unstake * st_token_amount) / staked_amount
+                    let st_tokens_to_burn = if amount_to_unstake >= staking_pos.staked_amount {
+                        staking_pos.st_token_amount // Burn all
+                    } else {
+                        amount_to_unstake.checked_mul(staking_pos.st_token_amount)
+                            .and_then(|v| v.checked_div(staking_pos.staked_amount))
+                            .ok_or(VaultError::InvalidAmount)?
+                    };
+                    
+                    // Unstake tokens by burning st_tokens
+                    match staking_client::unstake_tokens(
+                        env,
+                        staking_pool,
+                        st_tokens_to_burn
+                    ) {
+                        Ok(tokens_received) => {
+                            log!(env, "Successfully unstaked: {}", tokens_received);
+                            amount_liquidated = amount_liquidated.checked_add(tokens_received)
+                                .ok_or(VaultError::InvalidAmount)?;
+                            
+                            // Update or remove staking position
+                            let remaining_st_tokens = staking_pos.st_token_amount.checked_sub(st_tokens_to_burn)
+                                .ok_or(VaultError::InvalidAmount)?;
+                            
+                            if remaining_st_tokens > 0 {
+                                // Estimate remaining staked amount based on what we received
+                                let remaining_staked = staking_pos.staked_amount.checked_sub(tokens_received)
+                                    .ok_or(VaultError::InvalidAmount)?;
+                                
+                                let updated_pos = crate::types::StakingPosition {
+                                    staked_amount: remaining_staked,
+                                    st_token_amount: remaining_st_tokens,
+                                    ..staking_pos
+                                };
+                                env.storage().instance().set(&staking_symbol, &updated_pos);
+                            } else {
+                                env.storage().instance().remove(&staking_symbol);
+                            }
+                        },
+                        Err(e) => {
+                            log!(env, "Failed to unstake: {:?}", e);
+                            // Continue to try other liquidation methods
+                        }
+                    }
+                }
+            } else {
+                log!(env, "No active staking position found");
+            }
+        }
+        
+        // Check if we've liquidated enough
+        if amount_liquidated >= amount_needed {
+            log!(env, "Successfully liquidated {} (needed {})", amount_liquidated, amount_needed);
+            return Ok(());
+        }
+        
+        log!(env, "Warning: Only liquidated {} out of {} needed", amount_liquidated, amount_needed);
+        
+        // Could add more liquidation methods here:
+        // - Remove liquidity from pools
+        // For now, return what we have
+        
+        Ok(())
+    }
+    
+    /// Swap other assets back to base token for withdrawal
+    fn swap_assets_to_base_token(
+        env: &Env,
+        config: &VaultConfig,
+        base_token: &Address,
+        amount_needed: i128
+    ) -> Result<(), VaultError> {
+        use crate::pool_client;
+        
+        log!(env, "Swapping assets to base token. Amount needed: {}", amount_needed);
+        
+        let vault_address = env.current_contract_address();
+        let mut amount_swapped: i128 = 0;
+        
+        // Iterate through all assets and swap non-base assets to base
+        for i in 0..config.assets.len() {
+            if amount_swapped >= amount_needed {
+                break;
+            }
+            
+            let asset = config.assets.get(i)
+                .ok_or(VaultError::InvalidConfiguration)?;
+            
+            // Skip if this is the base token
+            if &asset == base_token {
+                continue;
+            }
+            
+            // Check balance of this asset
+            let asset_client = token::TokenClient::new(env, &asset);
+            let asset_balance = asset_client.balance(&vault_address);
+            
+            if asset_balance <= 0 {
+                log!(env, "No balance for asset at index {}", i);
+                continue;
+            }
+            
+            log!(env, "Found {} balance of asset at index {}", asset_balance, i);
+            
+            // Get factory to find the pair
+            let factory_address = config.factory_address.as_ref()
+                .ok_or(VaultError::InvalidConfiguration)?;
+            
+            // Find the liquidity pool between this asset and base token
+            let pair_address = pool_client::get_pool_for_pair(
+                env,
+                factory_address,
+                &asset,
+                base_token
+            )?;
+            
+            log!(env, "Found pair for swap");
+            
+            // Calculate how much we need to swap
+            // Try to get at least the remaining amount needed, but swap up to our full balance
+            let remaining_needed = amount_needed.checked_sub(amount_swapped)
+                .ok_or(VaultError::InvalidAmount)?;
+            
+            // Estimate how much of the asset we need to swap
+            // For safety, try to swap a bit more to account for slippage
+            let amount_to_swap = if asset_balance <= remaining_needed {
+                asset_balance // Swap all if we don't have enough
+            } else {
+                remaining_needed // Otherwise swap what we need
+            };
+            
+            log!(env, "Attempting to swap {} of asset to base token", amount_to_swap);
+            
+            // Execute the swap via the pool
+            match pool_client::swap_via_pool(
+                env,
+                &pair_address,
+                &asset,
+                base_token,
+                amount_to_swap,
+                0, // min_amount_out = 0 (accepting any slippage for withdrawal)
+            ) {
+                Ok(amount_out) => {
+                    log!(env, "Swapped successfully. Received {} base tokens", amount_out);
+                    amount_swapped = amount_swapped.checked_add(amount_out)
+                        .ok_or(VaultError::InvalidAmount)?;
+                },
+                Err(e) => {
+                    log!(env, "Swap failed: {:?}", e);
+                    // Continue to try other assets
+                }
+            }
+        }
+        
+        if amount_swapped > 0 {
+            log!(env, "Total swapped to base token: {}", amount_swapped);
+            Ok(())
+        } else {
+            log!(env, "No assets could be swapped");
+            Err(VaultError::InsufficientBalance)
+        }
     }
 
     /// Get vault state
