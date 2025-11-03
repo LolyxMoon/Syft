@@ -161,6 +161,7 @@ router.use('/', suggestionsRoutes);
 /**
  * POST /api/vaults/generate-from-prompt
  * Generate vault configuration from natural language
+ * Uses async job processing to avoid Heroku 30s timeout
  */
 router.post('/generate-from-prompt', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -179,6 +180,13 @@ router.post('/generate-from-prompt', async (req: Request, res: Response): Promis
     console.log('[Generate From Prompt] Has current vault:', !!currentVault);
     console.log('[Generate From Prompt] Session ID:', sessionId);
 
+    // Import job queue
+    const { jobQueue } = await import('../services/jobQueue.js');
+    
+    // Create job ID
+    const jobId = `vault-chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    jobQueue.createJob(jobId);
+
     // Save user message to chat history if session exists
     if (sessionId) {
       try {
@@ -193,45 +201,61 @@ router.post('/generate-from-prompt', async (req: Request, res: Response): Promis
       }
     }
 
-    // Generate vault using AI
-    const result = await naturalLanguageVaultGenerator.generateVault({
-      userPrompt,
-      conversationHistory: conversationHistory || [],
-      currentVault: currentVault || undefined,
-      network: network || 'testnet',
-    });
-
-    console.log('[Generate From Prompt] Generated vault:', {
-      nodeCount: result.nodes.length,
-      edgeCount: result.edges.length,
-      responseType: result.responseType,
-    });
-
-    // Save assistant response to chat history if session exists
-    if (sessionId) {
+    // Start processing in background (don't await)
+    (async () => {
       try {
-        const { chatHistoryService } = await import('../services/chatHistoryService.js');
-        await chatHistoryService.addMessage({
-          sessionId,
-          role: 'assistant',
-          content: result.explanation,
-          responseType: result.responseType,
-          vaultSnapshot: result.responseType === 'build' ? { nodes: result.nodes, edges: result.edges } : undefined,
-          marketContext: result.marketContext,
+        jobQueue.markProcessing(jobId);
+
+        // Generate vault using AI
+        const result = await naturalLanguageVaultGenerator.generateVault({
+          userPrompt,
+          conversationHistory: conversationHistory || [],
+          currentVault: currentVault || undefined,
+          network: network || 'testnet',
         });
 
-        // Mark vault as generated if built
-        if (result.responseType === 'build' && result.nodes.length > 0) {
-          await chatHistoryService.markVaultGenerated(sessionId);
-        }
-      } catch (error) {
-        console.warn('[Generate From Prompt] Failed to save assistant message:', error);
-      }
-    }
+        console.log('[Generate From Prompt] Generated vault:', {
+          nodeCount: result.nodes.length,
+          edgeCount: result.edges.length,
+          responseType: result.responseType,
+        });
 
+        // Save assistant response to chat history if session exists
+        if (sessionId) {
+          try {
+            const { chatHistoryService } = await import('../services/chatHistoryService.js');
+            await chatHistoryService.addMessage({
+              sessionId,
+              role: 'assistant',
+              content: result.explanation,
+              responseType: result.responseType,
+              vaultSnapshot: result.responseType === 'build' ? { nodes: result.nodes, edges: result.edges } : undefined,
+              marketContext: result.marketContext,
+            });
+
+            // Mark vault as generated if built
+            if (result.responseType === 'build' && result.nodes.length > 0) {
+              await chatHistoryService.markVaultGenerated(sessionId);
+            }
+          } catch (error) {
+            console.warn('[Generate From Prompt] Failed to save assistant message:', error);
+          }
+        }
+
+        jobQueue.completeJob(jobId, result);
+        console.log('[Generate From Prompt] Background job completed:', jobId);
+      } catch (error: any) {
+        jobQueue.failJob(jobId, error.message || 'Unknown error');
+        console.error('[Generate From Prompt] Background job failed:', error);
+      }
+    })();
+
+    // Return immediately with job ID
     res.json({
       success: true,
-      data: result,
+      jobId: jobId,
+      status: 'processing',
+      message: 'Vault generation started. Poll /api/nl/job-status for results.',
     });
   } catch (error) {
     console.error('Error generating vault from prompt:', error);

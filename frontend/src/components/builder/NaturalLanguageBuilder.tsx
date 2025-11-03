@@ -306,11 +306,43 @@ export function NaturalLanguageBuilder({ onVaultGenerated, network, currentNodes
       });
 
       console.log('[Chat] Backend response status:', response.status);
-      const data = await response.json();
+      let data = await response.json();
       console.log('[Chat] Backend response data:', data);
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate vault');
+      }
+
+      // Check if this is an async job response
+      if (data.jobId && data.status === 'processing') {
+        console.log('[Chat] Async job detected, polling for results...');
+        
+        // Poll for results
+        const maxAttempts = 60; // 60 seconds max
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          
+          const pollResponse = await fetch(`${backendUrl}/api/nl/job-status/${data.jobId}`);
+          const pollData = await pollResponse.json();
+          
+          console.log(`[Chat] Poll attempt ${attempt + 1}:`, pollData.status);
+          
+          if (pollData.status === 'completed') {
+            console.log('[Chat] Job completed!', pollData.data);
+            data = { success: true, data: pollData.data };
+            break;
+          }
+          
+          if (pollData.status === 'failed') {
+            throw new Error(pollData.error || 'Job failed');
+          }
+          
+          // Still processing, continue polling
+        }
+        
+        if (data.status === 'processing') {
+          throw new Error('Request timeout - please try again');
+        }
       }
 
       const { nodes, edges, explanation, marketContext, suggestions, responseType } = data.data;
