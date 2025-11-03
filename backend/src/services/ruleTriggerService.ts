@@ -11,6 +11,43 @@ export interface RuleTrigger {
 }
 
 /**
+ * Rule Configuration Examples:
+ * 
+ * Time-based rule:
+ * {
+ *   condition_type: 'time_based',
+ *   threshold: 86400, // seconds (24 hours)
+ *   action: 'rebalance',
+ *   target_allocation: [50000, 50000] // basis points (50% each)
+ * }
+ * 
+ * Price-based rule:
+ * {
+ *   condition_type: 'price_above',
+ *   asset_code: 'XLM', // or 'USDC', 'BTC', etc.
+ *   threshold: 0.15, // USD price
+ *   comparison_type: 'above', // 'above', 'below', 'equals', 'between'
+ *   max_threshold: 0.20, // only for 'between' type
+ *   action: 'stake'
+ * }
+ * 
+ * APY threshold rule:
+ * {
+ *   condition_type: 'apy_threshold',
+ *   threshold: 10.0, // percentage
+ *   action: 'notify'
+ * }
+ * 
+ * Allocation drift rule:
+ * {
+ *   condition_type: 'allocation_drift',
+ *   threshold: 500, // basis points (5%)
+ *   target_allocation: [60000, 40000],
+ *   action: 'rebalance'
+ * }
+ */
+
+/**
  * Evaluate vault rules and detect triggers
  */
 export async function evaluateVaultRules(vaultId: string): Promise<RuleTrigger[]> {
@@ -300,9 +337,51 @@ async function evaluateRule(
 
   // Price-based condition
   if (conditionType.includes('price')) {
-    // Would integrate with price oracle
-    // For MVP, return false
-    return false;
+    try {
+      // Import price service
+      const { getTokenPrice } = await import('./priceService.js');
+      
+      // Get asset code from rule configuration
+      const assetCode = rule.asset_code || rule.asset || 'XLM';
+      
+      // Fetch current price
+      const currentPrice = await getTokenPrice(assetCode);
+      
+      if (currentPrice === null) {
+        console.warn(`[RuleTrigger] Could not fetch price for ${assetCode}, skipping price-based rule`);
+        return false;
+      }
+      
+      // Determine comparison type (default to 'above')
+      const comparisonType = rule.comparison_type || 'above';
+      
+      switch (comparisonType) {
+        case 'above':
+        case 'greater_than':
+          return currentPrice > threshold;
+        
+        case 'below':
+        case 'less_than':
+          return currentPrice < threshold;
+        
+        case 'equals':
+          // For price, we use a small tolerance (0.1% difference)
+          const tolerance = threshold * 0.001;
+          return Math.abs(currentPrice - threshold) <= tolerance;
+        
+        case 'between':
+          // For 'between', threshold should be min and rule.max_threshold should be max
+          const maxThreshold = rule.max_threshold || threshold * 2;
+          return currentPrice >= threshold && currentPrice <= maxThreshold;
+        
+        default:
+          console.warn(`[RuleTrigger] Unknown comparison type: ${comparisonType}`);
+          return false;
+      }
+    } catch (error) {
+      console.error('[RuleTrigger] Error evaluating price-based condition:', error);
+      return false;
+    }
   }
 
   return false;
