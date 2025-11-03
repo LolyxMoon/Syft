@@ -107,8 +107,8 @@ export async function buildDepositTransaction(
           console.log('[Build Deposit TX] First asset:', JSON.stringify(firstAsset));
           
           // Handle both string format and AssetAllocation object format
-          const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.assetCode;
-          const assetAddress = typeof firstAsset === 'string' ? firstAsset : (firstAsset.assetIssuer || firstAsset.assetCode);
+          const assetCode = typeof firstAsset === 'string' ? firstAsset : (firstAsset.code || firstAsset.assetCode);
+          const assetAddress = typeof firstAsset === 'string' ? firstAsset : (firstAsset.issuer || firstAsset.assetIssuer || firstAsset.code || firstAsset.assetCode);
           
           console.log('[Build Deposit TX] assetCode:', assetCode, 'assetAddress:', assetAddress);
           
