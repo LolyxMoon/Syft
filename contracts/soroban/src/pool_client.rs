@@ -251,19 +251,32 @@ pub fn get_pool_for_pair(
     token_b: &Address,
 ) -> Result<Address, crate::errors::VaultError> {
     use crate::errors::VaultError;
-    use soroban_sdk::contractclient;
+    use soroban_sdk::{contractclient, contracterror};
+    
+    // Soroswap Factory Error type
+    #[contracterror]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+    #[repr(u32)]
+    pub enum FactoryError {
+        AlreadyInitialized = 1,
+        PairAlreadyExists = 2,
+        IdenticalAddresses = 3,
+        PairDoesNotExist = 4,
+        Unauthorized = 5,
+    }
     
     // Soroswap Factory interface
     #[contractclient(name = "FactoryClient")]
     pub trait FactoryInterface {
-        fn get_pair(env: Env, token_a: Address, token_b: Address) -> Address;
+        fn get_pair(env: Env, token_a: Address, token_b: Address) -> Result<Address, FactoryError>;
     }
     
     let factory_client = FactoryClient::new(env, factory_address);
-    let pool_address = factory_client.get_pair(&token_a.clone(), &token_b.clone());
     
-    // Verify pool exists (not zero address)
-    // In Soroban, we'd check if the address is valid
-    // For now, just return it
-    Ok(pool_address)
+    // Call get_pair which returns Result<Address, FactoryError>
+    match factory_client.try_get_pair(&token_a.clone(), &token_b.clone()) {
+        Ok(Ok(pool_address)) => Ok(pool_address),
+        Ok(Err(_)) => Err(VaultError::InvalidConfiguration), // Factory returned an error (e.g., pair doesn't exist)
+        Err(_) => Err(VaultError::InvalidConfiguration), // Contract invocation failed
+    }
 }
