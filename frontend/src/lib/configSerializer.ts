@@ -6,11 +6,24 @@ import type { VaultConfiguration } from '../types/blocks';
  */
 export class ConfigSerializer {
   /**
-   * Convert visual blocks and edges into deployable vault configuration
+   * Serialize vault configuration from visual blocks
    */
   static serialize(nodes: Node[], edges: Edge[]): VaultConfiguration {
+    console.log('[ConfigSerializer] Serializing:', {
+      nodes: nodes.length,
+      edges: edges.length,
+      assets: nodes.filter(n => n.type === 'asset').length,
+      conditions: nodes.filter(n => n.type === 'condition').length,
+      actions: nodes.filter(n => n.type === 'action').length,
+    });
+    
     const assets = this.extractAssets(nodes);
     const rules = this.extractRules(nodes, edges);
+
+    console.log('[ConfigSerializer] Serialization complete:', {
+      assets: assets.length,
+      rules: rules.length,
+    });
 
     return {
       assets,
@@ -74,27 +87,50 @@ export class ConfigSerializer {
     const actionBlocks = nodes.filter((n) => n.type === 'action');
 
     actionBlocks.forEach((actionNode) => {
-      // Find condition connected to this action
-      const conditionEdge = edges.find((e) => e.target === actionNode.id);
-      if (!conditionEdge) return;
+      // Find ALL conditions connected to this action (not just the first one!)
+      const conditionEdges = edges.filter((e) => e.target === actionNode.id);
+      
+      if (conditionEdges.length === 0) {
+        console.warn('[ConfigSerializer] Action block has no conditions:', actionNode.id);
+        return;
+      }
 
-      const conditionNode = nodes.find((n) => n.id === conditionEdge.source);
-      if (!conditionNode || conditionNode.type !== 'condition') return;
+      // Create a separate rule for EACH condition
+      conditionEdges.forEach((conditionEdge) => {
+        const conditionNode = nodes.find((n) => n.id === conditionEdge.source);
+        if (!conditionNode || conditionNode.type !== 'condition') {
+          console.warn('[ConfigSerializer] Invalid condition node:', conditionEdge.source);
+          return;
+        }
 
-      // Find asset connected to this condition
-      const assetEdge = edges.find((e) => e.target === conditionNode.id);
-      if (!assetEdge) return;
+        // Find asset connected to this condition
+        const assetEdge = edges.find((e) => e.target === conditionNode.id);
+        if (!assetEdge) {
+          console.warn('[ConfigSerializer] Condition has no asset:', conditionNode.id);
+          return;
+        }
 
-      const assetNode = nodes.find((n) => n.id === assetEdge.source);
-      if (!assetNode || assetNode.type !== 'asset') return;
+        const assetNode = nodes.find((n) => n.id === assetEdge.source);
+        if (!assetNode || assetNode.type !== 'asset') {
+          console.warn('[ConfigSerializer] Invalid asset node:', assetEdge.source);
+          return;
+        }
 
-      // Build the rule
-      const condition = this.serializeCondition(conditionNode, assetNode);
-      const action = this.serializeAction(actionNode);
+        // Build the rule
+        const condition = this.serializeCondition(conditionNode, assetNode);
+        const action = this.serializeAction(actionNode);
 
-      rules.push({ condition, action });
+        rules.push({ condition, action });
+        
+        console.log('[ConfigSerializer] Created rule:', {
+          asset: assetNode.data.assetCode || assetNode.data.assetType,
+          condition: condition.type,
+          action: action.type
+        });
+      });
     });
 
+    console.log(`[ConfigSerializer] Extracted ${rules.length} rules from canvas`);
     return rules;
   }
 
