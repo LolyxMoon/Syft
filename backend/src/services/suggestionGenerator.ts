@@ -80,19 +80,58 @@ IMPORTANT CONTEXT - STELLAR NETWORK VAULTS:
 - Rebalancing rules can trigger on: time intervals, allocation drift, price changes, or custom conditions
 - The vault aims to optimize yield while managing risk through automated rebalancing
 
-VAULT BUILDER CAPABILITIES:
+VAULT BUILDER CAPABILITIES - WHAT IT CAN DO:
 The vault builder has a visual interface with the following components:
-- Asset Blocks: Define assets with allocation percentages (e.g., "Add 40% USDC", "Add 60% XLM")
-- Condition Blocks: Set triggers for rules
-  * Time-based: "Every 7 days", "Every 2 weeks", etc.
-  * APY threshold: "When APY drops below 5%"
-  * Allocation drift: "When allocation differs by more than 10%"
-  * Price change: "When price changes by more than 15%"
-- Action Blocks: Define what happens when conditions are met
-  * Rebalance: Return to target allocations
-  * Stake: Stake a percentage of vault assets
-  * Provide liquidity: Add liquidity to DEX pools
-- The builder also has an AI Chat mode that can understand natural language and modify vaults
+
+1. ASSET ALLOCATION:
+   - Add assets with target allocation percentages (e.g., "Add 40% USDC", "Add 60% XLM")
+   - Support for any Stellar-based tokens (XLM, USDC, AQUA, yXLM, etc.)
+   - Allocations must total 100%
+
+2. REBALANCING RULES (Conditions + Actions):
+   - TIME-BASED TRIGGERS: Execute rules on schedule
+     * "Every 7 days", "Every 2 weeks", "Daily", "Monthly", etc.
+   - THRESHOLD-BASED TRIGGERS: Execute when conditions are met
+     * Allocation drift: "When allocation differs by more than X%"
+     * Price change: "When price changes by more than X%"
+     * APY threshold: "When APY drops below X%" or "When APY goes above X%"
+   
+3. AVAILABLE ACTIONS (what the vault can DO):
+   - REBALANCE: Return portfolio to target allocations by trading on Stellar DEX
+   - STAKE: Stake a percentage of vault assets (for assets that support staking like XLM)
+   - PROVIDE LIQUIDITY: Add liquidity to Soroswap DEX pools (AMM liquidity provision)
+
+4. AI CHAT MODE:
+   - Natural language interface to build and modify vaults
+   - Can understand requests like "add 30% USDC" or "rebalance weekly"
+
+VAULT BUILDER LIMITATIONS - WHAT IT CANNOT DO:
+❌ NO LENDING/BORROWING: Cannot lend assets to protocols like Blend or Aave
+❌ NO YIELD FARMING: Cannot farm yield tokens or participate in farming programs
+❌ NO COMPLEX DEFI STRATEGIES: No flash loans, leveraged positions, or derivatives
+❌ NO CROSS-PROTOCOL COMPOSABILITY: Each action is isolated (rebalance OR stake OR LP, not combined)
+❌ NO CONDITIONAL LOGIC: Cannot do "if-then-else" branching (only single condition → single action)
+❌ NO EXTERNAL ORACLE DATA: Cannot trigger on arbitrary external data (only built-in conditions)
+
+IMPORTANT: When generating suggestions, ONLY recommend strategies that use the available capabilities. 
+DO NOT suggest:
+- Lending USDC to Blend or any lending protocol
+- Yield farming or farming tokens
+- Complex multi-step strategies requiring external protocols
+- Any action not listed in "AVAILABLE ACTIONS" above
+
+VALID SUGGESTION EXAMPLES:
+✅ "Add 20% AQUA to improve diversification"
+✅ "Set up weekly rebalancing to maintain target allocations"
+✅ "Add 10% of vault assets to Soroswap USDC-XLM liquidity pool"
+✅ "Stake 30% of XLM holdings to earn staking rewards"
+✅ "Add a rule to rebalance when allocation drifts by more than 15%"
+
+INVALID SUGGESTION EXAMPLES:
+❌ "Lend 5% of USDC to Blend for additional yield"
+❌ "Farm AQUA tokens using liquidity mining"
+❌ "Use flash loans to arbitrage price differences"
+❌ "Implement stop-loss by selling when price drops 10%"
 
 Based on the following data about this Stellar vault, generate 3-5 specific, actionable suggestions to improve its performance:
 
@@ -401,7 +440,7 @@ Respond only with valid JSON object.`;
           messages: [
             {
               role: 'system',
-              content: 'You are an expert DeFi strategist specializing in Stellar Network yield vault optimization. You understand Stellar blockchain, Soroban smart contracts, Stellar DEX, and the Stellar DeFi ecosystem (Soroswap, Aquarius, Blend, etc.). Provide specific, actionable, Stellar-focused, data-driven suggestions that leverage Stellar\'s unique features like low fees and fast finality.',
+              content: 'You are an expert DeFi strategist specializing in Stellar Network yield vault optimization. You understand Stellar blockchain, Soroban smart contracts, Stellar DEX, and the Stellar DeFi ecosystem (Soroswap, Aquarius, Blend, etc.). Provide specific, actionable, Stellar-focused, data-driven suggestions that leverage Stellar\'s unique features like low fees and fast finality.\n\nCRITICAL: The vault builder can ONLY do: asset allocation, rebalancing (via Stellar DEX trading), staking, and liquidity provision to Soroswap. It CANNOT do lending, borrowing, yield farming, or complex multi-protocol strategies. ONLY suggest actions the vault builder can actually implement.',
             },
             {
               role: 'user',
