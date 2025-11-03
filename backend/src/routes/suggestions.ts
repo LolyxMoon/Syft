@@ -11,6 +11,26 @@ import { supabase } from '../lib/supabase.js';
 const router = Router();
 
 /**
+ * Map suggestion types from generator to database enum
+ */
+function mapSuggestionTypeToDb(type: string): string {
+  const typeMap: Record<string, string> = {
+    'rebalance': 'allocation',
+    'add_asset': 'diversification',
+    'remove_asset': 'allocation',
+    'adjust_rule': 'rebalance_rule',
+    'risk_adjustment': 'risk_management',
+    'allocation': 'allocation',
+    'rebalance_rule': 'rebalance_rule',
+    'risk_management': 'risk_management',
+    'market_timing': 'market_timing',
+    'diversification': 'diversification',
+  };
+  
+  return typeMap[type] || 'allocation'; // Default to 'allocation' if unknown
+}
+
+/**
  * Helper function to generate and cache suggestions
  */
 async function generateAndCacheSuggestions(vaultId: string, userPreferences?: any) {
@@ -139,7 +159,7 @@ async function generateAndCacheSuggestions(vaultId: string, userPreferences?: an
     const suggestionRecords = suggestions.map(s => ({
       suggestion_id: s.id,
       vault_id: vaultData.id, // Use UUID instead of text vault_id
-      suggestion_type: s.type,
+      suggestion_type: mapSuggestionTypeToDb(s.type), // Map to DB enum
       title: s.title,
       description: s.description,
       reasoning: s.rationale,
@@ -153,11 +173,15 @@ async function generateAndCacheSuggestions(vaultId: string, userPreferences?: an
       created_at: new Date().toISOString(),
     }));
 
+    console.log(`[Suggestions API] Preparing to insert ${suggestionRecords.length} suggestions into database`);
+    console.log(`[Suggestions API] Sample record:`, JSON.stringify(suggestionRecords[0], null, 2));
+    
     const { error: insertError } = await supabase.from('ai_suggestions').insert(suggestionRecords);
     if (insertError) {
       console.error('[Suggestions API] Error storing suggestions in database:', insertError);
+      console.error('[Suggestions API] Failed records:', JSON.stringify(suggestionRecords, null, 2));
     } else {
-      console.log(`[Suggestions API] Stored ${suggestionRecords.length} suggestions in database`);
+      console.log(`[Suggestions API] Successfully stored ${suggestionRecords.length} suggestions in database`);
     }
   }
 
@@ -454,6 +478,68 @@ router.get('/:vaultId/suggestions/status/:jobId', async (req: Request, res: Resp
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to check job status',
+    });
+  }
+});
+
+/**
+ * GET /api/suggestions/debug/:vaultId
+ * Debug endpoint to check database state for a vault
+ */
+router.get('/debug/:vaultId', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+
+    // Get the vault UUID
+    const { data: vaultData, error: vaultError } = await supabase
+      .from('vaults')
+      .select('id, vault_id, name')
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (vaultError || !vaultData) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vault not found',
+        details: vaultError,
+      });
+    }
+
+    // Get all suggestions for this vault
+    const { data: allSuggestions, error: suggestionsError, count } = await supabase
+      .from('ai_suggestions')
+      .select('*', { count: 'exact' })
+      .eq('vault_id', vaultData.id)
+      .order('created_at', { ascending: false });
+
+    if (suggestionsError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Error fetching suggestions',
+        details: suggestionsError,
+      });
+    }
+
+    // Check cache
+    const cached = suggestionCacheService.get(vaultId);
+
+    return res.json({
+      success: true,
+      vault: vaultData,
+      database: {
+        count: count || 0,
+        suggestions: allSuggestions || [],
+      },
+      cache: {
+        exists: !!cached,
+        count: cached?.length || 0,
+      },
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

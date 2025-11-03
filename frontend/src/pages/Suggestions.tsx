@@ -784,15 +784,17 @@ const Suggestions = () => {
                                     View Implementation
                                   </Button>
                                 )}
-                                <Button 
-                                  variant="primary" 
-                                  size="sm" 
-                                  className="w-full flex items-center justify-center gap-2"
-                                  onClick={() => handleApplySuggestion(suggestion)}
-                                >
-                                  <Sparkles className="w-4 h-4" />
-                                  Apply Suggestion
-                                </Button>
+                                {!showImplementationModal && (
+                                  <Button 
+                                    variant="primary" 
+                                    size="sm" 
+                                    className="w-full flex items-center justify-center gap-2"
+                                    onClick={() => handleApplySuggestion(suggestion)}
+                                  >
+                                    <Sparkles className="w-4 h-4" />
+                                    Apply Suggestion
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </Card>
@@ -1015,7 +1017,16 @@ const Suggestions = () => {
                   <Button variant="outline" size="md" onClick={handleCloseModal}>
                     Close
                   </Button>
-                  <Button variant="primary" size="md">
+                  <Button 
+                    variant="primary" 
+                    size="md"
+                    onClick={() => {
+                      handleApplySuggestion(selectedSuggestion);
+                      handleCloseModal();
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
                     Apply Suggestion
                   </Button>
                 </div>
