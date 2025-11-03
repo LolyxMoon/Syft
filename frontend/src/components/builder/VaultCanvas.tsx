@@ -104,19 +104,32 @@ const VaultCanvas = ({ initialNodes = [], initialEdges = [], onNodesChange, onEd
 
       if (!reactFlowWrapper.current || !reactFlowInstance) return;
 
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
       const paletteItemData = event.dataTransfer.getData('application/reactflow');
 
       if (!paletteItemData) return;
 
       const paletteItem: PaletteItem = JSON.parse(paletteItemData);
+      
+      // Use the event's client coordinates directly with screenToFlowPosition
+      // This method handles all the viewport transformations (zoom, pan, etc.)
       const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+        x: event.clientX,
+        y: event.clientY,
       });
 
+      // Generate a unique ID that won't collide with existing nodes
+      // Check existing nodes to find the highest ID number for this type
+      const existingNodesOfType = nodes.filter(n => n.id.startsWith(`${paletteItem.type}-`));
+      const maxId = existingNodesOfType.reduce((max, node) => {
+        const idMatch = node.id.match(/-(\d+)$/);
+        const nodeNum = idMatch ? parseInt(idMatch[1], 10) : -1;
+        return Math.max(max, nodeNum);
+      }, -1);
+      
+      const newNodeId = maxId + 1;
+
       const newNode: Node = {
-        id: `${paletteItem.type}-${nodeId}`,
+        id: `${paletteItem.type}-${newNodeId}`,
         type: paletteItem.type,
         position,
         data: {
@@ -128,7 +141,7 @@ const VaultCanvas = ({ initialNodes = [], initialEdges = [], onNodesChange, onEd
       setNodes((nds) => nds.concat(newNode));
       setNodeId((id) => id + 1);
     },
-    [reactFlowInstance, nodeId, setNodes]
+    [reactFlowInstance, nodeId, nodes, setNodes]
   );
 
   const onNodesDelete = useCallback(

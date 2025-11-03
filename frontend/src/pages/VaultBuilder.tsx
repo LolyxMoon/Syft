@@ -63,6 +63,37 @@ const VaultBuilder = () => {
   const navigate = useNavigate();
   const modal = useModal();
   const { canUndo, canRedo, undo, redo, pushState } = useBuilderHistory(nodes, edges);
+  
+  // Track when we're applying history to prevent creating new history entries
+  const isApplyingHistoryRef = useRef(false);
+
+  // Handle undo action
+  const handleUndo = useCallback(() => {
+    const previousState = undo();
+    if (previousState) {
+      isApplyingHistoryRef.current = true;
+      setNodes(previousState.nodes);
+      setEdges(previousState.edges);
+      // Reset after state updates
+      setTimeout(() => {
+        isApplyingHistoryRef.current = false;
+      }, 0);
+    }
+  }, [undo]);
+
+  // Handle redo action
+  const handleRedo = useCallback(() => {
+    const nextState = redo();
+    if (nextState) {
+      isApplyingHistoryRef.current = true;
+      setNodes(nextState.nodes);
+      setEdges(nextState.edges);
+      // Reset after state updates
+      setTimeout(() => {
+        isApplyingHistoryRef.current = false;
+      }, 0);
+    }
+  }, [redo]);
 
   // Load user's saved vaults when component mounts
   useEffect(() => {
@@ -166,8 +197,13 @@ const VaultBuilder = () => {
 
   // Debounced history update - only save to history after user stops making changes
   useEffect(() => {
+    // Don't push state if we're applying history (undo/redo)
+    if (isApplyingHistoryRef.current) {
+      return;
+    }
+
     const timer = setTimeout(() => {
-      if (nodes.length > 0 || edges.length > 0) {
+      if ((nodes.length > 0 || edges.length > 0) && !isApplyingHistoryRef.current) {
         pushState(nodes, edges);
       }
     }, 500); // 500ms debounce
@@ -714,7 +750,7 @@ const VaultBuilder = () => {
               {/* History */}
               <div className="flex items-center gap-1 mr-1">
                 <button
-                  onClick={undo}
+                  onClick={handleUndo}
                   disabled={!canUndo}
                   className="p-2 rounded-md hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-neutral-400 hover:text-neutral-50"
                   title="Undo"
@@ -722,7 +758,7 @@ const VaultBuilder = () => {
                   <Undo2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={redo}
+                  onClick={handleRedo}
                   disabled={!canRedo}
                   className="p-2 rounded-md hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-neutral-400 hover:text-neutral-50"
                   title="Redo"

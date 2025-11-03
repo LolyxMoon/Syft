@@ -9,10 +9,11 @@ interface HistoryState {
 interface UseBuilderHistoryReturn {
   canUndo: boolean;
   canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
+  undo: () => HistoryState | null;
+  redo: () => HistoryState | null;
   pushState: (nodes: Node[], edges: Edge[]) => void;
   clearHistory: () => void;
+  currentState: HistoryState;
 }
 
 /**
@@ -35,18 +36,24 @@ export function useBuilderHistory(
    */
   const undo = useCallback(() => {
     if (canUndo) {
-      setCurrentIndex((prev) => prev - 1);
+      const newIndex = currentIndex - 1;
+      setCurrentIndex(newIndex);
+      return history[newIndex];
     }
-  }, [canUndo]);
+    return null;
+  }, [canUndo, currentIndex, history]);
 
   /**
    * Redo to next state
    */
   const redo = useCallback(() => {
     if (canRedo) {
-      setCurrentIndex((prev) => prev + 1);
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
+      return history[newIndex];
     }
-  }, [canRedo]);
+    return null;
+  }, [canRedo, currentIndex, history]);
 
   /**
    * Push a new state to history
@@ -84,6 +91,8 @@ export function useBuilderHistory(
     setCurrentIndex(0);
   }, []);
 
+  const currentState = history[currentIndex] || { nodes: [], edges: [] };
+
   return {
     canUndo,
     canRedo,
@@ -91,6 +100,7 @@ export function useBuilderHistory(
     redo,
     pushState,
     clearHistory,
+    currentState,
   };
 }
 
