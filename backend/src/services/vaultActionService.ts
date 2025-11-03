@@ -266,6 +266,64 @@ export async function buildDepositTransaction(
           `3. Create a vault with XLM as the base token (XLM has the most liquidity pools)`
         );
       }
+
+      // WasmVm InvalidAction - usually means token transfer failed (no balance, no trustline, or token doesn't exist)
+      if (errorMsg.includes('Error(WasmVm, InvalidAction)')) {
+        // Check if it's specifically a transfer failure
+        if (errorMsg.includes('contract call failed') && errorMsg.includes('transfer')) {
+          throw new Error(
+            `Token transfer failed: You don't have enough ${baseTokenInfo} tokens in your wallet to complete this deposit.\n\n` +
+            `Please check:\n` +
+            `1. Your ${baseTokenInfo} token balance\n` +
+            `2. That you have a trustline for ${baseTokenInfo} (if it's not a native token)\n` +
+            `3. That the token contract exists on ${network || 'testnet'}\n\n` +
+            `Tip: You can check your balance on Stellar Expert or your wallet app.`
+          );
+        }
+        
+        // Check for UnreachableCodeReached - token contract issue
+        if (errorMsg.includes('UnreachableCodeReached')) {
+          throw new Error(
+            `Token contract error: The ${baseTokenInfo} token contract encountered an error.\n\n` +
+            `This usually means:\n` +
+            `1. You don't have any ${baseTokenInfo} tokens in your wallet\n` +
+            `2. The token contract has a bug or is not properly deployed\n` +
+            `3. You haven't established a trustline for this token\n\n` +
+            `To fix this:\n` +
+            `• If depositing ${baseTokenInfo}: Make sure you own this token first\n` +
+            `• If the vault requires ${baseTokenInfo}: Try depositing XLM instead and let the vault swap it`
+          );
+        }
+
+        throw new Error(
+          `Transaction failed: Unable to complete the deposit due to a contract execution error. ` +
+          `This usually means you don't have the required tokens or the token contract has an issue.`
+        );
+      }
+
+      // WasmVm MissingValue - accessing storage that doesn't exist
+      if (errorMsg.includes('Error(WasmVm, MissingValue)')) {
+        throw new Error(
+          `Contract state error: The vault or token contract is missing required data. ` +
+          `This vault may not be properly initialized. Please contact the vault owner.`
+        );
+      }
+
+      // Auth errors
+      if (errorMsg.includes('Error(Auth,') || errorMsg.includes('authorization')) {
+        throw new Error(
+          `Authorization failed: Please make sure you've approved the transaction in your wallet and that ` +
+          `you have sufficient XLM for transaction fees (minimum ~0.5 XLM recommended).`
+        );
+      }
+
+      // Budget exceeded
+      if (errorMsg.includes('Budget exceeded') || errorMsg.includes('ExceededLimit')) {
+        throw new Error(
+          `Transaction too complex: This operation requires more computational resources than allowed. ` +
+          `Try depositing a smaller amount or contact the vault owner to optimize the vault.`
+        );
+      }
       
       throw new Error(`Deposit simulation failed: ${simulationResponse.error || 'Unknown error'}`);
     }
