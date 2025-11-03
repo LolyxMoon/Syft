@@ -97,9 +97,9 @@ The vault builder has a visual interface with the following components:
      * APY threshold: "When APY drops below X%" or "When APY goes above X%"
    
 3. AVAILABLE ACTIONS (what the vault can DO):
-   - REBALANCE: Return portfolio to target allocations by trading on Stellar DEX
-   - STAKE: Stake a percentage of vault assets (for assets that support staking like XLM)
-   - PROVIDE LIQUIDITY: Add liquidity to Soroswap DEX pools (AMM liquidity provision)
+   - REBALANCE: Return portfolio to target allocations by trading on Stellar DEX/Soroswap
+   - STAKE: Stake XLM only via StellarStake protocol (testnet only, other assets not supported)
+   - PROVIDE LIQUIDITY: Add liquidity to real Soroswap AMM pools on testnet (production-ready)
 
 4. AI CHAT MODE:
    - Natural language interface to build and modify vaults
@@ -124,11 +124,12 @@ VALID SUGGESTION EXAMPLES:
 ✅ "Add 20% AQUA to improve diversification"
 ✅ "Set up weekly rebalancing to maintain target allocations"
 ✅ "Add 10% of vault assets to Soroswap USDC-XLM liquidity pool"
-✅ "Stake 30% of XLM holdings to earn staking rewards"
+✅ "Stake 30% of XLM holdings via StellarStake to earn staking rewards"
 ✅ "Add a rule to rebalance when allocation drifts by more than 15%"
 
 INVALID SUGGESTION EXAMPLES:
 ❌ "Lend 5% of USDC to Blend for additional yield"
+❌ "Stake USDC or other non-XLM assets" (only XLM staking is supported)
 ❌ "Farm AQUA tokens using liquidity mining"
 ❌ "Use flash loans to arbitrage price differences"
 ❌ "Implement stop-loss by selling when price drops 10%"

@@ -380,6 +380,8 @@ CRITICAL: Every node MUST have ALL required fields populated. Do not leave any d
    }
    
    FOR STAKE ACTIONS:
+   IMPORTANT: Only XLM staking is supported on testnet via StellarStake protocol
+   DO NOT suggest staking for USDC, BTC, or any other assets - only XLM can be staked
    {
      "id": "action-2",
      "type": "action",
@@ -387,13 +389,15 @@ CRITICAL: Every node MUST have ALL required fields populated. Do not leave any d
      "data": {
        "actionType": "stake",                      // REQUIRED
        "label": "Stake XLM",                       // REQUIRED - display name
-       "targetAsset": "XLM",                       // REQUIRED - asset to stake
-       "protocol": "Aquarius",                     // Optional - staking protocol
+       "targetAsset": "XLM",                       // REQUIRED - MUST be XLM only
+       "protocol": "StellarStake",                 // REQUIRED - use "StellarStake" for testnet
+       "targetAllocation": 30,                     // Optional - % of vault to stake
        "description": "Stake XLM for yield"       // REQUIRED
      }
    }
    
    FOR PROVIDE LIQUIDITY ACTIONS:
+   Production-ready integration with Soroswap AMM pools on testnet
    {
      "id": "action-3",
      "type": "action",
@@ -498,8 +502,8 @@ IMPORTANT RULES (when building):
 7. **Every action MUST have ALL required fields**:
    - ALL actions MUST have actionType, label, AND description
    - swap: MUST have targetAsset (which asset to swap to)
-   - stake: MUST have targetAsset (which asset to stake)
-   - provide_liquidity: MUST have protocol
+   - stake: MUST have targetAsset="XLM" AND protocol="StellarStake" (ONLY XLM supported)
+   - provide_liquidity: MUST have protocol (use "Soroswap" for testnet)
    - rebalance: label and description only
 8. **Every condition MUST connect to an action**
 8. **Assets should connect to conditions** (showing they're affected by rules)
