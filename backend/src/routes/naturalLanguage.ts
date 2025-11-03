@@ -50,6 +50,9 @@ function extractVaultParams(body: any) {
  * Generate vault strategy from natural language
  * This endpoint is called by VAPI voice assistant
  * It uses the EXACT same service as AI Chat (/api/vaults/generate-from-prompt)
+ * 
+ * For VAPI: Uses async job processing to avoid Heroku 30s timeout
+ * For AI Chat: Processes synchronously (faster for direct use)
  */
 router.post('/generate-vault', async (req, res) => {
   try {
@@ -66,18 +69,67 @@ router.post('/generate-vault', async (req, res) => {
 
     // Check if this is a VAPI function call (not direct chat)
     const isVAPIFunctionCall = req.body.message?.toolCalls?.[0];
+    const toolCallId = isVAPIFunctionCall?.id;
 
-    // Import and use the same vault generator service that AI Chat uses
+    // For VAPI requests: Use async job processing to avoid 30s timeout
+    if (isVAPIFunctionCall && toolCallId) {
+      console.log('[NL API] VAPI request detected - using async job processing');
+      
+      // Import job queue
+      const { jobQueue } = await import('../services/jobQueue.js');
+      
+      // Create job ID
+      const jobId = `vault-${toolCallId}`;
+      jobQueue.createJob(jobId);
+      
+      // Start processing in background (don't await)
+      (async () => {
+        try {
+          jobQueue.markProcessing(jobId);
+          
+          const { naturalLanguageVaultGenerator } = await import('../services/naturalLanguageVaultGenerator.js');
+          const result = await naturalLanguageVaultGenerator.generateVault({
+            userPrompt: prompt,
+            conversationHistory: conversationContext || [],
+            network: 'testnet',
+            forceVaultGeneration: true,
+          });
+          
+          jobQueue.completeJob(jobId, result);
+          console.log('[NL API] Background job completed:', jobId);
+        } catch (error: any) {
+          jobQueue.failJob(jobId, error.message || 'Unknown error');
+          console.error('[NL API] Background job failed:', error);
+        }
+      })();
+      
+      // Return immediately with job ID
+      console.log('[NL API] Returning VAPI format with jobId:', jobId);
+      res.json({
+        results: [
+          {
+            toolCallId: toolCallId,
+            result: JSON.stringify({
+              success: true,
+              jobId: jobId,
+              status: 'processing',
+              message: 'Vault generation started. Poll /api/nl/job-status for results.'
+            })
+          }
+        ]
+      });
+      return;
+    }
+
+    // For non-VAPI requests (AI Chat): Process synchronously
+    console.log('[NL API] Non-VAPI request - processing synchronously');
     const { naturalLanguageVaultGenerator } = await import('../services/naturalLanguageVaultGenerator.js');
     
-    // Generate vault using the proven AI Chat method
-    // When called via VAPI function, MUST generate vault (not just chat)
-    // When called via AI Chat tab, can be conversational
     const result = await naturalLanguageVaultGenerator.generateVault({
       userPrompt: prompt,
       conversationHistory: conversationContext || [],
       network: 'testnet',
-      forceVaultGeneration: !!isVAPIFunctionCall, // Force vault generation for voice function calls
+      forceVaultGeneration: !!isVAPIFunctionCall,
     });
 
     console.log('[NL API] Generated response:', {
@@ -86,37 +138,11 @@ router.post('/generate-vault', async (req, res) => {
       responseType: result.responseType,
     });
 
-    // VAPI requires a COMPLETELY different format than AI Chat
-    // VAPI expects: { results: [{ toolCallId, result }] }
-    // The result must be a JSON string (not an object)
-    
-    // Check if this is a VAPI request (has message.toolCalls array)
-    const isVAPIRequest = req.body.message?.toolCalls?.[0];
-    const toolCallId = isVAPIRequest?.id;
-    
-    if (isVAPIRequest && toolCallId) {
-      console.log('[NL API] Returning VAPI format with toolCallId:', toolCallId);
-      
-      // VAPI format: return as required by VAPI docs
-      res.json({
-        results: [
-          {
-            toolCallId: toolCallId,
-            result: JSON.stringify({
-              success: true,
-              data: result
-            })
-          }
-        ]
-      });
-    } else {
-      // Regular API format (for AI Chat compatibility)
-      console.log('[NL API] Returning standard format');
-      res.json({
-        success: true,
-        data: result,
-      });
-    }
+    // Regular API format (for AI Chat compatibility)
+    res.json({
+      success: true,
+      data: result,
+    });
 
   } catch (error: any) {
     console.error('[NL API] Error generating vault:', error);
@@ -274,6 +300,56 @@ router.post('/analyze-strategy', async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to analyze strategy',
+    });
+  }
+});
+
+/**
+ * GET /api/nl/job-status/:jobId
+ * Poll for async job status and results
+ */
+router.get('/job-status/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    const { jobQueue } = await import('../services/jobQueue.js');
+    const job = jobQueue.getJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found or expired',
+      });
+    }
+    
+    if (job.status === 'completed') {
+      return res.json({
+        success: true,
+        status: 'completed',
+        data: job.result,
+      });
+    }
+    
+    if (job.status === 'failed') {
+      return res.json({
+        success: false,
+        status: 'failed',
+        error: job.error,
+      });
+    }
+    
+    // Still processing or pending
+    return res.json({
+      success: true,
+      status: job.status,
+      message: 'Job is still processing',
+    });
+    
+  } catch (error: any) {
+    console.error('[NL API] Error checking job status:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to check job status',
     });
   }
 });

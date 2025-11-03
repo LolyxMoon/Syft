@@ -623,6 +623,7 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
       
       // First API call - let AI decide if it needs to search or can respond directly
       // Note: Cannot use response_format with tools, so we'll rely on the system prompt
+
       let response = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
         messages,

@@ -156,21 +156,69 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
     };
   }, []);
 
+  // Poll for async job results
+  const pollJobStatus = async (jobId: string, maxAttempts = 60) => {
+    console.log('[useVoiceAssistant] Starting to poll for job:', jobId);
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/nl/job-status/${jobId}`);
+        const data = await response.json();
+        
+        console.log(`[useVoiceAssistant] Poll attempt ${attempt + 1}:`, data.status);
+        
+        if (data.status === 'completed') {
+          console.log('[useVoiceAssistant] Job completed!', data.data);
+          return data.data;
+        }
+        
+        if (data.status === 'failed') {
+          throw new Error(data.error || 'Job failed');
+        }
+        
+        // Wait 1 second before next poll
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error('[useVoiceAssistant] Poll error:', error);
+        throw error;
+      }
+    }
+    
+    throw new Error('Job timeout - exceeded maximum polling attempts');
+  };
+
   // Function call result handler - processes results from VAPI server-side tool execution
   // The backend AI (naturalLanguageVaultGenerator) intelligently decides the response type:
   // - 'build': Generate new vault → display in visual builder
   // - 'chat': Just conversation → assistant speaks the response
   // - Can also handle modifications, explanations, etc. all through one endpoint
-  const handleGenerateVaultResult = (result: any) => {
+  const handleGenerateVaultResult = async (result: any) => {
     try {
       console.log('[useVoiceAssistant] ===== VAULT RESULT RECEIVED =====');
       console.log('[useVoiceAssistant] Raw result:', JSON.stringify(result, null, 2));
       
       // The backend returns: {success: true, data: {nodes, edges, explanation, responseType, ...}}
       // After VAPI and vapiService parsing, we should have this structure
-      const vaultData = result.data || result;
+      let vaultData = result.data || result;
       
       console.log('[useVoiceAssistant] Extracted vaultData:', JSON.stringify(vaultData, null, 2));
+      
+      // Check if this is an async job response
+      if (vaultData.jobId && vaultData.status === 'processing') {
+        console.log('[useVoiceAssistant] Async job detected, polling for results...');
+        vapiService.sendMessage('Processing your vault request...');
+        
+        try {
+          vaultData = await pollJobStatus(vaultData.jobId);
+          console.log('[useVoiceAssistant] Async job completed:', vaultData);
+        } catch (error) {
+          console.error('[useVoiceAssistant] Failed to poll job:', error);
+          vapiService.sendMessage(
+            `Error: ${error instanceof Error ? error.message : 'Failed to generate vault'}`
+          );
+          return;
+        }
+      }
       
       if (!vaultData) {
         console.error('[useVoiceAssistant] No vault data in result');
