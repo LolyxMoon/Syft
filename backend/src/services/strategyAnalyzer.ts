@@ -104,45 +104,75 @@ export class StrategyAnalyzer {
 
     const assets = config.assets || [];
     
-    // CRITICAL FIX: Handle case where assets are stored as strings without percentage
-    // This happens when vaults are deployed without explicit allocations
-    const assetsWithPercentages = assets.map((asset: any) => {
-      // If asset is just a string (legacy format), convert to AssetAllocation
-      if (typeof asset === 'string') {
-        return {
-          assetCode: asset,
-          assetId: asset,
-          percentage: 0, // Will trigger equal distribution below
-        };
-      }
-      // If asset object exists but percentage is missing, default to 0
-      return {
-        ...asset,
-        percentage: asset.percentage ?? 0,
-      };
-    });
+    // CRITICAL FIX: Try to get target allocation from rebalance rules first
+    // The rules array contains the authoritative target_allocation in basis points
+    const rules: any[] = (config as any).rules || [];
+    const rebalanceRule: any = rules.find((r: any) => r.action === 'rebalance' && r.target_allocation);
     
-    let totalAllocation = assetsWithPercentages.reduce((sum: number, asset: any) => sum + asset.percentage, 0);
+    let assetsWithPercentages: any[];
+    let totalAllocation = 0;
     
-    // If total allocation is 0 but we have assets, assume equal distribution
-    // This is a reasonable default for vaults without explicit allocations
-    if (totalAllocation === 0 && assetsWithPercentages.length > 0) {
-      const equalPercentage = 100 / assetsWithPercentages.length;
-      assetsWithPercentages.forEach((asset: any) => {
-        asset.percentage = equalPercentage;
-      });
-      totalAllocation = 100;
+    if (rebalanceRule && Array.isArray(rebalanceRule.target_allocation)) {
+      // Use target_allocation from rebalance rule (basis points format: 100_0000 = 100%)
+      console.log(`[StrategyAnalyzer] Using target_allocation from rebalance rule:`, rebalanceRule.target_allocation);
       
-      console.log(`[StrategyAnalyzer] No allocations found for vault, assuming equal distribution: ${equalPercentage.toFixed(2)}% per asset`);
+      assetsWithPercentages = assets.map((asset: any, index: number) => {
+        const basisPoints = rebalanceRule.target_allocation[index] || 0;
+        const percentage = basisPoints / 10000; // Convert basis points to percentage
+        
+        return {
+          assetCode: typeof asset === 'string' ? asset : asset.code,
+          assetId: typeof asset === 'string' ? asset : asset.assetId,
+          percentage: percentage,
+        };
+      });
+      
+      totalAllocation = assetsWithPercentages.reduce((sum: number, asset: any) => sum + asset.percentage, 0);
+      console.log(`[StrategyAnalyzer] Calculated allocation from rules:`, 
+        assetsWithPercentages.map(a => `${a.assetCode}: ${a.percentage.toFixed(2)}%`).join(', '),
+        `Total: ${totalAllocation.toFixed(2)}%`
+      );
+    } else {
+      // Fallback: Handle case where assets are stored as strings without percentage
+      // This happens when vaults are deployed without explicit allocations
+      assetsWithPercentages = assets.map((asset: any) => {
+        // If asset is just a string (legacy format), convert to AssetAllocation
+        if (typeof asset === 'string') {
+          return {
+            assetCode: asset,
+            assetId: asset,
+            percentage: 0, // Will trigger equal distribution below
+          };
+        }
+        // If asset object exists but percentage is missing, default to 0
+        return {
+          ...asset,
+          percentage: asset.percentage ?? 0,
+        };
+      });
+      
+      totalAllocation = assetsWithPercentages.reduce((sum: number, asset: any) => sum + asset.percentage, 0);
+      
+      // If total allocation is 0 but we have assets, assume equal distribution
+      // This is a reasonable default for vaults without explicit allocations
+      if (totalAllocation === 0 && assetsWithPercentages.length > 0) {
+        const equalPercentage = 100 / assetsWithPercentages.length;
+        assetsWithPercentages.forEach((asset: any) => {
+          asset.percentage = equalPercentage;
+        });
+        totalAllocation = 100;
+        
+        console.log(`[StrategyAnalyzer] No allocations found for vault, assuming equal distribution: ${equalPercentage.toFixed(2)}% per asset`);
+      }
     }
 
-    // Check if allocations sum to 100%
+    // Check if allocations sum to 100% (allow 0.1% tolerance for rounding)
     if (Math.abs(totalAllocation - 100) > 0.1) {
       issues.push({
         severity: 'high',
         category: 'efficiency',
         title: 'Incorrect Asset Allocation',
-        description: `Total allocation is ${totalAllocation}%, should be 100%`,
+        description: `Total allocation is ${totalAllocation.toFixed(2)}%, should be 100%`,
         impact: 'Vault may not deploy capital efficiently',
         recommendation: 'Adjust asset allocations to sum to exactly 100%',
       });

@@ -289,7 +289,7 @@ async function evaluateRule(
 
     for (let i = 0; i < currentBalances.length && i < targetAllocation.length; i++) {
       const currentPct = (parseFloat(currentBalances[i].value) / totalValue) * 100;
-      const targetPct = targetAllocation[i] / 1000; // Assuming target is in basis points
+      const targetPct = targetAllocation[i] / 1000; // Convert from basis points (100_0000 = 100%) to percentage
       const drift = Math.abs(currentPct - targetPct);
 
       if (drift >= threshold / 1000) {
