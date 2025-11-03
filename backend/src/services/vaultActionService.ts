@@ -50,8 +50,8 @@ export async function buildDepositTransaction(
       const vaultConfig = vault.config;
       if (vaultConfig?.assets && vaultConfig.assets.length > 0) {
         const firstAsset = vaultConfig.assets[0];
-        // Asset can be {code: "XLM", ...} or just "XLM"
-        const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.code;
+        // Asset can be {assetCode: "XLM", ...} or just "XLM"
+        const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.assetCode;
         tokenAddress = getAssetAddress(assetCode, network);
       } else {
         // Fallback to native XLM
@@ -98,15 +98,39 @@ export async function buildDepositTransaction(
       // Get vault's base token for better error messages
       let baseTokenInfo = 'unknown token';
       try {
+        const { getAssetSymbol } = await import('../config/tokenAddresses.js');
         const vaultConfig = vault.config;
+        console.log('[Build Deposit TX] Vault config assets:', JSON.stringify(vaultConfig?.assets));
+        
         if (vaultConfig?.assets && vaultConfig.assets.length > 0) {
           const firstAsset = vaultConfig.assets[0];
-          const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.code;
-          baseTokenInfo = assetCode || firstAsset.address || 'unknown token';
+          console.log('[Build Deposit TX] First asset:', JSON.stringify(firstAsset));
+          
+          // Handle both string format and AssetAllocation object format
+          const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.assetCode;
+          const assetAddress = typeof firstAsset === 'string' ? firstAsset : (firstAsset.assetIssuer || firstAsset.assetCode);
+          
+          console.log('[Build Deposit TX] assetCode:', assetCode, 'assetAddress:', assetAddress);
+          
+          // If we have a symbol (not a contract address), use it directly
+          if (assetCode && !assetCode.startsWith('C')) {
+            baseTokenInfo = assetCode;
+            console.log('[Build Deposit TX] Using assetCode:', baseTokenInfo);
+          } else if (assetAddress && assetAddress.startsWith('C')) {
+            // Try to resolve contract address to symbol
+            baseTokenInfo = getAssetSymbol(assetAddress);
+            console.log('[Build Deposit TX] Resolved address to symbol:', baseTokenInfo);
+          } else {
+            baseTokenInfo = assetCode || assetAddress || 'unknown token';
+            console.log('[Build Deposit TX] Fallback baseTokenInfo:', baseTokenInfo);
+          }
         }
       } catch (e) {
+        console.warn('Error getting base token info:', e);
         // Ignore error getting base token info
       }
+      
+      console.log('[Build Deposit TX] Final baseTokenInfo:', baseTokenInfo);
       
       // Provide helpful error message
       const errorMsg = JSON.stringify(simulationResponse);
@@ -198,11 +222,13 @@ export async function buildDepositTransaction(
       // Error #15: Pool not found
       if (errorMsg.includes('Error(Contract, #15)') || errorMsg.includes('PoolNotFound')) {
         throw new Error(
-          `No liquidity pool found: There is no liquidity pool between your deposit token and this vault's base token (${baseTokenInfo}). ` +
-          `To deposit, either:\n` +
-          `1. Deposit using ${baseTokenInfo} directly (the vault's base token)\n` +
-          `2. Create a liquidity pool on Soroswap for this token pair first\n` +
-          `3. Swap your tokens to ${baseTokenInfo} before depositing`
+          `No liquidity pool found between your deposit token and ${baseTokenInfo}.\n\n` +
+          `This vault's base token is ${baseTokenInfo}, but you're trying to deposit a different token. ` +
+          `Most token pairs don't have liquidity pools on testnet yet.\n\n` +
+          `To deposit successfully:\n` +
+          `1. Deposit ${baseTokenInfo} directly (recommended)\n` +
+          `2. Swap your tokens to ${baseTokenInfo} on Soroswap first\n` +
+          `3. Create a vault with XLM as the base token (XLM has the most liquidity pools)`
         );
       }
       
@@ -231,11 +257,13 @@ export async function buildDepositTransaction(
       // Legacy Error #205: No liquidity pool (from DEX contract)
       if (errorMsg.includes('Error(Contract, #205)') || errorMsg.includes('get_pair')) {
         throw new Error(
-          `No liquidity pool found: There is no liquidity pool between your deposit token and this vault's base token (${baseTokenInfo}). ` +
-          `To deposit, either:\n` +
-          `1. Deposit using ${baseTokenInfo} directly (the vault's base token)\n` +
-          `2. Create a liquidity pool on Soroswap for this token pair first\n` +
-          `3. Swap your tokens to ${baseTokenInfo} before depositing`
+          `No liquidity pool found between your deposit token and ${baseTokenInfo}.\n\n` +
+          `This vault's base token is ${baseTokenInfo}, but you're trying to deposit a different token. ` +
+          `Most token pairs don't have liquidity pools on testnet yet.\n\n` +
+          `To deposit successfully:\n` +
+          `1. Deposit ${baseTokenInfo} directly (recommended)\n` +
+          `2. Swap your tokens to ${baseTokenInfo} on Soroswap first\n` +
+          `3. Create a vault with XLM as the base token (XLM has the most liquidity pools)`
         );
       }
       

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useWallet } from '../../hooks/useWallet';
 import { useWalletBalance } from '../../hooks/useWalletBalance';
 import { useModal, Skeleton } from '../ui';
+import { resolveAssetNames } from '../../services/tokenService';
 
 interface VaultActionsProps {
   vaultId: string;
@@ -23,6 +24,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [userShares, setUserShares] = useState<string | null>(null);
   const [loadingShares, setLoadingShares] = useState(false);
+  const [resolvedAssetNames, setResolvedAssetNames] = useState<string[]>([]);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -57,6 +59,18 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
   useEffect(() => {
     fetchUserShares();
   }, [address, vaultId]);
+
+  // Resolve asset names when vault config changes
+  useEffect(() => {
+    if (vaultConfig?.assets && vaultConfig.assets.length > 0) {
+      console.log('[VaultActions] Vault config received:', vaultConfig);
+      console.log('[VaultActions] Assets:', vaultConfig.assets);
+      console.log('[VaultActions] Rules:', vaultConfig.rules);
+      resolveAssetNames(vaultConfig.assets, 'testnet').then(names => {
+        setResolvedAssetNames(names);
+      });
+    }
+  }, [vaultConfig]);
 
   // Map Freighter network names to our backend format
   const normalizeNetwork = (net?: string, passphrase?: string): string => {
@@ -420,20 +434,28 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
           </p>
           <div className="flex flex-wrap gap-2">
             {vaultConfig.assets.map((asset: any, index: number) => {
-              const assetCode = typeof asset === 'string' ? asset : (asset.code || asset.assetCode || 'Unknown');
+              // Use resolved asset name if available, otherwise show loading or fallback
+              const assetCode = resolvedAssetNames[index] || 'Loading...';
               
               // Try to get allocation from asset directly, or from rules' target_allocation
               let allocation = 0;
+              
+              // First priority: get from asset object itself
               if (typeof asset === 'object' && asset.allocation !== undefined) {
                 allocation = asset.allocation;
-              } else if (vaultConfig.rules && vaultConfig.rules.length > 0) {
+                console.log(`[VaultActions] Asset ${index} allocation from object:`, allocation);
+              } 
+              // Second priority: get from rules' target_allocation array
+              else if (vaultConfig.rules && vaultConfig.rules.length > 0) {
                 // Find rebalance rule with target_allocation
                 const rebalanceRule = vaultConfig.rules.find((r: any) => 
                   r.action === 'rebalance' && r.target_allocation && r.target_allocation.length > index
                 );
+                console.log(`[VaultActions] Found rebalance rule:`, rebalanceRule);
                 if (rebalanceRule) {
-                  // Convert from basis points (e.g., 700000) to percentage (70)
+                  // Convert from basis points (e.g., 1000000) to percentage (100)
                   allocation = rebalanceRule.target_allocation[index] / 10000;
+                  console.log(`[VaultActions] Asset ${index} allocation from rule: ${rebalanceRule.target_allocation[index]} basis points -> ${allocation}%`);
                 }
               }
               

@@ -70,7 +70,7 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
   const [error, setError] = useState('');
   const [xlmPrice, setXlmPrice] = useState<number>(0.10); // Fallback price
   const [vaultAnalytics, setVaultAnalytics] = useState<any>(null);
-  const [resolvedAssets, setResolvedAssets] = useState<string>(''); // Cache for resolved token names
+  const [resolvedAssets, setResolvedAssets] = useState<string | null>(null); // Cache for resolved token names
   const { address } = useWallet();
   const modal = useModal();
   const [showMintAndListModal, setShowMintAndListModal] = useState(false);
@@ -343,8 +343,10 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
     );
   }
 
-  // Use resolved assets if available, otherwise fallback to original logic
-  const assets = resolvedAssets || vault.config.assets?.map((a: any) => typeof a === 'string' ? a : a.code).join(' / ') || 'Unknown';
+  // Use resolved assets if available, otherwise show vault name or loading
+  const assets = resolvedAssets !== null 
+    ? resolvedAssets 
+    : (vault.name || vault.config?.name || 'Loading...');
 
   return (
     <div className="space-y-4">

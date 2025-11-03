@@ -40,6 +40,20 @@ function getAssetAddress(asset: string, network: string): string {
 }
 
 /**
+ * Get asset symbol from address or return symbol if already a symbol
+ */
+async function getAssetSymbolFromInput(asset: string): Promise<string> {
+  // If it's an address (starts with C), convert to symbol
+  if (asset.startsWith('C') && asset.length === 56) {
+    const { getAssetSymbol } = await import('../config/tokenAddresses.js');
+    return getAssetSymbol(asset);
+  }
+  
+  // Otherwise it's already a symbol, return as is
+  return asset.toUpperCase();
+}
+
+/**
  * Calculate optimal yield routing strategy
  */
 export async function calculateOptimalRouting(
@@ -50,13 +64,16 @@ export async function calculateOptimalRouting(
 ): Promise<YieldRoutingStrategy> {
   const routerConfig = { ...DEFAULT_CONFIG, ...config };
 
+  // Convert address to symbol if needed (for logging and comparison)
+  const assetSymbol = await getAssetSymbolFromInput(asset);
+  
   // Map asset symbol to address (if needed)
-  const assetAddress = getAssetAddress(asset, network);
+  const assetAddress = getAssetAddress(assetSymbol, network);
   
   // For USDC, query both variants and combine results (like the comparison endpoint does)
   let opportunities: YieldOpportunity[] = [];
   
-  if (asset.toUpperCase() === 'USDC') {
+  if (assetSymbol === 'USDC') {
     const usdcAddresses = getAllUSDCAddresses(network);
     
     const allOpps = await Promise.all(
@@ -83,7 +100,7 @@ export async function calculateOptimalRouting(
     opportunities = await getYieldOpportunities([assetAddress], network);
   }
 
-  console.log(`[calculateOptimalRouting] Asset: ${asset}, Address: ${assetAddress}, Opportunities: ${opportunities.length}`);
+  console.log(`[calculateOptimalRouting] Asset Symbol: ${assetSymbol}, Address: ${assetAddress}, Opportunities: ${opportunities.length}`);
   console.log('[calculateOptimalRouting] Raw opportunities:', opportunities.map(o => ({ protocol: o.protocolName, apy: o.apy, risk: o.risk })));
 
   // Filter by risk tolerance
@@ -126,7 +143,7 @@ export async function calculateOptimalRouting(
 
   return {
     totalAmount,
-    asset,
+    asset: assetSymbol, // Use symbol instead of potentially-address input
     allocations,
     expectedBlendedApy,
     rationale,

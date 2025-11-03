@@ -62,7 +62,61 @@ export const tokenAddresses: { [key: string]: { [key: string]: string } } = {
     'public': '',
   },
   'AQUA': {
-    'testnet': 'CCRRYUTYU3UJQME6ZKBDZMZS6P4ZXVFWRXLQGVL7TWVCXHWMLQOAAQUA',
+    'testnet': 'CD56XOMAZ55LIKCYVFXH5CP2AKCLYMPMBFRN5XIJVOTWOVY2KFGLZVJD',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'BTC': {
+    'testnet': 'CBFX54THH4KKRDDOMV5G6TNGDPHXEUAXM7SGTOOXTZKODACI7O5ND6U7',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'XRP': {
+    'testnet': 'CBFM34O7P6YJG2DCS3C7AJI6WDKD2JPMPPA7RTVYC7ZYEPKDLGEIFP5D',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'ARST': {
+    'testnet': 'CB3TIJR2B5NZFKZLBUE5LAASV7WIRDKS24VPIYUXXEHM7XN3X2JXFHZY',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'BRL': {
+    'testnet': 'CAG6QUTOUL3M4HPOPFYYDGJQODY7I3WUYKO2DFYDHIRHLD4HHPGIHWBJ',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'XTAR': {
+    'testnet': 'CCSV3Y6QKPRZCPLCMC5W7OCS5BFPKMYFK5GC25SSSS44U2WA4Y7QRKED',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'RYAW': {
+    'testnet': 'CBIWPSUKAYOE5ORIDLYNPFMWWNIZSA5LQVDNXYTW7HI4H5TIU64DGJ7F',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'JAHV': {
+    'testnet': 'CAZKRTMRBEMSMRCGC4C6YDUU22H5AVQZ5HAASR4PGWITXPDDBB3BTGHI',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'VOEZ': {
+    'testnet': 'CDUCWV4VK6MXD3JMYFQUQ2KUHHGTMR7RAS6C2SPF7EHHUEGKFCRO3ZZF',
+    'futurenet': nativeXLMAddresses['futurenet'],
+    'mainnet': '',
+    'public': '',
+  },
+  'JORV': {
+    'testnet': 'CAT5EZTZVB4V4O7E5ZA2HQJTL7MZPWDJWQZIJYPMTAY6DMRWOIK5AMCD',
     'futurenet': nativeXLMAddresses['futurenet'],
     'mainnet': '',
     'public': '',
@@ -124,12 +178,24 @@ export function getAssetSymbol(assetAddress: string): string {
     'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC': 'XLM',
     'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT': 'XLM',
     'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA': 'XLM',
-    // USDC addresses (both variants)
+    // USDC addresses (multiple variants)
     'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA': 'USDC', // Soroswap custom USDC
     'CAZRY5GSFBFXD7H6GAFBA5YGYQTDXU4QKWKMYFWBAZFUCURN3WKX6LF5': 'USDC', // Official Stellar USDC
-    // Other tokens
+    'CDWEFYYHMGEZEFC5TBUDXM3IJJ7K7W5BDGE765UIYQEV4JFWDOLSTOEK': 'USDC', // Alternative USDC
+    // EURC addresses (multiple variants)
     'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU': 'EURC',
-    'CCRRYUTYU3UJQME6ZKBDZMZS6P4ZXVFWRXLQGVL7TWVCXHWMLQOAAQUA': 'AQUA',
+    'CAUL6I3KR55BAOSOE23VRR5FUFD2EBWF3DHGWUZN7N3ZGVR4QQU6DQMD': 'EURC',
+    // All other testnet tokens
+    'CD56XOMAZ55LIKCYVFXH5CP2AKCLYMPMBFRN5XIJVOTWOVY2KFGLZVJD': 'AQUA',
+    'CBFX54THH4KKRDDOMV5G6TNGDPHXEUAXM7SGTOOXTZKODACI7O5ND6U7': 'BTC',
+    'CBFM34O7P6YJG2DCS3C7AJI6WDKD2JPMPPA7RTVYC7ZYEPKDLGEIFP5D': 'XRP',
+    'CB3TIJR2B5NZFKZLBUE5LAASV7WIRDKS24VPIYUXXEHM7XN3X2JXFHZY': 'ARST',
+    'CAG6QUTOUL3M4HPOPFYYDGJQODY7I3WUYKO2DFYDHIRHLD4HHPGIHWBJ': 'BRL',
+    'CCSV3Y6QKPRZCPLCMC5W7OCS5BFPKMYFK5GC25SSSS44U2WA4Y7QRKED': 'XTAR',
+    'CBIWPSUKAYOE5ORIDLYNPFMWWNIZSA5LQVDNXYTW7HI4H5TIU64DGJ7F': 'RYAW',
+    'CAZKRTMRBEMSMRCGC4C6YDUU22H5AVQZ5HAASR4PGWITXPDDBB3BTGHI': 'JAHV',
+    'CDUCWV4VK6MXD3JMYFQUQ2KUHHGTMR7RAS6C2SPF7EHHUEGKFCRO3ZZF': 'VOEZ',
+    'CAT5EZTZVB4V4O7E5ZA2HQJTL7MZPWDJWQZIJYPMTAY6DMRWOIK5AMCD': 'JORV',
   };
   return knownAssets[assetAddress] || 'TOKEN';
 }
