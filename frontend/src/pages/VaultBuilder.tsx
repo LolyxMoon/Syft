@@ -122,19 +122,29 @@ const VaultBuilder = () => {
       setSuggestionPrompt(state.actionPrompt);
       setSuggestionVaultId(state.vaultId);
       
-      // If there's a vault ID, load that vault
-      if (state.vaultId && savedVaults.length > 0) {
-        const vaultToLoad = savedVaults.find(v => v.vault_id === state.vaultId);
-        if (vaultToLoad) {
-          console.log('[VaultBuilder] Loading vault for suggestion:', vaultToLoad.name);
-          handleLoadVault(vaultToLoad);
-        }
+      // Load the vault if we have a vault ID
+      if (state.vaultId) {
+        (async () => {
+          console.log('[VaultBuilder] Fetching vault from backend:', state.vaultId);
+          const vault = await loadVaultById(state.vaultId);
+          if (vault) {
+            console.log('[VaultBuilder] Loading vault for suggestion:', vault.name);
+            handleLoadVault(vault);
+          } else {
+            console.warn('[VaultBuilder] Vault not found:', state.vaultId);
+            modal.message(
+              'Could not find the vault for this suggestion. It may have been deleted or deployed.',
+              'Vault Not Found',
+              'warning'
+            );
+          }
+        })();
       }
       
       // Clear the location state to prevent re-triggering
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state, savedVaults]); // Re-run when location state or saved vaults change
+  }, [location.state]); // Only depend on location.state
 
   // Map Freighter network names to our backend format
   const normalizeNetwork = (net?: string, passphrase?: string): string => {
@@ -178,6 +188,38 @@ const VaultBuilder = () => {
       console.error('Error loading saved vaults:', error);
     } finally {
       setLoadingVaults(false);
+    }
+  };
+
+  // Load a specific vault by vault_id from the backend
+  const loadVaultById = async (vaultId: string) => {
+    if (!address) {
+      console.log('[VaultBuilder] No address, cannot load vault');
+      return null;
+    }
+
+    try {
+      const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      console.log(`[VaultBuilder] Fetching vaults for ${address} on ${normalizedNetwork}`);
+      const response = await fetch(`${backendUrl}/api/vaults/user/${address}?network=${normalizedNetwork}`);
+      const data = await response.json();
+
+      if (data.success) {
+        console.log(`[VaultBuilder] Found ${data.data.length} vaults, searching for ${vaultId}`);
+        const vault = data.data.find((v: SavedVault) => v.vault_id === vaultId);
+        if (vault) {
+          console.log(`[VaultBuilder] Found vault:`, vault.name, 'Status:', vault.status);
+        } else {
+          console.log(`[VaultBuilder] Vault ${vaultId} not found in user's vaults`);
+          console.log(`[VaultBuilder] Available vault IDs:`, data.data.map((v: SavedVault) => v.vault_id));
+        }
+        return vault || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('[VaultBuilder] Error loading vault by ID:', error);
+      return null;
     }
   };
 
