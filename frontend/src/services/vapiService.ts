@@ -60,6 +60,7 @@ class VapiService {
   private conversationHistory: ConversationMessage[] = [];
   private currentCallMetrics: CallMetrics | null = null;
   private eventHandlers: Map<string, Function[]> = new Map();
+  private processedToolCallIds: Set<string> = new Set();
 
   constructor() {
     this.initializeVapi();
@@ -103,6 +104,8 @@ class VapiService {
         this.currentCallMetrics.endTime = Date.now();
         this.currentCallMetrics.duration = this.currentCallMetrics.endTime - this.currentCallMetrics.startTime;
       }
+      // Clear processed tool call IDs when call ends
+      this.processedToolCallIds.clear();
     });
 
     // Speech detection
@@ -192,7 +195,18 @@ class VapiService {
       const toolResults = message.messages.filter((msg: any) => msg.role === 'tool_call_result');
       
       toolResults.forEach((toolResult: any) => {
+        const toolCallId = toolResult.toolCallId || `${toolResult.name}-${Date.now()}`;
+        
+        // Skip if we've already processed this tool call
+        if (this.processedToolCallIds.has(toolCallId)) {
+          console.log('[VAPI] Skipping already processed tool call:', toolCallId);
+          return;
+        }
+        
         console.log('[VAPI] Found tool call result in conversation:', toolResult);
+        
+        // Mark this tool call as processed
+        this.processedToolCallIds.add(toolCallId);
         
         // Extract and parse the result
         let parsedResult = toolResult.result;
@@ -225,7 +239,7 @@ class VapiService {
         this.emit('functionCallResult', {
           name: toolResult.name,
           result: functionData,
-          toolCallId: toolResult.toolCallId,
+          toolCallId: toolCallId,
         });
       });
     }
@@ -278,6 +292,16 @@ class VapiService {
       if (!functionCall) return;
 
       const { name, result } = functionCall;
+      const toolCallId = message.id || `${name}-${Date.now()}`;
+      
+      // Skip if we've already processed this tool call
+      if (this.processedToolCallIds.has(toolCallId)) {
+        console.log('[VAPI] Skipping already processed function call:', toolCallId);
+        return;
+      }
+      
+      // Mark this tool call as processed
+      this.processedToolCallIds.add(toolCallId);
 
       // Parse the result - VAPI returns it in the format: {results: [{result: "..."}]}
       let parsedResult = result;
@@ -311,7 +335,7 @@ class VapiService {
       this.emit('functionCallResult', {
         name,
         result: functionData,
-        messageId: message.id,
+        messageId: toolCallId,
       });
 
     } catch (error) {

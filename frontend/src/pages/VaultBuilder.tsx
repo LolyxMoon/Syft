@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Eye, EyeOff, Sparkles, Grid3x3, TrendingUp, Mic } from 'lucide-react';
 import { Button, useModal } from '../components/ui';
@@ -611,9 +611,24 @@ const VaultBuilder = () => {
     pushState(template.nodes, template.edges);
   }, [pushState]);
 
+  // Track the last vault generation to prevent duplicate modals
+  const lastVaultGenerationRef = useRef<string>('');
+
   // Handle vault generated from AI chat
   const handleVaultGenerated = useCallback((newNodes: Node[], newEdges: Edge[], explanation: string) => {
     console.log('[VaultBuilder] AI generated vault:', { nodeCount: newNodes.length, edgeCount: newEdges.length });
+    
+    // Create a unique identifier for this vault generation
+    const vaultId = `${newNodes.length}-${newEdges.length}-${Date.now()}`;
+    
+    // Prevent duplicate calls within 2 seconds
+    if (lastVaultGenerationRef.current && Date.now() - parseInt(lastVaultGenerationRef.current.split('-')[2]) < 2000) {
+      console.log('[VaultBuilder] Skipping duplicate vault generation');
+      return;
+    }
+    
+    lastVaultGenerationRef.current = vaultId;
+    
     setNodes(newNodes);
     setEdges(newEdges);
     pushState(newNodes, newEdges);

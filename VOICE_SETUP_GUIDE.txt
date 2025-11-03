@@ -74,6 +74,9 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ### Step 3: Setup VAPI Assistant on Dashboard
 
+⚠️ **IMPORTANT**: Let the AI assistant decide when to call functions naturally. Don't force it to call functions on every interaction.
+The tool descriptions should be informative but not coercive. The AI is smart enough to know when to call a function.
+
 1. **Go to VAPI Dashboard**: https://dashboard.vapi.ai/
 2. **Login** with your credentials
 3. **Create New Assistant** or update existing one (ID: f3695e73-ff32-446e-9e79-a427e5b9656c)
@@ -124,25 +127,25 @@ Conversation Guidelines:
 - Explain risks and expected yields
 - Use analogies to simplify complex concepts
 
-CRITICAL - When user describes a strategy:
-1. ALWAYS extract their complete vault description and pass it as the 'prompt' parameter
-2. Infer the risk level from keywords: 'safe/conservative/stable' = low, 'balanced/moderate' = medium, 'aggressive/high-yield/risky' = high
-3. Identify strategy type from context: look for 'staking', 'farming', 'liquidity', 'balanced'
-4. IMMEDIATELY call generate_vault_strategy function with these extracted parameters
-5. After successful generation, summarize what was created
-6. Offer to make adjustments
+When to call generate_vault_strategy:
+- User clearly wants to CREATE or BUILD a vault strategy
+- User describes WHAT they want in their vault
+- You have a clear understanding of their requirements
+
+When NOT to call it:
+- User is just asking questions or exploring options
+- Speech is unclear or garbled
+- User is just greeting or making small talk
 
 Function Calling Examples:
-User: 'Create a conservative stablecoin vault'
--> Call generate_vault_strategy(prompt='Create a conservative stablecoin vault', riskLevel='low', strategyType='stablecoin staking')
+✅ User: 'Create a conservative stablecoin vault' → Call the function
+✅ User: 'Build me a high yield farming strategy with USDC' → Call the function  
+✅ User: 'I want a balanced portfolio' → Call the function
+❌ User: 'Help me, uh, medium brisk' → DON'T call (unclear speech)
+❌ User: 'What can you do?' → DON'T call (just asking)
+❌ User: 'Tell me about vaults' → DON'T call (exploratory question)
 
-User: 'Build me a high yield farming strategy with USDC'
--> Call generate_vault_strategy(prompt='Build me a high yield farming strategy with USDC', riskLevel='high', strategyType='yield farming')
-
-User: 'I want a balanced portfolio'
--> Call generate_vault_strategy(prompt='I want a balanced portfolio', riskLevel='medium', strategyType='balanced portfolio')
-
-ALWAYS pass the user's exact words as the 'prompt' parameter. Never leave it empty.
+Let the AI naturally decide when to call the function. Don't force every interaction to call it.
 ```
 
 **Voice Settings:**
@@ -164,7 +167,7 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
 
 #### Function 1: `generate_vault_strategy`
 
-**Description**: IMMEDIATELY call this function when user describes a vault they want to create. Extract the user's vault description and pass it in the 'prompt' parameter. CRITICAL: The 'prompt' field must ALWAYS contain the user's request in their own words. Examples: 'Create a conservative stablecoin strategy', 'Build a high-yield farming vault with USDC and XLM', 'I want a balanced portfolio'. Never call this function with an empty prompt.
+**Description**: Generate a new vault strategy based on the user's description. Call this function when the user clearly expresses they want to create or build a vault. The user should explicitly describe what kind of vault they want.
 
 **Parameters Schema**:
 ```json
@@ -173,16 +176,16 @@ Add these 5 functions in the VAPI dashboard under "Functions" section:
   "properties": {
     "prompt": {
       "type": "string",
-      "description": "REQUIRED: The user's exact vault description in their own words. This is what they said they want to create. Example: 'Create a conservative stablecoin vault with 70% USDC staking'. NEVER leave this empty."
+      "description": "The user's vault description. What they want to create. Example: 'Create a conservative stablecoin vault with 70% USDC staking and 30% in liquidity pools'"
     },
     "riskLevel": {
       "type": "string",
       "enum": ["low", "medium", "high"],
-      "description": "OPTIONAL: Infer from user's words - 'safe/conservative/stable' = low, 'balanced/moderate' = medium, 'aggressive/high-yield/risky' = high"
+      "description": "Risk level if mentioned by user: low (conservative/safe), medium (balanced), high (aggressive/risky)"
     },
     "strategyType": {
       "type": "string",
-      "description": "OPTIONAL: Identify from context - 'stablecoin staking', 'yield farming', 'liquidity provision', 'balanced portfolio'"
+      "description": "Type of strategy if clear from context: 'stablecoin staking', 'yield farming', 'liquidity provision', 'balanced portfolio', etc."
     }
   },
   "required": ["prompt"]
