@@ -493,7 +493,7 @@ export async function deployVault(
       'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK'; // Mock staking pool for testnet
     
     const soroswapFactoryAddress = config.factoryAddress || process.env.SOROSWAP_FACTORY_ADDRESS || 
-      'CBP7NO6F7FRDHSOFQBT2L2UWYIZ2PU76JKVRYAQTG3KZSQLYAOKIF2WB'; // Soroswap factory
+      'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES'; // Soroswap testnet factory
 
     console.log(`[Vault Deployment] Starting deployment for ${config.name}`);
     console.log(`[Vault Deployment] Network: ${network || 'testnet'}`);
