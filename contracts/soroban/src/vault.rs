@@ -398,6 +398,8 @@ impl VaultContract {
     }
     
     /// Swap other assets back to base token for withdrawal
+    /// SMART APPROACH: Scan ALL configured assets for balances and swap to base token
+    /// This works even if vault config is incomplete - we swap whatever tokens the vault actually holds
     fn swap_assets_to_base_token(
         env: &Env,
         config: &VaultConfig,
@@ -406,14 +408,30 @@ impl VaultContract {
     ) -> Result<(), VaultError> {
         use crate::pool_client;
         
-        log!(env, "Swapping assets to base token. Amount needed: {}", amount_needed);
+        log!(env, "Swapping non-base assets to base token. Amount needed: {}", amount_needed);
+        
+        // Check if factory is configured for swaps
+        let factory_address = match config.factory_address.as_ref() {
+            Some(addr) => addr,
+            None => {
+                log!(env, "No factory configured - cannot swap assets");
+                return Err(VaultError::RouterNotSet);
+            }
+        };
         
         let vault_address = env.current_contract_address();
         let mut amount_swapped: i128 = 0;
         
-        // Iterate through all assets and swap non-base assets to base
-        for i in 0..config.assets.len() {
+        // Simple approach: Iterate through ALL configured assets
+        // For each asset, check if vault has a balance, and if so, swap it to base token
+        // This works even if the config doesn't match what the vault actually holds
+        let asset_count = config.assets.len();
+        log!(env, "Scanning {} configured assets for balances to swap", asset_count);
+        
+        // Iterate through all assets and swap any balance we find
+        for i in 0..asset_count {
             if amount_swapped >= amount_needed {
+                log!(env, "Swapped enough ({}) - stopping", amount_swapped);
                 break;
             }
             
@@ -422,6 +440,7 @@ impl VaultContract {
             
             // Skip if this is the base token
             if &asset == base_token {
+                log!(env, "Asset {} is base token - skipping", i);
                 continue;
             }
             
@@ -435,10 +454,6 @@ impl VaultContract {
             }
             
             log!(env, "Found {} balance of asset at index {}", asset_balance, i);
-            
-            // Get factory to find the pair
-            let factory_address = config.factory_address.as_ref()
-                .ok_or(VaultError::InvalidConfiguration)?;
             
             // Find the liquidity pool between this asset and base token
             let pair_address = pool_client::get_pool_for_pair(

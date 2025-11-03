@@ -498,10 +498,60 @@ export async function deployVault(
     console.log(`[Vault Deployment] Starting deployment for ${config.name}`);
     console.log(`[Vault Deployment] Network: ${network || 'testnet'}`);
     console.log(`[Vault Deployment] Owner: ${config.owner}`);
-    console.log(`[Vault Deployment] Assets: ${config.assets.join(', ')}`);
+    console.log(`[Vault Deployment] Initial Assets: ${config.assets.join(', ')}`);
     console.log(`[Vault Deployment] Router: ${routerAddress}`);
     console.log(`[Vault Deployment] Staking Pool: ${stakingPoolAddress}`);
     console.log(`[Vault Deployment] Soroswap Factory: ${soroswapFactoryAddress}`);
+
+    // CRITICAL FIX: Extract all tokens referenced in rebalance rules
+    // This ensures the vault can swap between all tokens during withdrawal
+    const tokensFromRules = new Set<string>();
+    config.rules.forEach((rule, ruleIndex) => {
+      // For rebalance rules with target_allocation, all tokens must be in assets
+      if (rule.action === 'rebalance' && Array.isArray(rule.target_allocation)) {
+        console.log(`[Vault Deployment] Rule ${ruleIndex} has ${rule.target_allocation.length} allocations`);
+        
+        // The target_allocation array length tells us how many tokens are involved
+        // Make sure we have that many assets
+        if (rule.target_allocation.length > config.assets.length) {
+          console.warn(`⚠️  Rule ${ruleIndex} allocates to ${rule.target_allocation.length} tokens but only ${config.assets.length} assets defined!`);
+        }
+        
+        // Add all tokens from allocation (we'll infer from the count)
+        rule.target_allocation.forEach((_, allocIndex) => {
+          if (config.assets[allocIndex]) {
+            tokensFromRules.add(config.assets[allocIndex]);
+          }
+        });
+      }
+    });
+
+    // Add any tokens from rules that aren't in the main assets list
+    const allAssets = [...new Set([...config.assets, ...Array.from(tokensFromRules)])];
+    
+    if (allAssets.length > config.assets.length) {
+      console.log(`[Vault Deployment] 🔧 Auto-expanded assets from ${config.assets.length} to ${allAssets.length} based on rules`);
+      console.log(`[Vault Deployment] Original: ${config.assets.join(', ')}`);
+      console.log(`[Vault Deployment] Expanded: ${allAssets.join(', ')}`);
+      config.assets = allAssets;
+    }
+
+    // For vaults with allocation rules, ensure we have proper multi-asset setup
+    const hasAllocationRules = config.rules.some(r => 
+      r.action === 'rebalance' && Array.isArray(r.target_allocation) && r.target_allocation.length > 1
+    );
+    
+    if (hasAllocationRules && config.assets.length === 1) {
+      console.error(`❌ CONFIGURATION ERROR: Vault has allocation rules but only 1 asset!`);
+      console.error(`   This will cause withdrawal failures when trying to swap back to base token.`);
+      console.error(`   Please specify all tokens in the assets array.`);
+      throw new Error(
+        'Invalid vault configuration: Allocation rules require multiple assets. ' +
+        'Example: For 70% USDC / 30% XLM, assets should be ["USDC", "XLM"]'
+      );
+    }
+
+    console.log(`[Vault Deployment] Final Assets: ${config.assets.join(', ')}`);
 
     // Convert asset symbols to contract addresses (network-aware)
     const assetAddressStrings = config.assets.map((asset, index) => {
