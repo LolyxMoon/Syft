@@ -393,8 +393,8 @@ Respond only with valid JSON object.`;
 
       console.log('[SuggestionGenerator] Calling OpenAI API with model:', process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07');
 
-      // Set OpenAI timeout to 29 seconds to prevent long waits
-      const AI_TIMEOUT = 29000;
+      // Set OpenAI timeout to 120 seconds to prevent long waits
+      const AI_TIMEOUT = 120000;
       const response = await this.withTimeout(
         openai.chat.completions.create({
           model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
