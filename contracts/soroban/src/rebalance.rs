@@ -51,20 +51,30 @@ pub fn execute_rebalance_only(env: &Env) -> Result<(), VaultError> {
         .get(&STATE)
         .ok_or(VaultError::NotInitialized)?;
     
+    // Calculate ACTUAL total value from real balances (not from cached state)
+    let mut actual_total_value: i128 = 0;
+    for i in 0..config.assets.len() {
+        if let Some(asset) = config.assets.get(i) {
+            let balance = crate::token_client::get_vault_balance(env, &asset);
+            actual_total_value = actual_total_value.checked_add(balance)
+                .ok_or(VaultError::InvalidAmount)?;
+        }
+    }
+    
     env.events().publish(
         (symbol_short!("reb_start"),),
-        state.total_value
+        actual_total_value
     );
     
-    if state.total_value == 0 {
+    if actual_total_value == 0 {
         return Err(VaultError::InsufficientBalance);
     }
     
-    // Execute only rebalance rules
+    // Execute only rebalance rules using ACTUAL total value
     for i in 0..config.rules.len() {
         if let Some(rule) = config.rules.get(i) {
             if rule.action == String::from_str(env, "rebalance") {
-                execute_rebalance_action(env, &rule, &config.assets, state.total_value)?;
+                execute_rebalance_action(env, &rule, &config.assets, actual_total_value)?;
             }
         }
     }
@@ -84,20 +94,30 @@ pub fn execute_stake_only(env: &Env) -> Result<(), VaultError> {
         .get(&STATE)
         .ok_or(VaultError::NotInitialized)?;
     
+    // Calculate ACTUAL total value from real balances
+    let mut actual_total_value: i128 = 0;
+    for i in 0..config.assets.len() {
+        if let Some(asset) = config.assets.get(i) {
+            let balance = crate::token_client::get_vault_balance(env, &asset);
+            actual_total_value = actual_total_value.checked_add(balance)
+                .ok_or(VaultError::InvalidAmount)?;
+        }
+    }
+    
     env.events().publish(
         (symbol_short!("stk_start"),),
-        state.total_value
+        actual_total_value
     );
     
-    if state.total_value == 0 {
+    if actual_total_value == 0 {
         return Err(VaultError::InsufficientBalance);
     }
     
-    // Execute only stake rules
+    // Execute only stake rules using ACTUAL total value
     for i in 0..config.rules.len() {
         if let Some(rule) = config.rules.get(i) {
             if rule.action == String::from_str(env, "stake") {
-                execute_stake_action(env, &rule, &config.assets, state.total_value)?;
+                execute_stake_action(env, &rule, &config.assets, actual_total_value)?;
             }
         }
     }
@@ -117,20 +137,30 @@ pub fn execute_liquidity_only(env: &Env) -> Result<(), VaultError> {
         .get(&STATE)
         .ok_or(VaultError::NotInitialized)?;
     
+    // Calculate ACTUAL total value from real balances
+    let mut actual_total_value: i128 = 0;
+    for i in 0..config.assets.len() {
+        if let Some(asset) = config.assets.get(i) {
+            let balance = crate::token_client::get_vault_balance(env, &asset);
+            actual_total_value = actual_total_value.checked_add(balance)
+                .ok_or(VaultError::InvalidAmount)?;
+        }
+    }
+    
     env.events().publish(
         (symbol_short!("liq_start"),),
-        state.total_value
+        actual_total_value
     );
     
-    if state.total_value == 0 {
+    if actual_total_value == 0 {
         return Err(VaultError::InsufficientBalance);
     }
     
-    // Execute only liquidity rules
+    // Execute only liquidity rules using ACTUAL total value
     for i in 0..config.rules.len() {
         if let Some(rule) = config.rules.get(i) {
             if rule.action == String::from_str(env, "liquidity") {
-                execute_liquidity_action(env, &rule, &config.assets, state.total_value)?;
+                execute_liquidity_action(env, &rule, &config.assets, actual_total_value)?;
             }
         }
     }
