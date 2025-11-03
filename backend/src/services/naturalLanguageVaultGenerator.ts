@@ -615,31 +615,14 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
       const content = finalResponse.content || '{}';
       console.log('[NLVaultGenerator] OpenAI response received, length:', content.length);
       
-      // Extract JSON from response (sometimes AI adds text before/after JSON)
-      let jsonContent = content.trim();
-      
-      // Try to extract JSON from markdown code blocks if present
-      const jsonBlockMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-      if (jsonBlockMatch) {
-        jsonContent = jsonBlockMatch[1].trim();
-        console.log('[NLVaultGenerator] Extracted JSON from code block');
-      } else {
-        // Try to find JSON object by looking for first { and last }
-        const firstBrace = content.indexOf('{');
-        const lastBrace = content.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          jsonContent = content.substring(firstBrace, lastBrace + 1);
-          console.log('[NLVaultGenerator] Extracted JSON by brace detection');
-        }
-      }
-      
+      // Parse JSON - the AI should return pure JSON due to response_format: json_object
+      // No aggressive extraction needed since we enforce JSON mode
       let parsed;
       try {
-        parsed = JSON.parse(jsonContent);
+        parsed = JSON.parse(content);
       } catch (parseError) {
         console.error('[NLVaultGenerator] Failed to parse JSON:', parseError);
         console.error('[NLVaultGenerator] Raw content:', content.substring(0, 1000));
-        console.error('[NLVaultGenerator] Extracted JSON:', jsonContent.substring(0, 1000));
         throw new Error(`Failed to parse AI response as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
       }
 
