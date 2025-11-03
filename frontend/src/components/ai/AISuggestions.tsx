@@ -45,6 +45,44 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
     }
   };
 
+  // Helper function to poll for job status
+  const pollJobStatus = async (jobId: string): Promise<any> => {
+    const maxAttempts = 60; // Poll for up to 60 seconds
+    const pollInterval = 1000; // Poll every 1 second
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      try {
+        const statusResponse = await fetch(
+          `/api/vaults/${vaultId}/suggestions/status/${jobId}`
+        );
+        
+        if (!statusResponse.ok) {
+          throw new Error('Failed to check job status');
+        }
+        
+        const statusData = await statusResponse.json();
+        
+        if (statusData.status === 'completed') {
+          return statusData.data;
+        }
+        
+        if (statusData.status === 'failed') {
+          throw new Error(statusData.error || 'Job failed');
+        }
+        
+        // Still processing, continue polling
+        console.log(`Job ${jobId} still processing... (attempt ${attempt + 1}/${maxAttempts})`);
+      } catch (error) {
+        console.error('Error polling job status:', error);
+        throw error;
+      }
+    }
+    
+    throw new Error('Job timed out - took longer than expected');
+  };
+
   const generateNewSuggestions = async () => {
     setGenerating(true);
     setError(null);
@@ -56,20 +94,25 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          async: true, // Use async mode to prevent timeouts
           forceRefresh: true,
         }),
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        setSuggestions(data.suggestions || []);
-        
-        // If processing in background, show a message
-        if (data.processing) {
-          console.log('Suggestions are being generated in the background. Refresh in a few moments.');
+      if (data.success && data.jobId) {
+        // Show cached suggestions immediately if available
+        if (data.suggestions && data.suggestions.length > 0) {
+          setSuggestions(data.suggestions);
         }
+        
+        // Poll for job completion
+        console.log(`Polling for job: ${data.jobId}`);
+        const result = await pollJobStatus(data.jobId);
+        
+        // Update with fresh suggestions
+        setSuggestions(result.suggestions || []);
+        console.log(`Received ${result.suggestions?.length || 0} fresh suggestions`);
       } else {
         throw new Error(data.error || 'Failed to generate suggestions');
       }

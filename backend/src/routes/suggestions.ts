@@ -158,7 +158,7 @@ async function generateAndCacheSuggestions(vaultId: string, userPreferences?: an
 router.post('/:vaultId/suggestions', async (req: Request, res: Response) => {
   try {
     const { vaultId } = req.params;
-    const { userPreferences, forceRefresh, async: asyncMode } = req.body;
+    const { userPreferences, forceRefresh } = req.body;
 
     // Check cache first (unless force refresh requested)
     const cached = suggestionCacheService.get(vaultId);
@@ -170,73 +170,45 @@ router.post('/:vaultId/suggestions', async (req: Request, res: Response) => {
       });
     }
 
-    // If async mode or cache exists but force refresh, return immediately and process in background
-    if (asyncMode || (cached && forceRefresh)) {
-      // Return cached data immediately
-      res.json({
-        success: true,
-        cached: !!cached,
-        processing: true,
-        suggestions: cached || [],
-        message: 'Generating fresh suggestions in background...',
-      });
-
-      // Process in background (don't await)
-      setImmediate(() => {
-        generateAndCacheSuggestions(vaultId, userPreferences).catch((err: Error) => {
-          console.error(`Background suggestion generation failed for ${vaultId}:`, err);
-        });
-      });
-
-      return;
-    }
-
-    // Synchronous mode - generate suggestions and wait (with timeout)
-    console.log(`[Suggestions API] Generating suggestions synchronously for vault ${vaultId}`);
+    // Use job queue for async processing (like AI Chat and Voice)
+    console.log('[Suggestions API] Using async job processing to avoid timeout');
     
-    // Add timeout to prevent exceeding Heroku's 30s limit
-    const ROUTE_TIMEOUT = 25000; // 25 seconds to be safe
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout - suggestions taking too long')), ROUTE_TIMEOUT);
-    });
-
-    try {
-      const suggestions = await Promise.race([
-        generateAndCacheSuggestions(vaultId, userPreferences),
-        timeoutPromise
-      ]);
-
-      return res.json({
-        success: true,
-        cached: false,
-        suggestions,
-        meta: {
+    // Import job queue
+    const { jobQueue } = await import('../services/jobQueue.js');
+    
+    // Create job ID
+    const jobId = `suggestions-${vaultId}-${Date.now()}`;
+    jobQueue.createJob(jobId);
+    
+    // Start processing in background (don't await)
+    (async () => {
+      try {
+        jobQueue.markProcessing(jobId);
+        console.log(`[Suggestions API] Background job started: ${jobId}`);
+        
+        const suggestions = await generateAndCacheSuggestions(vaultId, userPreferences);
+        
+        jobQueue.completeJob(jobId, {
+          suggestions,
           count: suggestions.length,
           generatedAt: new Date().toISOString(),
-          message: suggestions.length === 0 
-            ? 'No suggestions generated. This could be due to AI errors or insufficient data. Check server logs for details.'
-            : undefined,
-        },
-      });
-    } catch (timeoutError) {
-      // If timeout, return cached data (if any) and process in background
-      const fallbackCached = suggestionCacheService.get(vaultId);
-      
-      // Start background processing
-      setImmediate(() => {
-        generateAndCacheSuggestions(vaultId, userPreferences).catch((err: Error) => {
-          console.error(`Background suggestion generation failed for ${vaultId}:`, err);
         });
-      });
-
-      return res.json({
-        success: true,
-        cached: !!fallbackCached,
-        processing: true,
-        suggestions: fallbackCached || [],
-        message: 'Request taking longer than expected. Returning cached results and continuing processing in background.',
-      });
-    }
+        console.log(`[Suggestions API] Background job completed: ${jobId}`);
+      } catch (error: any) {
+        jobQueue.failJob(jobId, error.message || 'Unknown error');
+        console.error(`[Suggestions API] Background job failed: ${jobId}`, error);
+      }
+    })();
+    
+    // Return immediately with jobId and cached data
+    return res.json({
+      success: true,
+      jobId,
+      status: 'processing',
+      cached: !!cached,
+      suggestions: cached || [],
+      message: 'Suggestion generation started. Poll /api/vaults/:vaultId/suggestions/status/:jobId for results.',
+    });
   } catch (error) {
     console.error('Error generating suggestions:', error);
     return res.status(500).json({
@@ -346,6 +318,55 @@ router.get('/cache/stats', async (_req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch cache stats',
+    });
+  }
+});
+
+/**
+ * GET /api/vaults/:vaultId/suggestions/status/:jobId
+ * Poll for suggestion generation job status and results
+ */
+router.get('/:vaultId/suggestions/status/:jobId', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    
+    const { jobQueue } = await import('../services/jobQueue.js');
+    const job = jobQueue.getJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found or expired',
+      });
+    }
+    
+    if (job.status === 'completed') {
+      return res.json({
+        success: true,
+        status: 'completed',
+        data: job.result,
+      });
+    }
+    
+    if (job.status === 'failed') {
+      return res.json({
+        success: false,
+        status: 'failed',
+        error: job.error,
+      });
+    }
+    
+    // Still processing
+    return res.json({
+      success: true,
+      status: job.status,
+      message: 'Job is still processing...',
+    });
+  } catch (error) {
+    console.error('Error checking job status:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check job status',
     });
   }
 });

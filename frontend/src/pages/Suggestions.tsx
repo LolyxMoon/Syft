@@ -122,6 +122,44 @@ const Suggestions = () => {
     }
   };
 
+  // Helper function to poll for job status
+  const pollJobStatus = async (jobId: string, vaultId: string, backendUrl: string): Promise<any> => {
+    const maxAttempts = 60; // Poll for up to 60 seconds
+    const pollInterval = 1000; // Poll every 1 second
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      try {
+        const statusResponse = await fetch(
+          `${backendUrl}/api/vaults/${vaultId}/suggestions/status/${jobId}`
+        );
+        
+        if (!statusResponse.ok) {
+          throw new Error('Failed to check job status');
+        }
+        
+        const statusData = await statusResponse.json();
+        
+        if (statusData.status === 'completed') {
+          return statusData.data;
+        }
+        
+        if (statusData.status === 'failed') {
+          throw new Error(statusData.error || 'Job failed');
+        }
+        
+        // Still processing, continue polling
+        console.log(`[Frontend] Job ${jobId} still processing... (attempt ${attempt + 1}/${maxAttempts})`);
+      } catch (error) {
+        console.error('[Frontend] Error polling job status:', error);
+        throw error;
+      }
+    }
+    
+    throw new Error('Job timed out - took longer than expected');
+  };
+
   const fetchSuggestions = async (forceRefresh = false) => {
     if (!selectedVault) return;
     
@@ -146,7 +184,7 @@ const Suggestions = () => {
         }
       }
 
-      // Generate new AI suggestions (POST endpoint) - Use async mode to prevent timeouts
+      // Generate new AI suggestions (POST endpoint) with job queue
       console.log(`[Frontend] Requesting suggestions for vault: ${selectedVault}`);
       const postResponse = await fetch(`${backendUrl}/api/vaults/${selectedVault}/suggestions`, {
         method: 'POST',
@@ -154,7 +192,6 @@ const Suggestions = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          async: true, // Use async mode to prevent Heroku H12 timeouts
           forceRefresh,
           userPreferences: {
             riskTolerance: 'medium',
@@ -171,19 +208,22 @@ const Suggestions = () => {
       const postData = await postResponse.json();
       console.log('[Frontend] Received response:', postData);
       
-      if (postData.success) {
-        setSuggestions(postData.suggestions || []);
-        
-        // Check if there's a message from the backend
-        if (postData.meta?.message) {
-          setSuggestionsMessage(postData.meta.message);
-          console.warn('[Frontend] Backend message:', postData.meta.message);
+      if (postData.success && postData.jobId) {
+        // Show cached suggestions immediately
+        if (postData.suggestions && postData.suggestions.length > 0) {
+          setSuggestions(postData.suggestions);
+          setSuggestionsMessage('Showing cached results. Generating fresh suggestions...');
         }
         
-        // Log empty suggestions
-        if (!postData.suggestions || postData.suggestions.length === 0) {
-          console.warn('[Frontend] Received empty suggestions array');
-        }
+        // Poll for job completion
+        console.log(`[Frontend] Polling for job: ${postData.jobId}`);
+        const result = await pollJobStatus(postData.jobId, selectedVault, backendUrl);
+        
+        // Update with fresh suggestions
+        setSuggestions(result.suggestions || []);
+        setSuggestionsMessage(null);
+        console.log(`[Frontend] Received ${result.suggestions?.length || 0} fresh suggestions`);
+        
       } else {
         throw new Error(postData.error || 'Failed to generate suggestions');
       }
