@@ -56,6 +56,7 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          async: true, // Use async mode to prevent timeouts
           forceRefresh: true,
         }),
       });
@@ -64,6 +65,11 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
 
       if (data.success) {
         setSuggestions(data.suggestions || []);
+        
+        // If processing in background, show a message
+        if (data.processing) {
+          console.log('Suggestions are being generated in the background. Refresh in a few moments.');
+        }
       } else {
         throw new Error(data.error || 'Failed to generate suggestions');
       }

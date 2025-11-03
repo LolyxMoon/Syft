@@ -11,178 +11,232 @@ import { supabase } from '../lib/supabase.js';
 const router = Router();
 
 /**
+ * Helper function to generate and cache suggestions
+ */
+async function generateAndCacheSuggestions(vaultId: string, userPreferences?: any) {
+  // Fetch vault configuration from database
+  const { data: vault, error: vaultError } = await supabase
+    .from('vaults')
+    .select('*')
+    .eq('vault_id', vaultId)
+    .single();
+
+  if (vaultError || !vault) {
+    throw new Error('Vault not found');
+  }
+
+  // First get the vault UUID from vault_id
+  const { data: vaultData, error: vaultUuidError } = await supabase
+    .from('vaults')
+    .select('id')
+    .eq('vault_id', vaultId)
+    .single();
+
+  if (vaultUuidError || !vaultData) {
+    throw new Error('Vault UUID not found');
+  }
+
+  // Fetch performance data (optional)
+  const { data: performance } = await supabase
+    .from('vault_performance')
+    .select('*')
+    .eq('vault_id', vaultData.id)
+    .order('timestamp', { ascending: false })
+    .limit(100);
+
+  // DEBUG: Log the vault config structure
+  console.log(`[Suggestions API] Raw vault config:`, JSON.stringify(vault.config, null, 2));
+  console.log(`[Suggestions API] Config keys:`, Object.keys(vault.config || {}));
+  console.log(`[Suggestions API] Current state exists:`, !!vault.config?.current_state);
+  if (vault.config?.current_state) {
+    console.log(`[Suggestions API] Current state keys:`, Object.keys(vault.config.current_state));
+    console.log(`[Suggestions API] Asset balances:`, vault.config.current_state.assetBalances);
+  }
+
+  // Helper to convert contract address to asset code
+  const getAssetCodeFromAddress = (address: string, _network: string): string => {
+    const nativeXLMAddresses: { [key: string]: string } = {
+      'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+      'futurenet': 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT',
+      'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+      'public': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+    };
+    
+    // Check if it's Native XLM
+    if (Object.values(nativeXLMAddresses).includes(address)) {
+      return 'XLM';
+    }
+    
+    // For other assets, return the address (would need a full registry for mainnet)
+    // In production, you'd query the asset issuer and code
+    return address;
+  };
+
+  // Enrich config with real allocation data from blockchain state
+  const enrichedConfig = { ...vault.config };
+  
+  // If we have current_state with assetBalances, calculate real allocations
+  if (enrichedConfig.current_state?.assetBalances && Array.isArray(enrichedConfig.current_state.assetBalances)) {
+    const assetBalances = enrichedConfig.current_state.assetBalances;
+    const totalValue = parseFloat(enrichedConfig.current_state.totalValue || '0');
+    
+    if (totalValue > 0 && assetBalances.length > 0) {
+      const network = vault.network || 'testnet';
+      
+      // Build assets array with real allocations
+      enrichedConfig.assets = assetBalances.map((balance: any) => {
+        const assetValue = parseFloat(balance.value || '0');
+        const percentage = (assetValue / totalValue) * 100;
+        const assetCode = getAssetCodeFromAddress(balance.asset, network);
+        
+        return {
+          assetCode,
+          assetId: balance.asset, // Keep contract address as ID
+          percentage: percentage,
+        };
+      });
+      
+      console.log(`[Suggestions API] Using real allocations from blockchain:`, 
+        enrichedConfig.assets.map((a: any) => `${a.assetCode}: ${a.percentage.toFixed(2)}%`).join(', ')
+      );
+    }
+  }
+  
+  // If still no proper allocations, use the original assets array
+  if (!enrichedConfig.assets || enrichedConfig.assets.length === 0 || typeof enrichedConfig.assets[0] === 'string') {
+    console.warn(`[Suggestions API] No real allocation data found, using config assets as-is`);
+  }
+
+  // Generate suggestions
+  const request: SuggestionRequest = {
+    vaultId,
+    config: enrichedConfig,
+    performanceData: performance || [],
+    userPreferences,
+  };
+
+  console.log(`[Suggestions API] Generating suggestions for vault ${vaultId}`);
+  const suggestions = await suggestionGenerator.generateSuggestions(request);
+  console.log(`[Suggestions API] Generated ${suggestions.length} suggestions`);
+
+  // Warn if no suggestions were generated
+  if (suggestions.length === 0) {
+    console.warn(`[Suggestions API] No suggestions generated for vault ${vaultId}. Check logs for AI errors.`);
+  }
+
+  // Cache the results
+  suggestionCacheService.set(vaultId, suggestions);
+
+  // Store suggestions in database (only if we have suggestions)
+  if (suggestions.length > 0) {
+    const suggestionRecords = suggestions.map(s => ({
+      suggestion_id: s.id,
+      vault_id: vaultData.id, // Use UUID instead of text vault_id
+      suggestion_type: s.type,
+      title: s.title,
+      description: s.description,
+      reasoning: s.rationale,
+      confidence_score: s.expectedImpact?.returnIncrease ? Math.min(s.expectedImpact.returnIncrease / 100, 1) : null,
+      projected_apy_improvement: s.expectedImpact?.returnIncrease || null,
+      projected_risk_change: s.expectedImpact?.riskReduction ? -s.expectedImpact.riskReduction : null,
+      suggestion_data: s,
+      sentiment_data: s.dataSupport?.sentiment || null,
+      market_data: s.dataSupport?.forecast || null,
+      created_at: new Date().toISOString(),
+    }));
+
+    await supabase.from('ai_suggestions').insert(suggestionRecords);
+  }
+
+  return suggestions;
+}
+
+/**
  * POST /api/vaults/:vaultId/suggestions
  * Generate AI suggestions for a vault
  */
 router.post('/:vaultId/suggestions', async (req: Request, res: Response) => {
   try {
     const { vaultId } = req.params;
-    const { userPreferences, forceRefresh } = req.body;
+    const { userPreferences, forceRefresh, async: asyncMode } = req.body;
 
     // Check cache first (unless force refresh requested)
-    if (!forceRefresh) {
-      const cached = suggestionCacheService.get(vaultId);
-      if (cached) {
-        return res.json({
-          success: true,
-          cached: true,
-          suggestions: cached,
-        });
-      }
-    }
-
-    // Fetch vault configuration from database
-    const { data: vault, error: vaultError } = await supabase
-      .from('vaults')
-      .select('*')
-      .eq('vault_id', vaultId)
-      .single();
-
-    if (vaultError || !vault) {
-      return res.status(404).json({
-        success: false,
-        error: 'Vault not found',
+    const cached = suggestionCacheService.get(vaultId);
+    if (!forceRefresh && cached) {
+      return res.json({
+        success: true,
+        cached: true,
+        suggestions: cached,
       });
     }
 
-    // First get the vault UUID from vault_id
-    const { data: vaultData, error: vaultUuidError } = await supabase
-      .from('vaults')
-      .select('id')
-      .eq('vault_id', vaultId)
-      .single();
-
-    if (vaultUuidError || !vaultData) {
-      return res.status(404).json({
-        success: false,
-        error: 'Vault UUID not found',
+    // If async mode or cache exists but force refresh, return immediately and process in background
+    if (asyncMode || (cached && forceRefresh)) {
+      // Return cached data immediately
+      res.json({
+        success: true,
+        cached: !!cached,
+        processing: true,
+        suggestions: cached || [],
+        message: 'Generating fresh suggestions in background...',
       });
-    }
 
-    // Fetch performance data (optional)
-    const { data: performance } = await supabase
-      .from('vault_performance')
-      .select('*')
-      .eq('vault_id', vaultData.id)
-      .order('timestamp', { ascending: false })
-      .limit(100);
-
-    // DEBUG: Log the vault config structure
-    console.log(`[Suggestions API] Raw vault config:`, JSON.stringify(vault.config, null, 2));
-    console.log(`[Suggestions API] Config keys:`, Object.keys(vault.config || {}));
-    console.log(`[Suggestions API] Current state exists:`, !!vault.config?.current_state);
-    if (vault.config?.current_state) {
-      console.log(`[Suggestions API] Current state keys:`, Object.keys(vault.config.current_state));
-      console.log(`[Suggestions API] Asset balances:`, vault.config.current_state.assetBalances);
-    }
-
-    // Helper to convert contract address to asset code
-    const getAssetCodeFromAddress = (address: string, _network: string): string => {
-      const nativeXLMAddresses: { [key: string]: string } = {
-        'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-        'futurenet': 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT',
-        'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-        'public': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-      };
-      
-      // Check if it's Native XLM
-      if (Object.values(nativeXLMAddresses).includes(address)) {
-        return 'XLM';
-      }
-      
-      // For other assets, return the address (would need a full registry for mainnet)
-      // In production, you'd query the asset issuer and code
-      return address;
-    };
-
-    // Enrich config with real allocation data from blockchain state
-    const enrichedConfig = { ...vault.config };
-    
-    // If we have current_state with assetBalances, calculate real allocations
-    if (enrichedConfig.current_state?.assetBalances && Array.isArray(enrichedConfig.current_state.assetBalances)) {
-      const assetBalances = enrichedConfig.current_state.assetBalances;
-      const totalValue = parseFloat(enrichedConfig.current_state.totalValue || '0');
-      
-      if (totalValue > 0 && assetBalances.length > 0) {
-        const network = vault.network || 'testnet';
-        
-        // Build assets array with real allocations
-        enrichedConfig.assets = assetBalances.map((balance: any) => {
-          const assetValue = parseFloat(balance.value || '0');
-          const percentage = (assetValue / totalValue) * 100;
-          const assetCode = getAssetCodeFromAddress(balance.asset, network);
-          
-          return {
-            assetCode,
-            assetId: balance.asset, // Keep contract address as ID
-            percentage: percentage,
-          };
+      // Process in background (don't await)
+      setImmediate(() => {
+        generateAndCacheSuggestions(vaultId, userPreferences).catch((err: Error) => {
+          console.error(`Background suggestion generation failed for ${vaultId}:`, err);
         });
-        
-        console.log(`[Suggestions API] Using real allocations from blockchain:`, 
-          enrichedConfig.assets.map((a: any) => `${a.assetCode}: ${a.percentage.toFixed(2)}%`).join(', ')
-        );
-      }
+      });
+
+      return;
     }
+
+    // Synchronous mode - generate suggestions and wait (with timeout)
+    console.log(`[Suggestions API] Generating suggestions synchronously for vault ${vaultId}`);
     
-    // If still no proper allocations, use the original assets array
-    if (!enrichedConfig.assets || enrichedConfig.assets.length === 0 || typeof enrichedConfig.assets[0] === 'string') {
-      console.warn(`[Suggestions API] No real allocation data found, using config assets as-is`);
-    }
-
-    // Generate suggestions
-    const request: SuggestionRequest = {
-      vaultId,
-      config: enrichedConfig,
-      performanceData: performance || [],
-      userPreferences,
-    };
-
-    console.log(`[Suggestions API] Generating suggestions for vault ${vaultId}`);
-    const suggestions = await suggestionGenerator.generateSuggestions(request);
-    console.log(`[Suggestions API] Generated ${suggestions.length} suggestions`);
-
-    // Warn if no suggestions were generated
-    if (suggestions.length === 0) {
-      console.warn(`[Suggestions API] No suggestions generated for vault ${vaultId}. Check logs for AI errors.`);
-    }
-
-    // Cache the results
-    suggestionCacheService.set(vaultId, suggestions);
-
-    // Store suggestions in database (only if we have suggestions)
-    if (suggestions.length > 0) {
-      const suggestionRecords = suggestions.map(s => ({
-        suggestion_id: s.id,
-        vault_id: vaultData.id, // Use UUID instead of text vault_id
-        suggestion_type: s.type,
-        title: s.title,
-        description: s.description,
-        reasoning: s.rationale,
-        confidence_score: s.expectedImpact?.returnIncrease ? Math.min(s.expectedImpact.returnIncrease / 100, 1) : null,
-        projected_apy_improvement: s.expectedImpact?.returnIncrease || null,
-        projected_risk_change: s.expectedImpact?.riskReduction ? -s.expectedImpact.riskReduction : null,
-        suggestion_data: s,
-        sentiment_data: s.dataSupport?.sentiment || null,
-        market_data: s.dataSupport?.forecast || null,
-        created_at: new Date().toISOString(),
-      }));
-
-      await supabase.from('ai_suggestions').insert(suggestionRecords);
-    }
-
-    return res.json({
-      success: true,
-      cached: false,
-      suggestions,
-      meta: {
-        count: suggestions.length,
-        generatedAt: new Date().toISOString(),
-        message: suggestions.length === 0 
-          ? 'No suggestions generated. This could be due to AI errors or insufficient data. Check server logs for details.'
-          : undefined,
-      },
+    // Add timeout to prevent exceeding Heroku's 30s limit
+    const ROUTE_TIMEOUT = 25000; // 25 seconds to be safe
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout - suggestions taking too long')), ROUTE_TIMEOUT);
     });
+
+    try {
+      const suggestions = await Promise.race([
+        generateAndCacheSuggestions(vaultId, userPreferences),
+        timeoutPromise
+      ]);
+
+      return res.json({
+        success: true,
+        cached: false,
+        suggestions,
+        meta: {
+          count: suggestions.length,
+          generatedAt: new Date().toISOString(),
+          message: suggestions.length === 0 
+            ? 'No suggestions generated. This could be due to AI errors or insufficient data. Check server logs for details.'
+            : undefined,
+        },
+      });
+    } catch (timeoutError) {
+      // If timeout, return cached data (if any) and process in background
+      const fallbackCached = suggestionCacheService.get(vaultId);
+      
+      // Start background processing
+      setImmediate(() => {
+        generateAndCacheSuggestions(vaultId, userPreferences).catch((err: Error) => {
+          console.error(`Background suggestion generation failed for ${vaultId}:`, err);
+        });
+      });
+
+      return res.json({
+        success: true,
+        cached: !!fallbackCached,
+        processing: true,
+        suggestions: fallbackCached || [],
+        message: 'Request taking longer than expected. Returning cached results and continuing processing in background.',
+      });
+    }
   } catch (error) {
     console.error('Error generating suggestions:', error);
     return res.status(500).json({

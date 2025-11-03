@@ -51,6 +51,16 @@ export interface SuggestionRequest {
 }
 
 export class SuggestionGenerator {
+  /**
+   * Helper to add timeout to promises
+   */
+  private async withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<T> {
+    const timeout = new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${name} timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]);
+  }
+
   private readonly SUGGESTION_PROMPT = `You are an expert DeFi yield vault strategist specializing in the Stellar Network blockchain.
 
 IMPORTANT CONTEXT - STELLAR NETWORK VAULTS:
@@ -133,13 +143,14 @@ Respond only with valid JSON object.`;
       rulesCount: config.rules?.length || 0,
     });
 
-    // Gather all relevant data in parallel
+    // Gather all relevant data in parallel with timeout
+    const GATHER_TIMEOUT = 15000; // 15 seconds max for data gathering
     const [analysis, sentimentData, marketNews, defiTrends, forecasts] = await Promise.allSettled([
-      this.analyzeStrategy(vaultId, config, performanceData),
-      this.gatherSentimentData(config),
-      this.gatherMarketNews(config),
-      this.gatherDeFiTrends(),
-      this.gatherForecasts(config),
+      this.withTimeout(this.analyzeStrategy(vaultId, config, performanceData), GATHER_TIMEOUT, 'analysis'),
+      this.withTimeout(this.gatherSentimentData(config), GATHER_TIMEOUT, 'sentiment'),
+      this.withTimeout(this.gatherMarketNews(config), GATHER_TIMEOUT, 'marketNews'),
+      this.withTimeout(this.gatherDeFiTrends(), GATHER_TIMEOUT, 'defiTrends'),
+      this.withTimeout(this.gatherForecasts(config), GATHER_TIMEOUT, 'forecasts'),
     ]);
 
     console.log('[SuggestionGenerator] Data gathering results:', {
@@ -359,21 +370,27 @@ Respond only with valid JSON object.`;
 
       console.log('[SuggestionGenerator] Calling OpenAI API with model:', process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07');
 
-      const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert DeFi strategist specializing in Stellar Network yield vault optimization. You understand Stellar blockchain, Soroban smart contracts, Stellar DEX, and the Stellar DeFi ecosystem (Soroswap, Aquarius, Blend, etc.). Provide specific, actionable, Stellar-focused, data-driven suggestions that leverage Stellar\'s unique features like low fees and fast finality.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      });
+      // Set OpenAI timeout to 29 seconds to prevent long waits
+      const AI_TIMEOUT = 29000;
+      const response = await this.withTimeout(
+        openai.chat.completions.create({
+          model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert DeFi strategist specializing in Stellar Network yield vault optimization. You understand Stellar blockchain, Soroban smart contracts, Stellar DEX, and the Stellar DeFi ecosystem (Soroswap, Aquarius, Blend, etc.). Provide specific, actionable, Stellar-focused, data-driven suggestions that leverage Stellar\'s unique features like low fees and fast finality.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        }),
+        AI_TIMEOUT,
+        'OpenAI API'
+      );
 
       console.log('[SuggestionGenerator] OpenAI API call successful');
 

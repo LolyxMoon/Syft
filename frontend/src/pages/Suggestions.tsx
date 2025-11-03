@@ -146,7 +146,7 @@ const Suggestions = () => {
         }
       }
 
-      // Generate new AI suggestions (POST endpoint)
+      // Generate new AI suggestions (POST endpoint) - Use async mode to prevent timeouts
       console.log(`[Frontend] Requesting suggestions for vault: ${selectedVault}`);
       const postResponse = await fetch(`${backendUrl}/api/vaults/${selectedVault}/suggestions`, {
         method: 'POST',
@@ -154,6 +154,7 @@ const Suggestions = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          async: true, // Use async mode to prevent Heroku H12 timeouts
           forceRefresh,
           userPreferences: {
             riskTolerance: 'medium',
