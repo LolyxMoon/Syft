@@ -184,6 +184,17 @@ export async function buildDepositTransaction(
         );
       }
       
+      // Error #114: Soroswap pair - liquidity was not initialized yet
+      if (errorMsg.includes('Error(Contract, #114)')) {
+        throw new Error(
+          `Pool not initialized: The liquidity pool exists but hasn't been initialized with liquidity yet. ` +
+          `This usually happens when a pool was just created but no liquidity has been added. ` +
+          `To deposit, either:\n` +
+          `1. Add liquidity to the ${baseTokenInfo}/deposit-token pool on Soroswap first\n` +
+          `2. Deposit using ${baseTokenInfo} directly (the vault's base token) to skip the swap`
+        );
+      }
+      
       // Error #15: Pool not found
       if (errorMsg.includes('Error(Contract, #15)') || errorMsg.includes('PoolNotFound')) {
         throw new Error(
@@ -348,6 +359,15 @@ export async function buildRebalanceTransaction(
       if (errorMsg.includes('Error(Contract, #14)') || errorMsg.includes('SwapFailed')) {
         throw new Error(
           `Swap failed: Unable to swap tokens during rebalancing. This could be due to insufficient liquidity.`
+        );
+      }
+      
+      // Error #114: Soroswap pair - liquidity was not initialized yet
+      if (errorMsg.includes('Error(Contract, #114)')) {
+        throw new Error(
+          `Pool not initialized: The liquidity pool exists but hasn't been initialized with liquidity yet. ` +
+          `This usually happens when a pool was just created but no liquidity has been added. ` +
+          `Please add liquidity to the pool on Soroswap before rebalancing.`
         );
       }
       
