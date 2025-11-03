@@ -255,22 +255,39 @@ impl VaultContract {
         let final_xlm_balance = token_client.balance(&vault_address);
         log!(&env, "Final XLM balance after liquidation and swaps: {}", final_xlm_balance);
         
-        // Verify we have enough XLM to return
-        if final_xlm_balance < amount {
-            log!(&env, "Insufficient XLM after liquidation: have={}, need={}", final_xlm_balance, amount);
+        // IMPORTANT: Use the actual XLM balance instead of the calculated amount
+        // The calculated amount is based on total_value, but actual value is less due to:
+        // - Swap fees (0.3% per swap)
+        // - Slippage
+        // - K invariant safety margin (-1 per swap)
+        // We return whatever XLM is actually available proportional to user's shares
+        let actual_amount = if final_xlm_balance < amount {
+            log!(&env, "Adjusting withdrawal: calculated={}, actual_available={}", amount, final_xlm_balance);
+            // Return proportional amount based on user's share of total shares
+            // This ensures fair distribution when multiple users withdraw
+            final_xlm_balance.checked_mul(shares)
+                .and_then(|v| v.checked_div(state.total_shares))
+                .ok_or(VaultError::InvalidAmount)?
+        } else {
+            amount
+        };
+        
+        // Verify we have enough XLM
+        if final_xlm_balance < actual_amount {
+            log!(&env, "Insufficient XLM: have={}, need={}", final_xlm_balance, actual_amount);
             return Err(VaultError::InsufficientBalance);
         }
         
         // Transfer XLM from vault to user
         // XLM is the native token and doesn't require trustlines - everyone can receive it!
-        token_client.transfer(&vault_address, &user, &amount);
+        token_client.transfer(&vault_address, &user, &actual_amount);
         
-        log!(&env, "Successfully transferred {} XLM to user", amount);
+        log!(&env, "Successfully transferred {} XLM to user (calculated: {}, actual: {})", actual_amount, amount, actual_amount);
 
-        // Update state
+        // Update state using actual amount withdrawn
         state.total_shares = state.total_shares.checked_sub(shares)
             .ok_or(VaultError::InvalidAmount)?;
-        state.total_value = state.total_value.checked_sub(amount)
+        state.total_value = state.total_value.checked_sub(actual_amount)
             .ok_or(VaultError::InvalidAmount)?;
 
         // Update user position
@@ -285,10 +302,10 @@ impl VaultContract {
             env.storage().instance().set(&(POSITION, user.clone()), &position);
         }
 
-        // Emit event
-        emit_withdraw(&env, &user, shares, amount);
+        // Emit event with actual amount withdrawn
+        emit_withdraw(&env, &user, shares, actual_amount);
 
-        Ok(amount)
+        Ok(actual_amount)
     }
     
     /// Find XLM token address in the vault's configured assets
