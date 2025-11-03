@@ -85,8 +85,18 @@ pub fn swap_via_pool(
     
     let amount_out = numerator / denominator;
     
+    // CRITICAL FIX: Reduce amount_out by a small margin to account for rounding
+    // errors and ensure the pool's K invariant check passes
+    // Soroswap pools verify that (reserve0 - amount0_out) * (reserve1 - amount1_out) >= K
+    // Due to integer division rounding, we need to request slightly less to be safe
+    let amount_out_safe = if amount_out > 1000 {
+        amount_out - 1  // Reduce by 1 to ensure invariant holds
+    } else {
+        amount_out
+    };
+    
     // Verify we get at least the minimum
-    if amount_out < min_amount_out {
+    if amount_out_safe < min_amount_out {
         return Err(VaultError::SlippageTooHigh);
     }
     
@@ -101,14 +111,18 @@ pub fn swap_via_pool(
     )?;
     
     // Determine output amounts for swap call
+    // Use the safer amount to ensure pool invariant checks pass
     let (amount0_out, amount1_out) = if is_token0_in {
-        (0, amount_out)  // Swapping token0 -> token1
+        (0, amount_out_safe)  // Swapping token0 -> token1
     } else {
-        (amount_out, 0)  // Swapping token1 -> token0
+        (amount_out_safe, 0)  // Swapping token1 -> token0
     };
     
-    // Note: No authorization needed here - the vault has already transferred tokens to the pool
-    // The pool will send tokens back to the vault address specified in the swap call
+    // CRITICAL: The pool's swap function will transfer tokens back to the vault
+    // We need to authorize this cross-contract call
+    // However, we can't use require_auth here because we're already in a contract context
+    // The pool should handle the transfer internally without needing vault authorization
+    // since the pool is sending tokens TO the vault, not FROM the vault
     
     // Call swap on the pool to get our tokens back to vault
     pool_client.swap(
@@ -117,7 +131,7 @@ pub fn swap_via_pool(
         &vault_address,
     );
     
-    Ok(amount_out)
+    Ok(amount_out_safe)
 }
 
 /// Calculate expected output for a swap without executing it
