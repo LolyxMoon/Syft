@@ -105,14 +105,11 @@ impl VaultContract {
         deposit_token_client.transfer(&user, &vault_address, &amount);
         env.events().publish((symbol_short!("debug"),), symbol_short!("xfer_ok"));
 
-        // AUTO-SWAP LOGIC:
-        // For SINGLE-ASSET vaults: Swap deposit token to base token if different
-        // For MULTI-ASSET vaults: Keep deposit token as-is, let rebalance distribute it
-        // This prevents the deposit from skewing the allocation before rebalance runs
-        let is_multi_asset_vault = config.assets.len() > 1;
-        
-        let final_amount = if deposit_token != base_token && !is_multi_asset_vault {
-            // Single-asset vault: Swap deposit token to base token
+        // AUTO-SWAP: Always swap to base token first for deposits
+        // The rebalance function will then distribute across assets according to target allocation
+        // This ensures consistent behavior regardless of which token is deposited
+        let final_amount = if deposit_token != base_token {
+            // Deposit token is different from base token - need to swap
             env.events().publish((symbol_short!("debug"),), symbol_short!("swap_req"));
             
             // Check if router is configured
@@ -133,41 +130,6 @@ impl VaultContract {
             
             env.events().publish((symbol_short!("debug"),), symbol_short!("swap_ok"));
             swapped_amount
-        } else if deposit_token != base_token && is_multi_asset_vault {
-            // Multi-asset vault: Check if deposit token is one of the vault's configured assets
-            let mut is_vault_asset = false;
-            for i in 0..config.assets.len() {
-                if let Some(asset) = config.assets.get(i) {
-                    if asset == deposit_token {
-                        is_vault_asset = true;
-                        break;
-                    }
-                }
-            }
-            
-            if is_vault_asset {
-                // Deposit token is a vault asset - keep it as-is for rebalance
-                env.events().publish((symbol_short!("debug"),), symbol_short!("keep_tok"));
-                amount
-            } else {
-                // Deposit token is NOT a vault asset - swap to base token
-                env.events().publish((symbol_short!("debug"),), symbol_short!("swap_req"));
-                
-                let router_address = config.router_address
-                    .ok_or(VaultError::RouterNotSet)?;
-                
-                let swapped_amount = crate::swap_router::swap_via_router(
-                    &env,
-                    &router_address,
-                    &deposit_token,
-                    &base_token,
-                    amount,
-                    0,
-                )?;
-                
-                env.events().publish((symbol_short!("debug"),), symbol_short!("swap_ok"));
-                swapped_amount
-            }
         } else {
             // Deposit token matches base token - no swap needed
             amount
@@ -202,18 +164,16 @@ impl VaultContract {
         env.storage().instance().set(&STATE, &state);
         env.storage().instance().set(&(POSITION, user.clone()), &position);
 
-        // Emit event with final amount (after swap if applicable)
+        // Emit event with final amount (after swap)
         emit_deposit(&env, &user, final_amount, shares);
 
-        // NOTE: Auto-swap behavior for deposits:
-        // - SINGLE-ASSET vaults: Deposits are swapped to base token automatically
-        //   Example: USDC-only vault, user deposits XLM → swaps to USDC
-        // - MULTI-ASSET vaults: Deposits are kept as-is if the token is a vault asset
-        //   Example: 70% USDC / 30% XLM vault, user deposits XLM → keeps as XLM
-        //   Then force_rebalance() distributes it according to target allocation (70/30)
+        // NOTE: Auto-swap is ENABLED for all deposits
+        // All deposits are first swapped to the base token (first asset in vault config)
+        // Example: User deposits XLM into 70% USDC / 30% XLM vault → swaps XLM to USDC first
         //
-        // IMPORTANT: For multi-asset vaults, always call force_rebalance() after deposit
-        // to ensure proper distribution across assets according to target allocation
+        // IMPORTANT: For multi-asset vaults, ALWAYS call force_rebalance() after deposit
+        // The rebalance function will then distribute the base token across all assets
+        // according to the target allocation (e.g., 70% USDC, 30% XLM)
 
         Ok(shares)
     }

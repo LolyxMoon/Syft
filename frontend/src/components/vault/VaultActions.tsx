@@ -25,7 +25,8 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
   const [userShares, setUserShares] = useState<string | null>(null);
   const [loadingShares, setLoadingShares] = useState(false);
   const [resolvedAssetNames, setResolvedAssetNames] = useState<string[]>([]);
-  const [selectedDepositToken, setSelectedDepositToken] = useState<string>('XLM');
+  // Fixed to XLM deposits only
+  const selectedDepositToken = 'XLM';
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -69,27 +70,9 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       console.log('[VaultActions] Rules:', vaultConfig.rules);
       resolveAssetNames(vaultConfig.assets, 'testnet').then(names => {
         setResolvedAssetNames(names);
-        // Set default deposit token to the first vault asset
-        if (names.length > 0 && names[0]) {
-          setSelectedDepositToken(names[0]);
-        }
       });
     }
   }, [vaultConfig]);
-
-  // Get available deposit tokens (vault assets + XLM)
-  const getAvailableDepositTokens = () => {
-    const tokens = ['XLM']; // Always allow XLM deposits
-    if (resolvedAssetNames && resolvedAssetNames.length > 0) {
-      // Add vault's base tokens
-      resolvedAssetNames.forEach(name => {
-        if (name && name !== 'Loading...' && !tokens.includes(name)) {
-          tokens.push(name);
-        }
-      });
-    }
-    return tokens;
-  };
 
   // Get token address for deposit
   const getDepositTokenAddress = (tokenSymbol: string, normalizedNetwork: string): string => {
@@ -527,23 +510,6 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
         <div>
           <h3 className="text-base font-semibold mb-3 text-neutral-50">Deposit Assets</h3>
           
-          {/* Token Selection Dropdown */}
-          <div className="mb-3">
-            <label className="text-xs text-neutral-400 mb-1 block">Select Token to Deposit</label>
-            <select
-              value={selectedDepositToken}
-              onChange={(e) => setSelectedDepositToken(e.target.value)}
-              className="w-full px-4 py-2 bg-input border border-default rounded-lg text-neutral-50 focus:outline-none focus:border-primary-500 transition-colors"
-              disabled={isProcessing}
-            >
-              {getAvailableDepositTokens().map((token) => (
-                <option key={token} value={token}>
-                  {token}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div className="flex gap-3">
             <div className="flex-1 relative">
               <input
@@ -571,9 +537,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
             </button>
           </div>
           <p className="text-sm text-neutral-400 mt-2">
-            💡 {selectedDepositToken === 'XLM' 
-              ? 'Deposit XLM - it will be automatically swapped and rebalanced according to the target allocation'
-              : `Deposit ${selectedDepositToken} directly into the vault`}
+            💡 Deposit XLM - it will be automatically swapped and rebalanced according to the target allocation
           </p>
         </div>
 
