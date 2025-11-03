@@ -28,6 +28,7 @@ export interface Suggestion {
     analysis?: any;
   };
   configChanges?: Partial<VaultConfig>;
+  actionPrompt?: string; // AI-generated prompt for applying this suggestion
   createdAt: string;
   expiresAt?: string;
 }

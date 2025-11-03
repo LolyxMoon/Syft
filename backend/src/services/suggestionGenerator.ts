@@ -35,6 +35,7 @@ export interface Suggestion {
     defiTrends?: any;
   };
   configChanges?: Partial<VaultConfig>;
+  actionPrompt?: string; // AI-generated prompt for applying this suggestion via AI Chat
   createdAt: string;
   expiresAt?: string;
 }
@@ -79,6 +80,20 @@ IMPORTANT CONTEXT - STELLAR NETWORK VAULTS:
 - Rebalancing rules can trigger on: time intervals, allocation drift, price changes, or custom conditions
 - The vault aims to optimize yield while managing risk through automated rebalancing
 
+VAULT BUILDER CAPABILITIES:
+The vault builder has a visual interface with the following components:
+- Asset Blocks: Define assets with allocation percentages (e.g., "Add 40% USDC", "Add 60% XLM")
+- Condition Blocks: Set triggers for rules
+  * Time-based: "Every 7 days", "Every 2 weeks", etc.
+  * APY threshold: "When APY drops below 5%"
+  * Allocation drift: "When allocation differs by more than 10%"
+  * Price change: "When price changes by more than 15%"
+- Action Blocks: Define what happens when conditions are met
+  * Rebalance: Return to target allocations
+  * Stake: Stake a percentage of vault assets
+  * Provide liquidity: Add liquidity to DEX pools
+- The builder also has an AI Chat mode that can understand natural language and modify vaults
+
 Based on the following data about this Stellar vault, generate 3-5 specific, actionable suggestions to improve its performance:
 
 Strategy Analysis:
@@ -108,6 +123,13 @@ Generate suggestions that are:
 6. Prioritized by potential impact
 7. Realistic to implement on Stellar/Soroban
 
+For EACH suggestion, also generate an "actionPrompt" field - this is a detailed natural language instruction that will be sent to the AI Chat interface to automatically apply the suggestion. The actionPrompt should:
+- Clearly describe what modifications to make to the current vault
+- Reference specific percentages, assets, conditions, and actions
+- Be detailed enough for an AI assistant to understand and implement
+- Start with context about why this change is being made
+- Example: "Based on market analysis showing strong XLM performance, adjust the vault allocation to 70% XLM and 30% USDC. Also add a weekly rebalancing rule to maintain these target allocations."
+
 Return a JSON object with a "suggestions" array:
 {
   "suggestions": [{
@@ -122,7 +144,8 @@ Return a JSON object with a "suggestions" array:
       "efficiencyGain": <number or null>
     },
     "steps": ["<step 1>", "<step 2>", ...],
-    "difficulty": "easy" | "moderate" | "advanced"
+    "difficulty": "easy" | "moderate" | "advanced",
+    "actionPrompt": "<detailed natural language instruction for AI Chat to apply this suggestion>"
   }]
 }
 
@@ -443,6 +466,7 @@ Respond only with valid JSON object.`;
           estimatedTime: this.estimateImplementationTime(s.difficulty),
         },
         configChanges: s.configChanges,
+        actionPrompt: s.actionPrompt || '', // Include the AI-generated prompt for applying the suggestion
       }));
     } catch (error) {
       console.error('[SuggestionGenerator] Failed to generate AI suggestions:', error);
@@ -493,6 +517,7 @@ Respond only with valid JSON object.`;
             difficulty: 'moderate',
             estimatedTime: '10-15 minutes',
           },
+          actionPrompt: `Address the following issue in the vault: ${issue.title}. ${issue.recommendation}`,
         });
       });
 
@@ -516,6 +541,7 @@ Respond only with valid JSON object.`;
           difficulty: 'moderate',
           estimatedTime: '15-20 minutes',
         },
+        actionPrompt: 'Add one or two new assets to the vault to improve diversification. Consider assets with different risk profiles that are not highly correlated with existing holdings. Adjust the allocation percentages to maintain a total of 100%.',
       });
     }
 

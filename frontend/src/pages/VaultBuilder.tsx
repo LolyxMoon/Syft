@@ -16,7 +16,7 @@ import { useBuilderHistory } from '../hooks/useBuilderHistory';
 import { vaultTemplates } from '../data/vaultTemplates';
 import { useWallet } from '../providers/WalletProvider';
 import { VoiceAssistantProvider } from '../providers/VoiceAssistantProvider';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { PaletteItem, ValidationResult } from '../types/blocks';
 
 interface SavedVault {
@@ -61,11 +61,16 @@ const VaultBuilder = () => {
 
   const { address, network, networkPassphrase } = useWallet();
   const navigate = useNavigate();
+  const location = useLocation();
   const modal = useModal();
   const { canUndo, canRedo, undo, redo, pushState } = useBuilderHistory(nodes, edges);
   
   // Track when we're applying history to prevent creating new history entries
   const isApplyingHistoryRef = useRef(false);
+  
+  // State for suggestion application
+  const [suggestionPrompt, setSuggestionPrompt] = useState<string | null>(null);
+  const [suggestionVaultId, setSuggestionVaultId] = useState<string | null>(null);
 
   // Handle undo action
   const handleUndo = useCallback(() => {
@@ -101,6 +106,35 @@ const VaultBuilder = () => {
       loadSavedVaults();
     }
   }, [address, network]); // Reload when network changes
+
+  // Handle suggestion application from location state
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.mode === 'chat' && state?.actionPrompt) {
+      console.log('[VaultBuilder] Applying suggestion from location state');
+      console.log('[VaultBuilder] Vault ID:', state.vaultId);
+      console.log('[VaultBuilder] Action prompt:', state.actionPrompt);
+      
+      // Switch to AI Chat mode
+      setBuilderMode('chat');
+      
+      // Store the suggestion data
+      setSuggestionPrompt(state.actionPrompt);
+      setSuggestionVaultId(state.vaultId);
+      
+      // If there's a vault ID, load that vault
+      if (state.vaultId && savedVaults.length > 0) {
+        const vaultToLoad = savedVaults.find(v => v.vault_id === state.vaultId);
+        if (vaultToLoad) {
+          console.log('[VaultBuilder] Loading vault for suggestion:', vaultToLoad.name);
+          handleLoadVault(vaultToLoad);
+        }
+      }
+      
+      // Clear the location state to prevent re-triggering
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, savedVaults]); // Re-run when location state or saved vaults change
 
   // Map Freighter network names to our backend format
   const normalizeNetwork = (net?: string, passphrase?: string): string => {
@@ -1037,6 +1071,8 @@ const VaultBuilder = () => {
                 network={network}
                 currentNodes={nodes}
                 currentEdges={edges}
+                initialPrompt={suggestionPrompt || undefined}
+                vaultIdToLoad={suggestionVaultId || undefined}
               />
             </div>
 

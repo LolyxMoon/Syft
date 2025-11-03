@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Suggestion } from '../../types/suggestion';
 import styles from './SuggestionCard.module.css';
 
@@ -13,6 +14,7 @@ interface SuggestionCardProps {
 }
 
 export function SuggestionCard({ suggestion, onApply }: SuggestionCardProps) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [applying, setApplying] = useState(false);
 
@@ -31,11 +33,23 @@ export function SuggestionCard({ suggestion, onApply }: SuggestionCardProps) {
   };
 
   const handleApply = async () => {
-    if (!onApply) return;
-
     setApplying(true);
     try {
-      await onApply(suggestion);
+      // If there's a custom onApply handler, use it
+      if (onApply) {
+        await onApply(suggestion);
+      } else {
+        // Default behavior: Navigate to Vault Builder with suggestion context
+        // Use location state to pass the suggestion data
+        navigate('/app/builder', {
+          state: {
+            mode: 'chat',
+            vaultId: suggestion.vaultId,
+            actionPrompt: suggestion.actionPrompt || `Apply the following suggestion to the vault: ${suggestion.title}. ${suggestion.description}`,
+            suggestionId: suggestion.id,
+          }
+        });
+      }
     } finally {
       setApplying(false);
     }

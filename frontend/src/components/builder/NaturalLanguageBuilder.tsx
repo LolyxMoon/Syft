@@ -28,12 +28,23 @@ interface NaturalLanguageBuilderProps {
   network?: string;
   currentNodes?: Node[];
   currentEdges?: Edge[];
+  initialPrompt?: string; // Prompt to auto-send on mount (for suggestions)
+  vaultIdToLoad?: string; // Vault ID to load into context (for suggestions)
 }
 
-export function NaturalLanguageBuilder({ onVaultGenerated, network, currentNodes = [], currentEdges = [] }: NaturalLanguageBuilderProps) {
+export function NaturalLanguageBuilder({ 
+  onVaultGenerated, 
+  network, 
+  currentNodes = [], 
+  currentEdges = [],
+  initialPrompt,
+  vaultIdToLoad,
+}: NaturalLanguageBuilderProps) {
   const { address: walletAddress } = useWallet(); // Get connected wallet address
   
   console.log('[NaturalLanguageBuilder] Wallet address:', walletAddress);
+  console.log('[NaturalLanguageBuilder] Initial prompt:', initialPrompt);
+  console.log('[NaturalLanguageBuilder] Vault to load:', vaultIdToLoad);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -138,6 +149,27 @@ export function NaturalLanguageBuilder({ onVaultGenerated, network, currentNodes
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Auto-send initial prompt when provided (for applying suggestions)
+  useEffect(() => {
+    // Only auto-send if we have an initial prompt and session is loaded
+    if (initialPrompt && !isLoadingSession && !isGenerating) {
+      console.log('[Chat] Auto-sending initial prompt from suggestion');
+      
+      // Set the input value and trigger submit after a short delay
+      // to ensure the UI is ready
+      setTimeout(() => {
+        setInputValue(initialPrompt);
+        // Trigger the form submission programmatically
+        const form = document.querySelector('form');
+        if (form) {
+          form.requestSubmit();
+        }
+      }, 500);
+    }
+    // Only run once when component mounts with initialPrompt
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, isLoadingSession]);
 
   // Create a new chat session
   const createNewSession = async (initialPrompt?: string) => {
