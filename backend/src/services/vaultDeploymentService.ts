@@ -912,6 +912,11 @@ export async function deployVault(
         console.log(`  - This should map to assets: ${config.assets.join(', ')}`);
       });
       
+      // 🐛 DEBUG: Log the factory address being used
+      console.log(`[Vault Initialization] 🔍 DEBUG: Factory address being set: ${soroswapFactoryAddress}`);
+      console.log(`[Vault Initialization] 🔍 DEBUG: Router address being set: ${routerAddress}`);
+      console.log(`[Vault Initialization] 🔍 DEBUG: Staking pool address being set: ${stakingPoolAddress}`);
+      
       // Build VaultConfig struct for initialization
       // IMPORTANT: ScMap entries MUST be sorted alphabetically by key!
       // Include router_address, staking_pool_address, and factory_address so vault is fully configured
@@ -963,6 +968,31 @@ export async function deployVault(
       if (initResult.success) {
         console.log(`[Vault Initialization] ✅ Vault initialized successfully`);
         console.log(`[Vault Initialization] TX: ${initResult.hash}`);
+        
+        // 🐛 DEBUG: Query the config back to verify what was actually stored
+        try {
+          console.log(`[Vault Initialization] 🔍 DEBUG: Querying vault config to verify initialization...`);
+          const configResult = await invokeVaultMethod(
+            contractAddress,
+            'get_config',
+            [],
+            sourceKeypair,
+            network
+          );
+          
+          if (configResult.success && configResult.result) {
+            const config = StellarSdk.scValToNative(configResult.result);
+            console.log(`[Vault Initialization] 🔍 DEBUG: Retrieved config:`, JSON.stringify(config, null, 2));
+            
+            if (config.factory_address) {
+              console.log(`[Vault Initialization] ✅ Factory address is SET in contract config`);
+            } else {
+              console.log(`[Vault Initialization] ❌ Factory address is NULL/NONE in contract config!`);
+            }
+          }
+        } catch (configError) {
+          console.error(`[Vault Initialization] ⚠️  Could not query config for verification:`, configError);
+        }
       }
     } catch (initError) {
       console.error(`[Vault Initialization] ⚠️  Failed to initialize vault:`, initError);
