@@ -641,8 +641,9 @@ export async function deployVault(
       StellarSdk.Address.fromString(asset).toScVal()
     );
 
-    // Build VaultConfig struct - must match the Rust struct field order and types
-    // The struct should be passed as a map with symbol keys
+    // Build VaultConfig struct for factory - factory doesn't actually use this
+    // The factory just deploys an empty vault contract
+    // We'll initialize it separately with the full config
     const vaultConfigStruct = StellarSdk.xdr.ScVal.scvMap([
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('assets')),
@@ -913,26 +914,41 @@ export async function deployVault(
       
       // Build VaultConfig struct for initialization
       // IMPORTANT: ScMap entries MUST be sorted alphabetically by key!
+      // Include router_address, staking_pool_address, and factory_address so vault is fully configured
       const vaultConfigStruct = StellarSdk.xdr.ScVal.scvMap([
         new StellarSdk.xdr.ScMapEntry({
           key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('assets')), // 'a' comes first
           val: StellarSdk.xdr.ScVal.scvVec(assetAddresses),
         }),
         new StellarSdk.xdr.ScMapEntry({
-          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('name')), // 'n' comes second
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('factory_address')), // 'f' comes second
+          val: StellarSdk.xdr.ScVal.scvVec([
+            StellarSdk.Address.fromString(soroswapFactoryAddress).toScVal()
+          ]), // Option::Some(Address)
+        }),
+        new StellarSdk.xdr.ScMapEntry({
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('name')), // 'n' comes third
           val: StellarSdk.nativeToScVal(config.name, { type: 'string' }),
         }),
         new StellarSdk.xdr.ScMapEntry({
-          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('owner')), // 'o' comes third
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('owner')), // 'o' comes fourth
           val: StellarSdk.Address.fromString(config.owner).toScVal(),
         }),
         new StellarSdk.xdr.ScMapEntry({
-          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('router_address')), // 'r' comes fourth
-          val: StellarSdk.nativeToScVal(null, { type: 'option' }), // No router initially
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('router_address')), // 'r' comes fifth
+          val: StellarSdk.xdr.ScVal.scvVec([
+            StellarSdk.Address.fromString(routerAddress).toScVal()
+          ]), // Option::Some(Address)
         }),
         new StellarSdk.xdr.ScMapEntry({
-          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('rules')), // 'r' comes last (rules)
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('rules')), // 'r' comes sixth
           val: StellarSdk.xdr.ScVal.scvVec(rulesScVal), // Pass the actual rules!
+        }),
+        new StellarSdk.xdr.ScMapEntry({
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('staking_pool_address')), // 's' comes last
+          val: StellarSdk.xdr.ScVal.scvVec([
+            StellarSdk.Address.fromString(stakingPoolAddress).toScVal()
+          ]), // Option::Some(Address)
         }),
       ]);
       
