@@ -5,10 +5,46 @@ import {
   Activity, ShieldCheck, Layers, Sparkles
 } from 'lucide-react';
 import { Button, Card } from '../components/ui';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(false);
+  const [isFeaturesSectionVisible, setIsFeaturesSectionVisible] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Intersection Observer to pause animations when not visible
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.target.id === 'features') {
+            setIsFeaturesSectionVisible(entry.isIntersecting);
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    const featuresSection = document.getElementById('features');
+    if (featuresSection) {
+      observer.observe(featuresSection);
+    }
+
+    return () => {
+      if (featuresSection) {
+        observer.unobserve(featuresSection);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Script is already loaded in HTML, just initialize
@@ -284,9 +320,9 @@ const Home = () => {
 
       {/* Features Section - Enhanced with Animated Integrations */}
       <section id="features" className="py-24 relative bg-[#090a0a] overflow-hidden">
-        <div className="opacity-30 absolute top-0 right-0 bottom-0 left-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#dce85d] rounded-full blur-[120px]"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#74b97f] rounded-full blur-[120px]"></div>
+        <div className="opacity-30 absolute top-0 right-0 bottom-0 left-0 will-change-[filter] transform-gpu">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#dce85d] rounded-full blur-[120px] md:blur-[120px] blur-[60px]"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#74b97f] rounded-full blur-[120px] md:blur-[120px] blur-[60px]"></div>
         </div>
         
         <div className="container mx-auto px-4 max-w-7xl relative z-10">
@@ -309,43 +345,61 @@ const Home = () => {
             <div className="flex gap-8 sm:gap-12 mb-8 gap-x-8 gap-y-8 items-center justify-center">
               <motion.span 
                 whileHover={{ scale: 1.1 }}
-                className="inline-flex items-center justify-center glass-card transition-all duration-300 w-14 h-14 rounded-xl"
-                style={{ animation: 'float 3s ease-in-out infinite' }}
+                className="inline-flex items-center justify-center glass-card transition-all duration-300 w-14 h-14 rounded-xl will-change-transform"
+                style={{ 
+                  animation: isFeaturesSectionVisible ? 'float 3s ease-in-out infinite' : 'none',
+                  willChange: 'transform'
+                }}
               >
                 <Shield className="w-6 h-6 text-[#dce85d]" />
               </motion.span>
               <motion.span 
                 whileHover={{ scale: 1.1 }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
-                style={{ animation: 'float 3s ease-in-out infinite 0.2s' }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 will-change-transform"
+                style={{ 
+                  animation: isFeaturesSectionVisible ? 'float 3s ease-in-out infinite 0.2s' : 'none',
+                  willChange: 'transform'
+                }}
               >
                 <Activity className="w-6 h-6 text-[#dce85d]" />
               </motion.span>
               <motion.span 
                 whileHover={{ scale: 1.1 }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
-                style={{ animation: 'float 3s ease-in-out infinite 0.4s' }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 will-change-transform"
+                style={{ 
+                  animation: isFeaturesSectionVisible ? 'float 3s ease-in-out infinite 0.4s' : 'none',
+                  willChange: 'transform'
+                }}
               >
                 <Box className="w-6 h-6 text-[#dce85d]" />
               </motion.span>
               <motion.span 
                 whileHover={{ scale: 1.1 }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
-                style={{ animation: 'float 3s ease-in-out infinite 0.6s' }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 will-change-transform"
+                style={{ 
+                  animation: isFeaturesSectionVisible ? 'float 3s ease-in-out infinite 0.6s' : 'none',
+                  willChange: 'transform'
+                }}
               >
                 <Layers className="w-6 h-6 text-[#dce85d]" />
               </motion.span>
               <motion.span 
                 whileHover={{ scale: 1.1 }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
-                style={{ animation: 'float 3s ease-in-out infinite 0.8s' }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 will-change-transform"
+                style={{ 
+                  animation: isFeaturesSectionVisible ? 'float 3s ease-in-out infinite 0.8s' : 'none',
+                  willChange: 'transform'
+                }}
               >
                 <TrendingUp className="w-6 h-6 text-[#dce85d]" />
               </motion.span>
               <motion.span 
                 whileHover={{ scale: 1.1 }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300"
-                style={{ animation: 'float 3s ease-in-out infinite 1s' }}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-xl glass-card transition-all duration-300 will-change-transform"
+                style={{ 
+                  animation: isFeaturesSectionVisible ? 'float 3s ease-in-out infinite 1s' : 'none',
+                  willChange: 'transform'
+                }}
               >
                 <Zap className="w-6 h-6 text-[#dce85d]" />
               </motion.span>
@@ -353,7 +407,7 @@ const Home = () => {
 
             {/* Animated Connection Lines (SVG) */}
             <div className="relative h-72">
-              <svg viewBox="0 0 900 360" className="absolute top-0 right-0 bottom-0 left-0 w-full h-[288px] max-w-[1008px] mx-auto" fill="none" strokeWidth="2">
+              <svg viewBox="0 0 900 360" className="absolute top-0 right-0 bottom-0 left-0 w-full h-[288px] max-w-[1008px] mx-auto will-change-transform transform-gpu" fill="none" strokeWidth="2">
                 <defs>
                   <filter id="glow">
                     <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -362,37 +416,45 @@ const Home = () => {
                       <feMergeNode in="SourceGraphic"/>
                     </feMerge>
                   </filter>
+                  {/* Simplified filter for mobile */}
+                  <filter id="glow-simple">
+                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
                 </defs>
                 
-                <circle cx="150" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite' }}></circle>
-                <circle cx="270" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.2s' }}></circle>
-                <circle cx="390" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.4s' }}></circle>
-                <circle cx="510" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.6s' }}></circle>
-                <circle cx="630" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.8s' }}></circle>
-                <circle cx="750" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 1s' }}></circle>
+                <circle cx="150" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
+                <circle cx="270" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.2s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
+                <circle cx="390" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.4s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
+                <circle cx="510" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.6s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
+                <circle cx="630" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.8s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
+                <circle cx="750" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 1s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
 
-                <path d="M450 300 C 450 200, 300 120, 150 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: '600' }} opacity="0.6">
-                  <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="0s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                {/* Render fewer animated paths on mobile for performance */}
+                <path d="M450 300 C 450 200, 300 120, 150 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: isMobile ? '0' : '600' }} opacity="0.6">
+                  {!isMobile && <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="0s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
                 </path>
-                <path d="M450 300 C 450 210, 360 130, 270 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: '520' }} opacity="0.6">
-                  <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                <path d="M450 300 C 450 210, 360 130, 270 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: isMobile ? '0' : '520' }} opacity="0.6">
+                  {!isMobile && <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
                 </path>
-                <path d="M450 300 C 450 150, 420 80, 390 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: '450' }} opacity="0.6">
-                  <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                <path d="M450 300 C 450 150, 420 80, 390 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: isMobile ? '0' : '450' }} opacity="0.6">
+                  {!isMobile && <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
                 </path>
-                <path d="M450 300 C 450 150, 480 80, 510 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: '450' }} opacity="0.6">
-                  <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                <path d="M450 300 C 450 150, 480 80, 510 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: isMobile ? '0' : '450' }} opacity="0.6">
+                  {!isMobile && <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
                 </path>
-                <path d="M450 300 C 450 210, 540 130, 630 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: '520' }} opacity="0.6">
-                  <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                <path d="M450 300 C 450 210, 540 130, 630 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: isMobile ? '0' : '520' }} opacity="0.6">
+                  {!isMobile && <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
                 </path>
-                <path d="M450 300 C 450 200, 600 120, 750 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: '600' }} opacity="0.6">
-                  <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                <path d="M450 300 C 450 200, 600 120, 750 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: isMobile ? '0' : '600' }} opacity="0.6">
+                  {!isMobile && <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
                 </path>
               </svg>
 
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#dce85d]/20 ring-2 ring-[#dce85d]/40" style={{ boxShadow: '0 0 30px rgba(220,232,93,0.6), 0 0 60px rgba(220,232,93,0.3)' }}>
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#dce85d]/20 ring-2 ring-[#dce85d]/40" style={{ boxShadow: isMobile ? '0 0 15px rgba(220,232,93,0.4)' : '0 0 30px rgba(220,232,93,0.6), 0 0 60px rgba(220,232,93,0.3)' }}>
                   <Sparkles className="w-8 h-8 text-[#dce85d]" />
                 </span>
               </div>

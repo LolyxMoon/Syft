@@ -92,6 +92,22 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Smooth scrolling optimization for mobile */
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Optimize scroll performance on mobile */
+@media (max-width: 768px) {
+  body {
+    /* Use momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Reduce composite layers on mobile */
+  section {
+    contain: layout style;
+  }
 }
 
 /* Scrollbar Styling */
@@ -197,10 +213,10 @@ body {
 
 @keyframes float {
   0%, 100% {
-    transform: translateY(0px);
+    transform: translate3d(0, 0, 0);
   }
   50% {
-    transform: translateY(-20px);
+    transform: translate3d(0, -20px, 0);
   }
 }
 
@@ -210,6 +226,18 @@ body {
   }
   50% {
     opacity: 0.5;
+  }
+}
+
+/* Optimized animations for mobile */
+@media (max-width: 768px) {
+  @keyframes float {
+    0%, 100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -10px, 0);
+    }
   }
 }
 
@@ -242,11 +270,21 @@ body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.08);
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .glass-card:hover {
   background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
   border-color: rgba(220, 232, 93, 0.3);
+}
+
+/* Reduce blur on mobile for performance */
+@media (max-width: 768px) {
+  .glass-card {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
 }
 
 .card-hover:hover {
@@ -375,6 +413,51 @@ input[type="number"]::-webkit-outer-spin-button {
   word-wrap: break-word;
   word-break: break-word;
   hyphens: auto;
+}
+
+/* GPU Acceleration utilities */
+.transform-gpu {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+/* Contain property for layout optimization */
+.will-change-transform {
+  will-change: transform;
+  contain: layout style paint;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* Disable expensive animations on mobile for better performance */
+@media (max-width: 768px) {
+  /* Reduce animation complexity */
+  .glass-card {
+    transition: none;
+  }
+  
+  /* Simplify hover effects on mobile (touch devices) */
+  @media (hover: none) {
+    .glass-card:hover {
+      background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+      border-color: rgba(255,255,255,0.08);
+    }
+  }
+  
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 
