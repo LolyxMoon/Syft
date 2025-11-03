@@ -226,7 +226,20 @@ const VaultBuilder = () => {
   // Load a specific vault into the builder
   const handleLoadVault = useCallback((vault: SavedVault) => {
     try {
+      console.log('[VaultBuilder] Loading vault config:', vault.config);
+      
+      // Validate vault config exists
+      if (!vault.config) {
+        throw new Error('Vault configuration is missing');
+      }
+      
       const { nodes: importedNodes, edges: importedEdges } = ConfigSerializer.deserialize(vault.config);
+      
+      console.log('[VaultBuilder] Deserialized:', {
+        nodes: importedNodes.length,
+        edges: importedEdges.length,
+      });
+      
       setNodes(importedNodes);
       setEdges(importedEdges);
       pushState(importedNodes, importedEdges);
@@ -239,6 +252,8 @@ const VaultBuilder = () => {
       setShowLoadModal(false);
       modal.message(`Loaded: ${vault.name}`, 'Vault Loaded', 'success');
     } catch (error) {
+      console.error('[VaultBuilder] Error loading vault:', error);
+      console.error('[VaultBuilder] Vault data:', vault);
       modal.message(
         `Failed to load vault: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'Load Failed',

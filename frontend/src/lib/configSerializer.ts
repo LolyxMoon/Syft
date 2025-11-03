@@ -219,9 +219,22 @@ export class ConfigSerializer {
    * Useful for loading saved vaults
    */
   static deserialize(config: VaultConfiguration): { nodes: Node[]; edges: Edge[] } {
+    console.log('[ConfigSerializer] Deserializing config:', config);
+    
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     let nodeIdCounter = 0;
+
+    // Validate config structure
+    if (!config) {
+      throw new Error('Configuration is null or undefined');
+    }
+    if (!config.assets || !Array.isArray(config.assets)) {
+      throw new Error('Invalid configuration: missing or invalid assets array');
+    }
+    if (!config.rules || !Array.isArray(config.rules)) {
+      throw new Error('Invalid configuration: missing or invalid rules array');
+    }
 
     // Create asset blocks
     config.assets.forEach((asset, index) => {
@@ -249,7 +262,40 @@ export class ConfigSerializer {
     });
 
     // Create condition and action blocks for each rule
-    config.rules.forEach((rule, index) => {
+    config.rules.forEach((rule: any, index) => {
+      // Handle both old flat format and new nested format
+      let condition, action;
+      
+      // Check if it's the old flat format (from database)
+      if ('condition_type' in rule && !rule.condition) {
+        // Convert old format to new format
+        console.log('[ConfigSerializer] Converting old flat format rule:', rule);
+        condition = {
+          type: rule.condition_type,
+          parameters: {
+            asset: config.assets[0]?.code || 'USDC', // Default to first asset
+            operator: 'gt',
+            threshold: rule.threshold || 0
+          }
+        };
+        action = {
+          type: rule.action,
+          parameters: {
+            targetAllocation: rule.target_allocation
+          }
+        };
+      } else {
+        // New nested format
+        condition = rule.condition;
+        action = rule.action;
+      }
+      
+      // Skip malformed rules
+      if (!condition || !action) {
+        console.warn('[ConfigSerializer] Skipping malformed rule at index', index, rule);
+        return;
+      }
+
       const conditionId = `condition-${nodeIdCounter++}`;
       const actionId = `action-${nodeIdCounter++}`;
 
@@ -257,7 +303,7 @@ export class ConfigSerializer {
       const assetNode = nodes.find((n) => {
         if (n.type !== 'asset') return false;
         const assetIdentifier = n.data.assetType === 'CUSTOM' ? n.data.assetCode : n.data.assetType;
-        return assetIdentifier === rule.condition.parameters.asset;
+        return assetIdentifier === condition?.parameters?.asset;
       });
 
       // Create condition block
@@ -266,9 +312,9 @@ export class ConfigSerializer {
         type: 'condition',
         position: { x: 400, y: 100 + index * 150 },
         data: {
-          conditionType: rule.condition.type,
-          ...rule.condition.parameters,
-          label: rule.condition.type,
+          conditionType: condition?.type || 'custom',
+          ...(condition?.parameters || {}),
+          label: condition?.type || 'custom',
         },
       });
 
@@ -278,9 +324,9 @@ export class ConfigSerializer {
         type: 'action',
         position: { x: 700, y: 100 + index * 150 },
         data: {
-          actionType: rule.action.type,
-          ...rule.action.parameters,
-          label: rule.action.type,
+          actionType: action?.type || 'custom',
+          ...(action?.parameters || {}),
+          label: action?.type || 'custom',
         },
       });
 
