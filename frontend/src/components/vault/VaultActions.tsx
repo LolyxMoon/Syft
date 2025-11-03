@@ -28,32 +28,33 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
     text: string;
   } | null>(null);
 
-  // Fetch user's vault shares
-  useEffect(() => {
-    const fetchUserShares = async () => {
-      if (!address || !vaultId) return;
+  // Function to fetch and update user shares
+  const fetchUserShares = async () => {
+    if (!address || !vaultId) return;
+    
+    setLoadingShares(true);
+    try {
+      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/position/${address}`);
+      const data = await response.json();
       
-      setLoadingShares(true);
-      try {
-        const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-        const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/position/${address}`);
-        const data = await response.json();
-        
-        if (data.success && data.data?.shares) {
-          // Convert from stroops to whole units
-          const sharesNum = parseFloat(data.data.shares) / 10_000_000;
-          setUserShares(sharesNum.toFixed(7));
-        } else {
-          setUserShares('0');
-        }
-      } catch (err) {
-        console.error('[VaultActions] Failed to fetch user shares:', err);
-        setUserShares(null);
-      } finally {
-        setLoadingShares(false);
+      if (data.success && data.data?.shares) {
+        // Convert from stroops to whole units
+        const sharesNum = parseFloat(data.data.shares) / 10_000_000;
+        setUserShares(sharesNum.toFixed(7));
+      } else {
+        setUserShares('0');
       }
-    };
+    } catch (err) {
+      console.error('[VaultActions] Failed to fetch user shares:', err);
+      setUserShares(null);
+    } finally {
+      setLoadingShares(false);
+    }
+  };
 
+  // Fetch user's vault shares on mount and when address/vaultId changes
+  useEffect(() => {
     fetchUserShares();
   }, [address, vaultId]);
 
@@ -250,10 +251,14 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       );
       setAmount('');
       
-      // Refresh wallet balance immediately and again after a delay
+      // Refresh wallet balance and user shares immediately
       await updateBalance();
+      await fetchUserShares();
+      
+      // Refresh again after a delay to ensure blockchain state is updated
       setTimeout(async () => {
         await updateBalance();
+        await fetchUserShares();
       }, 3000);
       
       onActionComplete?.('deposit', submitData.data);
@@ -357,10 +362,14 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       );
       setShares('');
       
-      // Refresh wallet balance immediately and again after a delay
+      // Refresh wallet balance and user shares immediately
       await updateBalance();
+      await fetchUserShares();
+      
+      // Refresh again after a delay to ensure blockchain state is updated
       setTimeout(async () => {
         await updateBalance();
+        await fetchUserShares();
       }, 3000);
       
       onActionComplete?.('withdraw', submitData.data);
