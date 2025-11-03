@@ -699,6 +699,14 @@ router.post('/submit-deployment', async (req: Request, res: Response) => {
       // Continue anyway - we'll store the vault but mark it as needing initialization
     }
 
+    // Log what we're about to store
+    const assetsToStore = (config as any).assetsWithAllocations || config.assets;
+    console.log('[Submit Deploy] Config received:', JSON.stringify(config, null, 2));
+    console.log('[Submit Deploy] assetsWithAllocations:', (config as any).assetsWithAllocations);
+    console.log('[Submit Deploy] config.assets:', config.assets);
+    console.log('[Submit Deploy] Assets to store:', JSON.stringify(assetsToStore, null, 2));
+    console.log('[Submit Deploy] Rules to store:', JSON.stringify(config.rules, null, 2));
+
     await supabase.from('vaults').insert({
       vault_id: vaultId,
       owner_wallet_address: config.owner,
@@ -706,7 +714,8 @@ router.post('/submit-deployment', async (req: Request, res: Response) => {
       name: config.name || 'Untitled Vault',
       description: config.description || 'Deployed vault from visual builder',
       config: {
-        assets: config.assets,
+        // Store full asset objects with allocations if available, otherwise use simple asset codes
+        assets: assetsToStore,
         rules: config.rules,
         isPublic: config.isPublic ?? true,
       },

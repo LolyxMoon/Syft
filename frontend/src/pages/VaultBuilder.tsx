@@ -412,6 +412,8 @@ const VaultBuilder = () => {
       });
 
       console.log(`[VaultBuilder] Transaction signed, submitting...`);
+      console.log(`[VaultBuilder] Backend config being sent:`, JSON.stringify(backendConfig, null, 2));
+      console.log(`[VaultBuilder] assetsWithAllocations:`, backendConfig.assetsWithAllocations);
 
       // Step 3: Submit signed transaction
       const submitResponse = await fetch(`${backendUrl}/api/vaults/submit-deployment`, {
