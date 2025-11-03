@@ -129,6 +129,13 @@ async function generateAndCacheSuggestions(vaultId: string, userPreferences?: an
 
   // Store suggestions in database (only if we have suggestions)
   if (suggestions.length > 0) {
+    // First, delete old suggestions for this vault (keep history clean)
+    await supabase
+      .from('ai_suggestions')
+      .delete()
+      .eq('vault_id', vaultData.id)
+      .eq('status', 'pending'); // Only delete pending suggestions, keep applied/dismissed ones
+    
     const suggestionRecords = suggestions.map(s => ({
       suggestion_id: s.id,
       vault_id: vaultData.id, // Use UUID instead of text vault_id
@@ -142,10 +149,16 @@ async function generateAndCacheSuggestions(vaultId: string, userPreferences?: an
       suggestion_data: s,
       sentiment_data: s.dataSupport?.sentiment || null,
       market_data: s.dataSupport?.forecast || null,
+      status: 'pending',
       created_at: new Date().toISOString(),
     }));
 
-    await supabase.from('ai_suggestions').insert(suggestionRecords);
+    const { error: insertError } = await supabase.from('ai_suggestions').insert(suggestionRecords);
+    if (insertError) {
+      console.error('[Suggestions API] Error storing suggestions in database:', insertError);
+    } else {
+      console.log(`[Suggestions API] Stored ${suggestionRecords.length} suggestions in database`);
+    }
   }
 
   return suggestions;
@@ -225,6 +238,7 @@ router.post('/:vaultId/suggestions', async (req: Request, res: Response) => {
 router.get('/:vaultId/suggestions', async (req: Request, res: Response) => {
   try {
     const { vaultId } = req.params;
+    const maxAgeHours = parseInt(req.query.maxAgeHours as string) || 24; // Default: 24 hours
 
     // Try cache first
     const cached = suggestionCacheService.get(vaultId);
@@ -232,6 +246,7 @@ router.get('/:vaultId/suggestions', async (req: Request, res: Response) => {
       return res.json({
         success: true,
         cached: true,
+        source: 'memory_cache',
         suggestions: cached,
       });
     }
@@ -250,11 +265,13 @@ router.get('/:vaultId/suggestions', async (req: Request, res: Response) => {
       });
     }
 
-    // Fetch from database
+    // Fetch from database only suggestions created within maxAgeHours
+    const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
     const { data: suggestions, error } = await supabase
       .from('ai_suggestions')
       .select('*')
       .eq('vault_id', vaultData.id)
+      .gte('created_at', cutoffTime)
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -264,10 +281,19 @@ router.get('/:vaultId/suggestions', async (req: Request, res: Response) => {
 
     const suggestionData = suggestions?.map(s => s.suggestion_data) || [];
 
+    // If we have recent suggestions, populate cache for next time
+    if (suggestionData.length > 0) {
+      suggestionCacheService.set(vaultId, suggestionData);
+    }
+
     return res.json({
       success: true,
       cached: false,
+      source: suggestionData.length > 0 ? 'database' : 'none',
       suggestions: suggestionData,
+      age: suggestions?.[0]?.created_at ? 
+        Math.floor((Date.now() - new Date(suggestions[0].created_at).getTime()) / 1000 / 60) : 
+        null, // age in minutes
     });
   } catch (error) {
     console.error('Error fetching suggestions:', error);
@@ -298,6 +324,67 @@ router.delete('/:vaultId/suggestions', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to clear suggestions',
+    });
+  }
+});
+
+/**
+ * GET /api/vaults/:vaultId/suggestions/exists
+ * Check if suggestions exist for a vault (lightweight check)
+ */
+router.get('/:vaultId/suggestions/exists', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const maxAgeHours = parseInt(req.query.maxAgeHours as string) || 24;
+
+    // Check cache first
+    const cached = suggestionCacheService.get(vaultId);
+    if (cached && cached.length > 0) {
+      return res.json({
+        success: true,
+        exists: true,
+        source: 'cache',
+        count: cached.length,
+      });
+    }
+
+    // Get the vault UUID
+    const { data: vaultData, error: vaultError } = await supabase
+      .from('vaults')
+      .select('id')
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (vaultError || !vaultData) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vault not found',
+      });
+    }
+
+    // Check database for recent suggestions
+    const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('ai_suggestions')
+      .select('*', { count: 'exact', head: true })
+      .eq('vault_id', vaultData.id)
+      .gte('created_at', cutoffTime);
+
+    if (error) {
+      throw error;
+    }
+
+    return res.json({
+      success: true,
+      exists: (count || 0) > 0,
+      source: 'database',
+      count: count || 0,
+    });
+  } catch (error) {
+    console.error('Error checking suggestions existence:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check suggestions',
     });
   }
 });

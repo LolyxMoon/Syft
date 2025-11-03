@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Skeleton } from '../components/ui';
-import { Lightbulb, Sparkles, AlertCircle, RefreshCw, X, CheckCircle, TrendingUp, Shield, Zap } from 'lucide-react';
+import { Lightbulb, Sparkles, AlertCircle, RefreshCw, X, CheckCircle, TrendingUp, Shield, Zap, Info } from 'lucide-react';
 import { useWallet } from '../providers/WalletProvider';
 import { resolveAssetNames } from '../services/tokenService';
 
@@ -173,29 +173,62 @@ const Suggestions = () => {
     try {
       const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
-      // First try to get cached suggestions (GET endpoint)
-      if (!forceRefresh) {
-        const getResponse = await fetch(`${backendUrl}/api/vaults/${selectedVault}/suggestions`);
+      // Always try to get existing suggestions first (GET endpoint)
+      // This checks memory cache and database (last 24 hours)
+      console.log(`[Frontend] Fetching suggestions for vault: ${selectedVault}`);
+      const getResponse = await fetch(`${backendUrl}/api/vaults/${selectedVault}/suggestions?maxAgeHours=24`);
+      
+      if (getResponse.ok) {
+        const getData = await getResponse.json();
         
-        if (getResponse.ok) {
-          const getData = await getResponse.json();
-          if (getData.success && getData.suggestions?.length > 0) {
-            setSuggestions(getData.suggestions);
-            setLoadingSuggestions(false);
-            return;
+        // If we have suggestions and not forcing refresh, use them
+        if (getData.success && getData.suggestions?.length > 0 && !forceRefresh) {
+          console.log(`[Frontend] Loaded ${getData.suggestions.length} suggestions from ${getData.source}`);
+          setSuggestions(getData.suggestions);
+          
+          // Show age info if from database
+          if (getData.source === 'database' && getData.age !== null) {
+            const ageMinutes = getData.age;
+            const ageHours = Math.floor(ageMinutes / 60);
+            const ageText = ageHours > 0 ? 
+              `${ageHours} hour${ageHours > 1 ? 's' : ''} ago` : 
+              `${ageMinutes} minute${ageMinutes !== 1 ? 's' : ''} ago`;
+            setSuggestionsMessage(`Loaded from cache (generated ${ageText})`);
           }
+          
+          setLoadingSuggestions(false);
+          return;
+        }
+        
+        // If no suggestions found and not forcing refresh, inform user
+        if (getData.success && getData.suggestions?.length === 0 && !forceRefresh) {
+          setSuggestionsMessage('No recent suggestions found. Click "Generate New Suggestions" to create some.');
+          setLoadingSuggestions(false);
+          return;
         }
       }
 
+      // Only generate new suggestions if:
+      // 1. Force refresh is requested, OR
+      // 2. No existing suggestions were found
+      if (!forceRefresh) {
+        // Don't auto-generate, let user click the button
+        setSuggestionsMessage('Click "Generate New Suggestions" to get AI-powered recommendations.');
+        setLoadingSuggestions(false);
+        return;
+      }
+
       // Generate new AI suggestions (POST endpoint) with job queue
-      console.log(`[Frontend] Requesting suggestions for vault: ${selectedVault}`);
+      console.log(`[Frontend] Generating new suggestions for vault: ${selectedVault}`);
+      setSuggestionsMessage('Generating fresh AI suggestions... This may take a minute.');
+      
       const postResponse = await fetch(`${backendUrl}/api/vaults/${selectedVault}/suggestions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          forceRefresh,
+          forceRefresh: true,
           userPreferences: {
             riskTolerance: 'medium',
             timeHorizon: 'medium',
@@ -209,13 +242,13 @@ const Suggestions = () => {
       }
 
       const postData = await postResponse.json();
-      console.log('[Frontend] Received response:', postData);
+      console.log('[Frontend] Received generation response:', postData);
       
       if (postData.success && postData.jobId) {
-        // Show cached suggestions immediately
+        // Show cached suggestions immediately if available
         if (postData.suggestions && postData.suggestions.length > 0) {
           setSuggestions(postData.suggestions);
-          setSuggestionsMessage('Showing cached results. Generating fresh suggestions...');
+          setSuggestionsMessage('Showing previous results while generating fresh suggestions...');
         }
         
         // Poll for job completion
@@ -224,8 +257,11 @@ const Suggestions = () => {
         
         // Update with fresh suggestions
         setSuggestions(result.suggestions || []);
-        setSuggestionsMessage(null);
+        setSuggestionsMessage('Fresh suggestions generated successfully!');
         console.log(`[Frontend] Received ${result.suggestions?.length || 0} fresh suggestions`);
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuggestionsMessage(null), 3000);
         
       } else {
         throw new Error(postData.error || 'Failed to generate suggestions');
@@ -621,11 +657,23 @@ const Suggestions = () => {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        Get New Suggestions
+                        Generate New
                       </>
                     )}
                   </Button>
                 </div>
+
+                {/* Status Message Banner */}
+                {suggestionsMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg flex items-start gap-3"
+                  >
+                    <Info className="w-5 h-5 text-primary-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-neutral-200">{suggestionsMessage}</p>
+                  </motion.div>
+                )}
 
                 {loadingSuggestions ? (
                   <div className="text-center py-12">
