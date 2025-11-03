@@ -418,7 +418,7 @@ const Home = () => {
                   </filter>
                   {/* Simplified filter for mobile */}
                   <filter id="glow-simple">
-                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                    <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
                     <feMerge>
                       <feMergeNode in="SourceGraphic"/>
                     </feMerge>
@@ -432,24 +432,24 @@ const Home = () => {
                 <circle cx="630" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 0.8s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
                 <circle cx="750" cy="30" r="5" fill="#dce85d" filter="url(#glow)" style={{ animation: 'pulse-glow 2s ease-in-out infinite 1s', willChange: 'opacity' }} className="md:filter-[url(#glow)] filter-[url(#glow-simple)]"></circle>
 
-                {/* Render fewer animated paths on mobile for performance */}
-                <path d="M450 300 C 450 200, 300 120, 150 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: isMobile ? '0' : '600' }} opacity="0.6">
-                  {!isMobile && <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="0s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
+                {/* Optimized animated paths - faster duration and simpler easing on mobile */}
+                <path d="M450 300 C 450 200, 300 120, 150 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: '600' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="600;0;600" dur={isMobile ? "4s" : "3s"} begin="0s" repeatCount="indefinite" calcMode={isMobile ? "linear" : "spline"} keySplines={isMobile ? undefined : "0.42 0 0.58 1; 0.42 0 0.58 1"} />
                 </path>
-                <path d="M450 300 C 450 210, 360 130, 270 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: isMobile ? '0' : '520' }} opacity="0.6">
-                  {!isMobile && <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
+                <path d="M450 300 C 450 210, 360 130, 270 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: '520' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="520;0;520" dur={isMobile ? "4s" : "3s"} begin="0.2s" repeatCount="indefinite" calcMode={isMobile ? "linear" : "spline"} keySplines={isMobile ? undefined : "0.42 0 0.58 1; 0.42 0 0.58 1"} />
                 </path>
-                <path d="M450 300 C 450 150, 420 80, 390 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: isMobile ? '0' : '450' }} opacity="0.6">
-                  {!isMobile && <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
+                <path d="M450 300 C 450 150, 420 80, 390 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: '450' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="450;0;450" dur={isMobile ? "4s" : "3s"} begin="0.4s" repeatCount="indefinite" calcMode={isMobile ? "linear" : "spline"} keySplines={isMobile ? undefined : "0.42 0 0.58 1; 0.42 0 0.58 1"} />
                 </path>
-                <path d="M450 300 C 450 150, 480 80, 510 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: isMobile ? '0' : '450' }} opacity="0.6">
-                  {!isMobile && <animate attributeName="stroke-dashoffset" values="450;0;450" dur="3s" begin="0.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
+                <path d="M450 300 C 450 150, 480 80, 510 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '450', strokeDashoffset: '450' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="450;0;450" dur={isMobile ? "4s" : "3s"} begin="0.6s" repeatCount="indefinite" calcMode={isMobile ? "linear" : "spline"} keySplines={isMobile ? undefined : "0.42 0 0.58 1; 0.42 0 0.58 1"} />
                 </path>
-                <path d="M450 300 C 450 210, 540 130, 630 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: isMobile ? '0' : '520' }} opacity="0.6">
-                  {!isMobile && <animate attributeName="stroke-dashoffset" values="520;0;520" dur="3s" begin="0.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
+                <path d="M450 300 C 450 210, 540 130, 630 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '520', strokeDashoffset: '520' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="520;0;520" dur={isMobile ? "4s" : "3s"} begin="0.8s" repeatCount="indefinite" calcMode={isMobile ? "linear" : "spline"} keySplines={isMobile ? undefined : "0.42 0 0.58 1; 0.42 0 0.58 1"} />
                 </path>
-                <path d="M450 300 C 450 200, 600 120, 750 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: isMobile ? '0' : '600' }} opacity="0.6">
-                  {!isMobile && <animate attributeName="stroke-dashoffset" values="600;0;600" dur="3s" begin="1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />}
+                <path d="M450 300 C 450 200, 600 120, 750 30" stroke="#dce85d" strokeWidth="2" strokeLinecap="round" fill="none" style={{ strokeDasharray: '600', strokeDashoffset: '600' }} opacity="0.6">
+                  <animate attributeName="stroke-dashoffset" values="600;0;600" dur={isMobile ? "4s" : "3s"} begin="1s" repeatCount="indefinite" calcMode={isMobile ? "linear" : "spline"} keySplines={isMobile ? undefined : "0.42 0 0.58 1; 0.42 0 0.58 1"} />
                 </path>
               </svg>
 
