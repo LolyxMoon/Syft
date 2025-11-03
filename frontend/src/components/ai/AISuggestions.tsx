@@ -47,7 +47,7 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
 
   // Helper function to poll for job status
   const pollJobStatus = async (jobId: string): Promise<any> => {
-    const maxAttempts = 60; // Poll for up to 60 seconds
+    const maxAttempts = 120; // Poll for up to 60 seconds
     const pollInterval = 1000; // Poll every 1 second
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
