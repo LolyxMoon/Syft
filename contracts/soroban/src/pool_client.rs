@@ -273,10 +273,10 @@ pub fn get_pool_for_pair(
     
     let factory_client = FactoryClient::new(env, factory_address);
     
-    // Call get_pair which returns Result<Address, FactoryError>
-    match factory_client.try_get_pair(&token_a.clone(), &token_b.clone()) {
-        Ok(Ok(pool_address)) => Ok(pool_address),
-        Ok(Err(_)) => Err(VaultError::InvalidConfiguration), // Factory returned an error (e.g., pair doesn't exist)
-        Err(_) => Err(VaultError::InvalidConfiguration), // Contract invocation failed
-    }
+    // Call get_pair - the Result is handled at the contract invocation level
+    // If the factory returns an error, the whole contract call will panic/fail
+    // We don't need to handle the Result ourselves
+    let pool_address = factory_client.get_pair(&token_a.clone(), &token_b.clone());
+    
+    Ok(pool_address)
 }
