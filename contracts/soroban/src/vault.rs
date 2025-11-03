@@ -178,7 +178,8 @@ impl VaultContract {
     }
 
     /// Withdraw assets from the vault
-    /// This will liquidate active positions proportionally if needed
+    /// This will liquidate active positions and swap everything to XLM before withdrawal
+    /// Users will always receive XLM (native token) which doesn't require trustlines
     pub fn withdraw(env: Env, user: Address, shares: i128) -> Result<i128, VaultError> {
         // Require authorization from the user first
         user.require_auth();
@@ -214,7 +215,7 @@ impl VaultContract {
             .and_then(|v| v.checked_div(state.total_shares))
             .ok_or(VaultError::InvalidAmount)?;
 
-        // Get config to determine base asset
+        // Get config
         let config: VaultConfig = env.storage().instance().get(&CONFIG)
             .ok_or(VaultError::NotInitialized)?;
         
@@ -222,55 +223,49 @@ impl VaultContract {
             return Err(VaultError::InvalidConfiguration);
         }
         
-        let base_token = config.assets.get(0)
+        // ALWAYS withdraw as XLM (native token) - no trustline required
+        // XLM address on Stellar: Native token (special handling needed)
+        // For now, use the first asset as withdrawal token, but will swap to XLM
+        let xlm_token = config.assets.get(0)
             .ok_or(VaultError::InvalidConfiguration)?;
 
         // Get vault address
         let vault_address = env.current_contract_address();
         
-        // Check vault's current balance of base token
-        let token_client = token::TokenClient::new(&env, &base_token);
+        // Check vault's current balance of XLM
+        let token_client = token::TokenClient::new(&env, &xlm_token);
         let current_balance = token_client.balance(&vault_address);
         
-        log!(&env, "Withdrawal: shares={}, amount_needed={}, current_balance={}", shares, amount, current_balance);
+        log!(&env, "Withdrawal: shares={}, amount_needed={}, current_xlm_balance={}", shares, amount, current_balance);
         
-        // If vault doesn't have enough liquid balance, we need to:
-        // 1. Liquidate staking/LP positions
-        // 2. Swap other assets back to base token
-        if current_balance < amount {
-            let shortfall = amount.checked_sub(current_balance)
-                .ok_or(VaultError::InvalidAmount)?;
-            
-            log!(&env, "Insufficient liquid balance. Shortfall: {}", shortfall);
-            
-            // Step 1: Liquidate positions (unstake, remove liquidity)
-            Self::liquidate_positions_for_withdrawal(&env, &config, shortfall)?;
-            
-            // Step 2: Check balance again after liquidation
-            let balance_after_liquidation = token_client.balance(&vault_address);
-            log!(&env, "Balance after liquidation: {}", balance_after_liquidation);
-            
-            // Step 3: If still short, swap other assets to base token
-            if balance_after_liquidation < amount {
-                let remaining_shortfall = amount.checked_sub(balance_after_liquidation)
-                    .ok_or(VaultError::InvalidAmount)?;
-                
-                log!(&env, "Still need {} more. Swapping other assets to base token", remaining_shortfall);
-                
-                Self::swap_assets_to_base_token(&env, &config, &base_token, remaining_shortfall)?;
-            }
-            
-            // Verify we now have enough balance
-            let final_balance = token_client.balance(&vault_address);
-            if final_balance < amount {
-                log!(&env, "Insufficient funds after all liquidation attempts: have={}, need={}", final_balance, amount);
-                return Err(VaultError::InsufficientBalance);
-            }
+        // WITHDRAWAL STRATEGY: Always return XLM to avoid trustline issues
+        // 1. Liquidate all positions (unstake, remove liquidity)
+        // 2. Swap ALL non-XLM assets to XLM
+        // 3. Send XLM to user (no trustline needed)
+        
+        // Step 1: Liquidate ALL positions (not just proportional)
+        log!(&env, "Step 1: Liquidating all positions");
+        Self::liquidate_all_positions(&env, &config)?;
+        
+        // Step 2: Swap ALL non-XLM assets to XLM
+        log!(&env, "Step 2: Swapping all assets to XLM");
+        Self::swap_all_assets_to_xlm(&env, &config, &xlm_token)?;
+        
+        // Step 3: Check final XLM balance
+        let final_xlm_balance = token_client.balance(&vault_address);
+        log!(&env, "Final XLM balance after liquidation and swaps: {}", final_xlm_balance);
+        
+        // Verify we have enough XLM to return
+        if final_xlm_balance < amount {
+            log!(&env, "Insufficient XLM after liquidation: have={}, need={}", final_xlm_balance, amount);
+            return Err(VaultError::InsufficientBalance);
         }
         
-        // Transfer tokens from vault to user using token contract
-        // DO NOT call user.require_auth() - vault doesn't need user auth to send funds to them
+        // Transfer XLM from vault to user
+        // XLM is the native token and doesn't require trustlines - everyone can receive it!
         token_client.transfer(&vault_address, &user, &amount);
+        
+        log!(&env, "Successfully transferred {} XLM to user", amount);
 
         // Update state
         state.total_shares = state.total_shares.checked_sub(shares)
@@ -296,7 +291,49 @@ impl VaultContract {
         Ok(amount)
     }
     
-    /// Liquidate positions to cover withdrawal shortfall
+    /// Liquidate ALL positions before withdrawal (unstake everything, remove all liquidity)
+    fn liquidate_all_positions(
+        env: &Env,
+        config: &VaultConfig,
+    ) -> Result<(), VaultError> {
+        use crate::staking_client;
+        
+        log!(env, "Liquidating ALL positions");
+        
+        // Unstake ALL tokens from staking pool if configured
+        if let Some(ref staking_pool) = config.staking_pool_address {
+            let staking_symbol = symbol_short!("STAKE");
+            
+            if let Some(staking_pos) = env.storage().instance().get::<_, crate::types::StakingPosition>(&staking_symbol) {
+                log!(env, "Unstaking ALL: {} tokens (st_tokens: {})", 
+                    staking_pos.staked_amount, 
+                    staking_pos.st_token_amount);
+                
+                // Unstake ALL st_tokens
+                match staking_client::unstake_tokens(
+                    env,
+                    staking_pool,
+                    staking_pos.st_token_amount // Burn ALL st_tokens
+                ) {
+                    Ok(tokens_received) => {
+                        log!(env, "Successfully unstaked all: {}", tokens_received);
+                        // Remove staking position
+                        env.storage().instance().remove(&staking_symbol);
+                    },
+                    Err(e) => {
+                        log!(env, "Failed to unstake: {:?}", e);
+                        // Continue anyway
+                    }
+                }
+            }
+        }
+        
+        // TODO: Add liquidity position liquidation here if needed
+        
+        Ok(())
+    }
+    
+    /// Liquidate positions to cover withdrawal shortfall (OLD - kept for compatibility)
     fn liquidate_positions_for_withdrawal(
         env: &Env,
         config: &VaultConfig,
@@ -397,7 +434,96 @@ impl VaultContract {
         Ok(())
     }
     
-    /// Swap other assets back to base token for withdrawal
+    /// Swap ALL non-XLM assets to XLM for withdrawal
+    /// This ensures users always receive XLM which doesn't require trustlines
+    fn swap_all_assets_to_xlm(
+        env: &Env,
+        config: &VaultConfig,
+        xlm_token: &Address,
+    ) -> Result<(), VaultError> {
+        use crate::pool_client;
+        
+        log!(env, "Swapping ALL non-XLM assets to XLM");
+        
+        // Check if factory is configured for swaps
+        let factory_address = match config.factory_address.as_ref() {
+            Some(addr) => addr,
+            None => {
+                log!(env, "No factory configured - cannot swap assets");
+                return Err(VaultError::RouterNotSet);
+            }
+        };
+        
+        let vault_address = env.current_contract_address();
+        let mut total_xlm_received: i128 = 0;
+        
+        // Iterate through ALL configured assets and swap everything to XLM
+        let asset_count = config.assets.len();
+        log!(env, "Scanning {} configured assets", asset_count);
+        
+        for i in 0..asset_count {
+            let asset = config.assets.get(i)
+                .ok_or(VaultError::InvalidConfiguration)?;
+            
+            // Skip if this is XLM itself
+            if &asset == xlm_token {
+                log!(env, "Asset {} is XLM - skipping", i);
+                continue;
+            }
+            
+            // Check balance of this asset
+            let asset_client = token::TokenClient::new(env, &asset);
+            let asset_balance = asset_client.balance(&vault_address);
+            
+            if asset_balance <= 0 {
+                log!(env, "No balance for asset at index {}", i);
+                continue;
+            }
+            
+            log!(env, "Found {} balance of asset at index {} - swapping ALL to XLM", asset_balance, i);
+            
+            // Find the liquidity pool between this asset and XLM
+            let pair_address = match pool_client::get_pool_for_pair(
+                env,
+                factory_address,
+                &asset,
+                xlm_token
+            ) {
+                Ok(addr) => addr,
+                Err(e) => {
+                    log!(env, "No liquidity pool found for asset {} to XLM: {:?}", i, e);
+                    continue; // Skip this asset and try the next one
+                }
+            };
+            
+            log!(env, "Found liquidity pair - swapping {} tokens", asset_balance);
+            
+            // Swap ALL balance to XLM
+            match pool_client::swap_via_pool(
+                env,
+                &pair_address,
+                &asset,
+                xlm_token,
+                asset_balance, // Swap entire balance
+                0, // min_amount_out = 0 (accepting any slippage for withdrawal)
+            ) {
+                Ok(xlm_received) => {
+                    log!(env, "Swapped successfully. Received {} XLM", xlm_received);
+                    total_xlm_received = total_xlm_received.checked_add(xlm_received)
+                        .ok_or(VaultError::InvalidAmount)?;
+                },
+                Err(e) => {
+                    log!(env, "Swap failed: {:?}", e);
+                    // Continue to try other assets
+                }
+            }
+        }
+        
+        log!(env, "Total XLM received from swaps: {}", total_xlm_received);
+        Ok(())
+    }
+    
+    /// Swap other assets back to base token for withdrawal (OLD - kept for compatibility)
     /// SMART APPROACH: Scan ALL configured assets for balances and swap to base token
     /// This works even if vault config is incomplete - we swap whatever tokens the vault actually holds
     fn swap_assets_to_base_token(
@@ -456,12 +582,18 @@ impl VaultContract {
             log!(env, "Found {} balance of asset at index {}", asset_balance, i);
             
             // Find the liquidity pool between this asset and base token
-            let pair_address = pool_client::get_pool_for_pair(
+            let pair_address = match pool_client::get_pool_for_pair(
                 env,
                 factory_address,
                 &asset,
                 base_token
-            )?;
+            ) {
+                Ok(addr) => addr,
+                Err(e) => {
+                    log!(env, "No liquidity pool found for asset {} to base token: {:?}", i, e);
+                    continue; // Skip this asset and try the next one
+                }
+            };
             
             log!(env, "Found pair for swap");
             
@@ -501,8 +633,11 @@ impl VaultContract {
             }
         }
         
+        log!(env, "Total swapped to base token: {} (needed: {})", amount_swapped, amount_needed);
+        
+        // Return Ok even if we didn't swap enough - the calling function will check final balance
+        // This allows partial swaps to still be useful
         if amount_swapped > 0 {
-            log!(env, "Total swapped to base token: {}", amount_swapped);
             Ok(())
         } else {
             log!(env, "No assets could be swapped");

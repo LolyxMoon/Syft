@@ -22,4 +22,5 @@ pub enum VaultError {
     PoolNotFound = 15,
     InsufficientLiquidity = 16,
     RouterNotSet = 17,
+    TrustlineRequired = 18,
 }

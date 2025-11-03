@@ -107,9 +107,8 @@ pub fn swap_via_pool(
         (amount_out, 0)  // Swapping token1 -> token0
     };
     
-    // Authorize the swap operation as the current contract
-    // This is needed for the pool to send tokens back to us
-    env.authorize_as_current_contract(soroban_sdk::vec![env]);
+    // Note: No authorization needed here - the vault has already transferred tokens to the pool
+    // The pool will send tokens back to the vault address specified in the swap call
     
     // Call swap on the pool to get our tokens back to vault
     pool_client.swap(
@@ -273,10 +272,11 @@ pub fn get_pool_for_pair(
     
     let factory_client = FactoryClient::new(env, factory_address);
     
-    // Call get_pair - the Result is handled at the contract invocation level
-    // If the factory returns an error, the whole contract call will panic/fail
-    // We don't need to handle the Result ourselves
-    let pool_address = factory_client.get_pair(&token_a.clone(), &token_b.clone());
+    // Call get_pair - in Soroban, when the contract returns a Result,
+    // the client call will panic if it's an Err
+    // We return the result directly since we can't catch panics in Soroban
+    // The calling code should handle missing pairs gracefully
+    let pool_address = factory_client.get_pair(token_a, token_b);
     
     Ok(pool_address)
 }
