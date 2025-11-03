@@ -69,9 +69,9 @@ function getProtocolRegistry(): ProtocolInfo[] {
       type: 'dex',
       networks: ['testnet', 'futurenet', 'mainnet'],
       contractAddress: {
-        testnet: process.env.PUBLIC_SOROSWAP_ROUTER_TESTNET || '',
+        testnet: 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS',
         futurenet: process.env.PUBLIC_SOROSWAP_ROUTER_FUTURENET || '',
-        mainnet: process.env.PUBLIC_SOROSWAP_ROUTER_MAINNET || '',
+        mainnet: 'CAG5LRYQ5JVEUI5TEID72EYOVX44TTUJT5BQR2J6J77FH65PCCFAJDDH',
       },
       website: 'https://soroswap.finance',
       docs: 'https://docs.soroswap.finance',
@@ -83,9 +83,9 @@ function getProtocolRegistry(): ProtocolInfo[] {
       type: 'liquidity',
       networks: ['testnet', 'futurenet', 'mainnet'],
       contractAddress: {
-        testnet: process.env.PUBLIC_SOROSWAP_ROUTER_TESTNET || '',
+        testnet: 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS',
         futurenet: process.env.PUBLIC_SOROSWAP_ROUTER_FUTURENET || '',
-        mainnet: process.env.PUBLIC_SOROSWAP_ROUTER_MAINNET || '',
+        mainnet: 'CAG5LRYQ5JVEUI5TEID72EYOVX44TTUJT5BQR2J6J77FH65PCCFAJDDH',
       },
       website: 'https://soroswap.finance',
       docs: 'https://docs.soroswap.finance',
@@ -115,19 +115,17 @@ function getProtocolRegistry(): ProtocolInfo[] {
       website: 'https://phoenix-hub.io',
     },
     {
-      id: 'script3',
-      name: 'Script3',
-      description: 'Liquid staking protocol',
+      id: 'stellarStake',
+      name: 'StellarStake',
+      description: 'Native XLM liquid staking protocol',
       type: 'staking',
-      networks: ['testnet', 'mainnet'],
-      website: 'https://script3.io',
-    },
-    {
-      id: 'comet',
-      name: 'Comet',
-      description: 'Yield optimization protocol',
-      type: 'staking',
-      networks: ['testnet', 'mainnet'],
+      networks: ['testnet'],
+      contractAddress: {
+        testnet: 'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK',
+        futurenet: '',
+        mainnet: '',
+      },
+      website: 'https://stellar.expert/explorer/testnet/contract/CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK',
     },
   ];
 }

@@ -33,10 +33,10 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
       if (actionType === 'stake') {
         const protocols = await getProtocolsByType('staking', network as any);
         setAvailableProtocols(protocols);
-        // Set Script3 as default protocol for staking
+        // Set StellarStake as default protocol for staking on testnet
         if (!localProtocol && protocols.length > 0) {
-          const script3 = protocols.find(p => p.name === 'Script3') || protocols[0];
-          const defaultProtocol = script3.name;
+          const stellarStake = protocols.find(p => p.id === 'stellarStake') || protocols[0];
+          const defaultProtocol = stellarStake.name;
           setLocalProtocol(defaultProtocol);
           updateNodeData(id, { protocol: defaultProtocol });
         }
