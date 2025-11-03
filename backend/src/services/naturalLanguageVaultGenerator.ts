@@ -35,6 +35,7 @@ export interface VaultGenerationRequest {
     summary?: string;
   };
   network?: string;
+  forceVaultGeneration?: boolean; // When true (VAPI function call), MUST generate vault, not chat
 }
 
 export interface VaultGenerationResponse {
@@ -545,7 +546,7 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
    * Generate vault configuration from natural language
    */
   async generateVault(request: VaultGenerationRequest): Promise<VaultGenerationResponse> {
-    const { userPrompt, conversationHistory = [], currentVault } = request;
+    const { userPrompt, conversationHistory = [], currentVault, forceVaultGeneration = false } = request;
 
     console.log('[NLVaultGenerator] Processing prompt:', userPrompt);
     if (currentVault && currentVault.nodes.length > 0) {
@@ -562,6 +563,14 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
         content: this.SYSTEM_PROMPT,
       },
     ];
+
+    // If this is a forced vault generation (from VAPI function call), add strict instruction
+    if (forceVaultGeneration) {
+      messages.push({
+        role: 'system',
+        content: `CRITICAL OVERRIDE: This request came from a Voice Assistant function call. You MUST respond with type "build" and generate a complete vault configuration with nodes and edges. DO NOT respond with type "chat". The user has explicitly requested vault generation through the voice interface. Build the best vault you can based on their description, even if the description is vague - use reasonable defaults and create a working vault.`,
+      });
+    }
 
     // Add current vault context if exists
     if (currentVault && currentVault.nodes.length > 0) {

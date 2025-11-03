@@ -64,15 +64,20 @@ router.post('/generate-vault', async (req, res) => {
 
     console.log('[NL API] Validated params - prompt:', prompt);
 
+    // Check if this is a VAPI function call (not direct chat)
+    const isVAPIFunctionCall = req.body.message?.toolCalls?.[0];
+
     // Import and use the same vault generator service that AI Chat uses
     const { naturalLanguageVaultGenerator } = await import('../services/naturalLanguageVaultGenerator.js');
     
     // Generate vault using the proven AI Chat method
-    // This intelligently handles: build, modify, explain, chat, etc.
+    // When called via VAPI function, MUST generate vault (not just chat)
+    // When called via AI Chat tab, can be conversational
     const result = await naturalLanguageVaultGenerator.generateVault({
       userPrompt: prompt,
       conversationHistory: conversationContext || [],
       network: 'testnet',
+      forceVaultGeneration: !!isVAPIFunctionCall, // Force vault generation for voice function calls
     });
 
     console.log('[NL API] Generated response:', {
