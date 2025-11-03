@@ -162,38 +162,88 @@ WHEN TO SEARCH THE WEB:
 - You need real-time data to provide accurate advice
 - Use the search_web function when needed
 
-RESPONSE FORMAT:
-⚠️ CRITICAL: Your response MUST be valid JSON ONLY. No text before or after the JSON object.
+RESPONSE FORMAT - CRITICAL INSTRUCTIONS:
 
-When just chatting, respond with:
+⚠️ EXTREMELY IMPORTANT: Your response MUST be ONLY valid JSON. No text before or after. No comments. No markdown. Just pure JSON.
+
+✅ CORRECT - Chat response:
 {
   "type": "chat",
-  "message": "<your conversational response>",
-  "suggestions": ["<optional suggestion 1>", "<optional suggestion 2>"]
+  "message": "I'd be happy to help you create a vault! What kind of risk level are you comfortable with - low, medium, or high risk?",
+  "suggestions": ["Create a conservative stablecoin vault", "Build a balanced portfolio", "Show me a high-yield strategy"]
 }
 
-When building a vault, respond with:
+✅ CORRECT - Build response:
 {
   "type": "build",
-  "nodes": [...],
-  "edges": [...],
-  "explanation": "<explanation of the vault>",
-  "suggestions": ["<optional suggestion 1>", "<optional suggestion 2>"]
+  "nodes": [
+    {
+      "id": "asset-0",
+      "type": "asset",
+      "position": {"x": 100, "y": 100},
+      "data": {
+        "assetType": "XLM",
+        "assetCode": "XLM",
+        "allocation": 60,
+        "label": "XLM"
+      }
+    },
+    {
+      "id": "asset-1",
+      "type": "asset",
+      "position": {"x": 100, "y": 250},
+      "data": {
+        "assetType": "USDC",
+        "assetCode": "USDC",
+        "allocation": 40,
+        "label": "USDC"
+      }
+    },
+    {
+      "id": "condition-0",
+      "type": "condition",
+      "position": {"x": 500, "y": 175},
+      "data": {
+        "conditionType": "time_based",
+        "timeUnit": "days",
+        "timeValue": 7,
+        "label": "Every 7 days",
+        "description": "Rebalance weekly"
+      }
+    },
+    {
+      "id": "action-0",
+      "type": "action",
+      "position": {"x": 900, "y": 175},
+      "data": {
+        "actionType": "rebalance",
+        "label": "Rebalance Portfolio",
+        "description": "Rebalance to target allocations"
+      }
+    }
+  ],
+  "edges": [
+    {"id": "edge-0", "source": "asset-0", "target": "condition-0", "animated": true},
+    {"id": "edge-1", "source": "asset-1", "target": "condition-0", "animated": true},
+    {"id": "edge-2", "source": "condition-0", "target": "action-0", "animated": true}
+  ],
+  "explanation": "This vault holds 60% XLM and 40% USDC, rebalancing weekly to maintain target allocations.",
+  "suggestions": ["Add price-change condition for reactive rebalancing", "Consider staking XLM for additional yield"]
 }
 
-❌ WRONG (don't add text outside JSON):
-Here's the vault configuration:
-{
-  "type": "build",
-  ...
-}
-This vault will help you achieve your goals.
+❌ WRONG - Text before JSON:
+Adding text like "Here is your vault:" before the JSON object
 
-✅ CORRECT (pure JSON only):
-{
-  "type": "build",
-  ...
-}
+❌ WRONG - Text after JSON:
+Adding text like "Hope this helps!" after the JSON object
+
+❌ WRONG - Comments in JSON:
+Adding comments inside the JSON structure
+
+❌ WRONG - Markdown code blocks:
+Wrapping JSON in markdown code fences
+
+REMEMBER: Start your response with { and end with }. Nothing else. The entire response must be parseable by JSON.parse().
 
 VAULT STRUCTURE (when building):
 
@@ -615,16 +665,7 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
       const content = finalResponse.content || '{}';
       console.log('[NLVaultGenerator] OpenAI response received, length:', content.length);
       
-      // Parse JSON - the AI should return pure JSON due to response_format: json_object
-      // No aggressive extraction needed since we enforce JSON mode
-      let parsed;
-      try {
-        parsed = JSON.parse(content);
-      } catch (parseError) {
-        console.error('[NLVaultGenerator] Failed to parse JSON:', parseError);
-        console.error('[NLVaultGenerator] Raw content:', content.substring(0, 1000));
-        throw new Error(`Failed to parse AI response as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
-      }
+      const parsed = JSON.parse(content);
 
       // Check response type
       if (parsed.type === 'chat') {
