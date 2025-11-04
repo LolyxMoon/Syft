@@ -61,6 +61,13 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
     title?: string;
   }>({ isOpen: false, message: '', variant: 'info' });
 
+  // Progress modal state
+  const [progressModal, setProgressModal] = useState<{
+    isOpen: boolean;
+    step: 'deployment' | 'router' | 'complete';
+    message: string;
+  }>({ isOpen: false, step: 'deployment', message: '' });
+
   // Filters
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -156,6 +163,13 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
     try {
       setSubscribing(listing.listing_id);
 
+      // Show progress modal
+      setProgressModal({
+        isOpen: true,
+        step: 'deployment',
+        message: 'Preparing vault deployment transaction...',
+      });
+
       // Backend URL (local fallback)
       const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
@@ -182,6 +196,13 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
       
       console.log(`[Subscribe] Got deployment data - vaultId:`, newVaultId);
       console.log(`[Subscribe] Cloned config:`, clonedConfig);
+
+      // Update progress
+      setProgressModal({
+        isOpen: true,
+        step: 'deployment',
+        message: 'Please sign the vault deployment transaction in your wallet...',
+      });
 
       console.log(`[Subscribe] Received XDR from backend (first 100 chars):`, deploymentXdr.substring(0, 100));
       console.log(`[Subscribe] XDR length:`, deploymentXdr.length);
@@ -238,6 +259,13 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
 
       console.log(`[Subscribe] ✅ Vault deployed! Contract: ${contractAddress}`);
 
+      // Update progress
+      setProgressModal({
+        isOpen: true,
+        step: 'router',
+        message: 'Vault deployed! Setting up auto-swap router...',
+      });
+
       // Set up router for auto-swap functionality (critical for multi-asset vaults)
       try {
         console.log(`[Subscribe] Setting up router for auto-swap...`);
@@ -256,6 +284,13 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
 
         if (routerBuildData.success) {
           console.log(`[Subscribe] Router transaction built, requesting wallet signature...`);
+
+          // Update progress
+          setProgressModal({
+            isOpen: true,
+            step: 'router',
+            message: 'Please sign the router setup transaction in your wallet...',
+          });
 
           // Sign router transaction
           const routerSignResult = await signTransaction(routerBuildData.data.xdr);
@@ -294,6 +329,13 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
         addNotification('Vault deployed but router setup failed. Auto-swap may not work.', 'warning');
       }
 
+      // Update progress
+      setProgressModal({
+        isOpen: true,
+        step: 'complete',
+        message: 'Finalizing subscription...',
+      });
+
       // Complete subscription
       await fetch(`${backendUrl}/api/marketplace/subscribe/complete`, {
         method: 'POST',
@@ -306,11 +348,29 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
         }),
       });
 
+      // Close progress modal
+      setProgressModal({
+        isOpen: false,
+        step: 'complete',
+        message: '',
+      });
+
       addNotification(`Successfully subscribed! You're sharing ${profitSharePercentage}% of profits with the creator.`, 'success');
-      navigate(`/app/vaults/${vaultId}`);
+      
+      // Small delay to ensure notification is visible before navigation
+      setTimeout(() => {
+        navigate(`/app/vaults/${vaultId}`);
+      }, 500);
     } catch (error) {
       console.error('Subscription error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to subscribe';
+      
+      // Close progress modal on error
+      setProgressModal({
+        isOpen: false,
+        step: 'deployment',
+        message: '',
+      });
       
       // Check if it's an account not funded error
       if (errorMessage.includes('Wallet account not found') || errorMessage.includes('Not Found')) {
@@ -503,7 +563,10 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
                     <Button 
                       variant="primary" 
                       size="sm"
-                      onClick={() => handleSubscribe(listing)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent card click
+                        handleSubscribe(listing);
+                      }}
                       disabled={subscribing === listing.listing_id}
                     >
                       {subscribing === listing.listing_id ? 'Subscribing...' : 'Subscribe'}
@@ -527,6 +590,68 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
           </motion.div>
         ))}
       </div>
+
+      {/* Progress Modal */}
+      {progressModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="max-w-md w-full bg-card border border-default p-6">
+            <div className="text-center">
+              <div className="mb-4">
+                {/* Animated spinner */}
+                <div className="relative w-16 h-16 mx-auto">
+                  <div className="absolute inset-0 border-4 border-primary-500/30 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-transparent border-t-primary-500 rounded-full animate-spin"></div>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-bold text-neutral-50 mb-2">
+                {progressModal.step === 'deployment' && 'Deploying Vault'}
+                {progressModal.step === 'router' && 'Setting Up Router'}
+                {progressModal.step === 'complete' && 'Completing Subscription'}
+              </h3>
+              
+              <p className="text-neutral-400 mb-6">{progressModal.message}</p>
+
+              {/* Progress steps */}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <div className={`w-3 h-3 rounded-full ${
+                  progressModal.step === 'deployment' 
+                    ? 'bg-primary-500 animate-pulse' 
+                    : 'bg-success-500'
+                }`} />
+                <div className={`w-8 h-0.5 ${
+                  progressModal.step !== 'deployment' ? 'bg-success-500' : 'bg-neutral-700'
+                }`} />
+                <div className={`w-3 h-3 rounded-full ${
+                  progressModal.step === 'router' 
+                    ? 'bg-primary-500 animate-pulse' 
+                    : progressModal.step === 'complete'
+                    ? 'bg-success-500'
+                    : 'bg-neutral-700'
+                }`} />
+                <div className={`w-8 h-0.5 ${
+                  progressModal.step === 'complete' ? 'bg-success-500' : 'bg-neutral-700'
+                }`} />
+                <div className={`w-3 h-3 rounded-full ${
+                  progressModal.step === 'complete' 
+                    ? 'bg-primary-500 animate-pulse' 
+                    : 'bg-neutral-700'
+                }`} />
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-neutral-500">
+                <span>Deploy</span>
+                <span>Router</span>
+                <span>Complete</span>
+              </div>
+
+              <p className="text-xs text-neutral-500 mt-6">
+                Please do not close this window or refresh the page
+              </p>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Alert Modal */}
       <AlertModal
