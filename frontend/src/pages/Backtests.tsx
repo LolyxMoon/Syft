@@ -398,19 +398,15 @@ const Backtests = () => {
             // BACKWARD COMPATIBILITY: Detect old-style "absolute threshold" format
             // Old format: threshold=80 with target=70 meant "rebalance at 80%" (deviation was implicit)
             // New format: threshold=5 means "rebalance at ±5% deviation"
-            // Heuristic: If threshold > 20%, it's likely old format
+            // Heuristic: If threshold > 20%, it's likely old format → convert to industry standard 5%
             if (thresholdValue > 20) {
-              // Calculate target allocation from target_allocation array
-              const targetAllocation = rule.target_allocation && Array.isArray(rule.target_allocation) 
-                ? (rule.target_allocation[0] / 10000) // First asset percentage from basis points
-                : 50; // Default 50-50 split
+              const oldThreshold = thresholdValue;
+              thresholdValue = 5; // Industry standard (Vanguard, Fidelity best practice)
               
-              // Convert old absolute threshold to deviation
-              // Example: target=70%, threshold=80% → deviation=10%
-              thresholdValue = Math.abs(thresholdValue - targetAllocation);
-              
-              console.log(`[Backtests] Converted old threshold format: ${rule.threshold}% → ±${thresholdValue}% deviation (target: ${targetAllocation}%)`);
+              console.log(`[Backtests] ⚠️  CONVERTING old threshold: ${oldThreshold}% → ±${thresholdValue}% deviation (industry standard)`);
             }
+            
+            console.log(`[Backtests] Allocation condition: assetId=${rule.monitored_asset}, threshold=${thresholdValue}%`);
             
             conditions.push({
               type: 'allocation',
@@ -462,10 +458,13 @@ const Backtests = () => {
             });
           }
 
+          // Get the actual deviation threshold used (might be converted from old format)
+          const actualDeviation = conditions.find(c => c.type === 'allocation')?.value || rule.threshold || 5;
+          
           return {
             id: rule.id || `rule_${index}`,
-            name: rule.name || `Rebalance when ${rule.monitored_asset || 'asset'} drifts ±${rule.threshold || 5}%`,
-            description: rule.description || `Monitor ${rule.monitored_asset} allocation and rebalance if drift exceeds ±${rule.threshold || 5}% from target`,
+            name: rule.name || `Rebalance when ${rule.monitored_asset || 'asset'} drifts ±${actualDeviation}%`,
+            description: rule.description || `Monitor ${rule.monitored_asset} allocation and rebalance if drift exceeds ±${actualDeviation}% from target`,
             conditions,
             actions,
             enabled: rule.enabled !== false, // Default to enabled
