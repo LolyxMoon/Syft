@@ -27,10 +27,11 @@ impl VaultContract {
         }
 
         // Initialize vault state
+        // Set last_rebalance to 0 so first trigger always works
         let state = VaultState {
             total_shares: 0,
             total_value: 0,
-            last_rebalance: env.ledger().timestamp(),
+            last_rebalance: 0,
         };
 
         // Store configuration and state
@@ -837,6 +838,8 @@ impl VaultContract {
 
         // Check if staking should occur based on rules
         if !crate::engine::should_stake(&env) {
+            // Emit event to indicate staking was skipped (conditions not met)
+            env.events().publish((symbol_short!("skip_stak"),), env.ledger().timestamp());
             return Ok(()); // No staking needed
         }
 
