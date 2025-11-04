@@ -117,11 +117,9 @@ async function initializeVaultContract(
         if (hasLiquidityRules && network === 'testnet') {
           // Soroswap Factory address on testnet
           const factoryAddress = process.env.SOROSWAP_FACTORY_ADDRESS || 'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES';
-          return StellarSdk.xdr.ScVal.scvVec([
-            StellarSdk.Address.fromString(factoryAddress).toScVal()
-          ]); // Option::Some(Address)
+          return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(factoryAddress), {type: 'address'}); // Option::Some(Address)
         }
-        return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
+        return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
       })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
@@ -140,11 +138,9 @@ async function initializeVaultContract(
         if (hasLiquidityRules && network === 'testnet') {
           // Soroswap Router address on testnet
           const routerAddress = process.env.SOROSWAP_ROUTER_ADDRESS || 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
-          return StellarSdk.xdr.ScVal.scvVec([
-            StellarSdk.Address.fromString(routerAddress).toScVal()
-          ]); // Option::Some(Address)
+          return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(routerAddress), {type: 'address'}); // Option::Some(Address)
         }
-        return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
+        return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
       })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
@@ -158,11 +154,9 @@ async function initializeVaultContract(
         const hasStakeRules = config.rules?.some((r: any) => r.action === 'stake');
         if (hasStakeRules && network === 'testnet') {
           const stakingPoolAddress = 'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK';
-          return StellarSdk.xdr.ScVal.scvVec([
-            StellarSdk.Address.fromString(stakingPoolAddress).toScVal()
-          ]); // Option::Some(Address)
+          return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(stakingPoolAddress), {type: 'address'}); // Option::Some(Address)
         }
-        return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
+        return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
       })(),
     }),
   ]);
@@ -881,11 +875,9 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
           // Set factory address for testnet (Soroswap Factory)
           if (network === 'testnet') {
             const factoryAddress = process.env.SOROSWAP_FACTORY_ADDRESS || 'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES';
-            return StellarSdk.xdr.ScVal.scvVec([
-              StellarSdk.Address.fromString(factoryAddress).toScVal()
-            ]); // Option::Some(Address)
+            return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(factoryAddress), {type: 'address'}); // Option::Some(Address)
           }
-          return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
+          return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
         })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
@@ -902,11 +894,9 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
           // Set router address for testnet (Soroswap Router)
           if (network === 'testnet') {
             const routerAddress = process.env.SOROSWAP_ROUTER_ADDRESS || 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
-            return StellarSdk.xdr.ScVal.scvVec([
-              StellarSdk.Address.fromString(routerAddress).toScVal()
-            ]); // Option::Some(Address)
+            return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(routerAddress), {type: 'address'}); // Option::Some(Address)
           }
-          return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
+          return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
         })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
@@ -920,11 +910,9 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
           const hasStakeRules = config.rules?.some((r: any) => r.action === 'stake');
           if (hasStakeRules && network === 'testnet') {
             const stakingPoolAddress = 'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK';
-            return StellarSdk.xdr.ScVal.scvVec([
-              StellarSdk.Address.fromString(stakingPoolAddress).toScVal()
-            ]); // Option::Some(Address)
+            return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(stakingPoolAddress), {type: 'address'}); // Option::Some(Address)
           }
-          return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
+          return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
         })(),
       }),
     ]);
