@@ -56,7 +56,14 @@ interface UserVault {
   description?: string;
   config: {
     name?: string;
-    assets: Array<{ assetId?: string; assetCode: string; assetIssuer?: string; percentage: number }>;
+    assets: Array<{ 
+      assetId?: string; 
+      assetCode?: string; 
+      code?: string; // Support both 'code' and 'assetCode' formats
+      assetIssuer?: string; 
+      percentage?: number;
+      allocation?: number; // Support both 'allocation' and 'percentage' formats
+    }>;
     rules?: any[];
   };
   status: string;
@@ -789,10 +796,10 @@ const Backtests = () => {
                                   <div className="flex flex-wrap gap-2">
                                     {vault.config.assets.map((asset, idx) => {
                                       // Handle both string format and object format
-                                      const assetCode = typeof asset === 'string' ? asset : asset.assetCode;
+                                      const assetCode = typeof asset === 'string' ? asset : (asset.code || asset.assetCode);
                                       const percentage = typeof asset === 'string' 
                                         ? Math.round(100 / vault.config.assets.length) 
-                                        : asset.percentage;
+                                        : (asset.allocation || asset.percentage);
                                       
                                       // Resolve token name asynchronously
                                       const cacheKey = `${vault.vault_id}-${idx}`;
