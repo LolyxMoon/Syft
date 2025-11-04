@@ -165,6 +165,7 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestRes
   const MIN_REBALANCE_COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
   let lastGlobalRebalance = 0;
 
+  let iterationCount = 0;
   while (currentTime <= end) {
     const timestamp = new Date(currentTime).toISOString();
 
@@ -175,17 +176,42 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestRes
     portfolio = updatePortfolioValue(portfolio, currentPrices);
     
     // Apply daily management fee (amortized from annual rate)
-    // Management fee is deducted continuously, not on rebalance
+    // Management fee reduces the value of holdings proportionally
     if (vaultConfig.managementFee && vaultConfig.managementFee > 0) {
       const daysInPeriod = resolution / (24 * 60 * 60 * 1000);
       const dailyFeeRate = (vaultConfig.managementFee / 100) / 365; // Convert annual to daily
       const periodFee = portfolio.totalValue * dailyFeeRate * daysInPeriod;
       
       if (periodFee > 0) {
-        portfolio.totalValue -= periodFee;
+        // Reduce holdings proportionally to maintain allocations
+        const feeRatio = 1 - (periodFee / portfolio.totalValue);
+        for (const [assetCode, amount] of portfolio.holdings.entries()) {
+          portfolio.holdings.set(assetCode, amount * feeRatio);
+        }
+        
+        // Recalculate portfolio value and allocations after fee
+        portfolio = updatePortfolioValue(portfolio, currentPrices);
         totalFees += periodFee;
       }
     }
+    
+    // Log first day and every 30 days to see price changes and allocation drift
+    if (iterationCount === 0 || iterationCount % 30 === 0) {
+      const holdingsDebug: any = {};
+      portfolio.holdings.forEach((amount, assetCode) => {
+        const value = amount * (currentPrices[assetCode] || 1);
+        holdingsDebug[assetCode] = {
+          quantity: amount.toFixed(4),
+          price: (currentPrices[assetCode] || 1).toFixed(4),
+          value: value.toFixed(2)
+        };
+      });
+      
+      console.log(`\n[Backtest Day ${iterationCount}] Holdings:`, JSON.stringify(holdingsDebug, null, 2));
+      console.log(`[Backtest Day ${iterationCount}] Total Value: $${portfolio.totalValue.toFixed(2)}`);
+      console.log(`[Backtest Day ${iterationCount}] Allocations:`, portfolio.allocations.map(a => `${a.assetCode}=${a.percentage.toFixed(2)}%`).join(', '));
+    }
+    iterationCount++;
 
     // Check if any rules trigger (only if cooldown has passed)
     const timeSinceLastRebalance = currentTime - lastGlobalRebalance;
@@ -552,9 +578,18 @@ function initializePortfolio(
     const quantity = allocationAmount / price;
     holdings.set(allocation.assetCode, quantity);
     actualTotalValue += quantity * price;
+    
+    console.log(`[Backtest] Init ${allocation.assetCode}: $${allocationAmount.toFixed(2)} / $${price.toFixed(4)} = ${quantity.toFixed(4)} units`);
   }
 
   console.log(`[Backtest] Initialized portfolio: target=$${capital}, actual=$${actualTotalValue.toFixed(2)}`);
+  
+  // Log initial holdings for debugging
+  const holdingsDebug: any = {};
+  holdings.forEach((amount, assetCode) => {
+    holdingsDebug[assetCode] = amount.toFixed(4);
+  });
+  console.log(`[Backtest] Initial holdings:`, holdingsDebug);
 
   return {
     holdings,
