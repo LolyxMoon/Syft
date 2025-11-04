@@ -389,37 +389,16 @@ const Backtests = () => {
             });
           } else if (rule.condition_type === 'allocation_based' || rule.condition_type === 'allocation') {
             // Handle allocation-based rebalancing
-            // Interpret threshold sensibly based on its value:
-            // - If threshold is small (< 20%), treat as deviation threshold (e.g., "rebalance when deviates by 5%")
-            // - If threshold is large (>= 20%), treat as absolute allocation level (e.g., "rebalance when reaches 80%")
+            // Threshold always represents deviation from target (e.g., 5% means "rebalance when allocation deviates by ±5%")
+            // Industry standard: 5% deviation threshold (Vanguard, Fidelity best practices)
             const thresholdValue = rule.threshold || 5;
-            const isAbsoluteThreshold = thresholdValue >= 20;
             
-            if (isAbsoluteThreshold) {
-              // Threshold represents absolute allocation level (e.g., 80% means "when asset reaches 80%")
-              // Calculate reasonable deviation from target
-              // If target is 70% and threshold is 80%, deviation is 10%
-              const targetAllocation = rule.target_allocation && Array.isArray(rule.target_allocation) 
-                ? (rule.target_allocation[0] / 10000) // First asset percentage from basis points
-                : 50; // Default 50-50 split
-              
-              const deviation = Math.abs(thresholdValue - targetAllocation);
-              
-              conditions.push({
-                type: 'allocation',
-                operator: 'gte',
-                value: Math.max(deviation, 5), // At least 5% deviation to avoid too frequent rebalancing
-                assetId: rule.monitored_asset || rule.assetId,
-              });
-            } else {
-              // Threshold represents deviation from target (e.g., 5% means "when deviates by 5%")
-              conditions.push({
-                type: 'allocation',
-                operator: 'gte',
-                value: thresholdValue,
-                assetId: rule.monitored_asset || rule.assetId,
-              });
-            }
+            conditions.push({
+              type: 'allocation',
+              operator: 'gte',
+              value: thresholdValue,
+              assetId: rule.monitored_asset || rule.assetId,
+            });
           }
 
           // Transform action
@@ -466,8 +445,8 @@ const Backtests = () => {
 
           return {
             id: rule.id || `rule_${index}`,
-            name: rule.name || `Rebalance when ${rule.monitored_asset || 'asset'} deviates by ${rule.threshold}%`,
-            description: rule.description || `Monitor ${rule.monitored_asset} allocation and rebalance if deviation exceeds ${rule.threshold}%`,
+            name: rule.name || `Rebalance when ${rule.monitored_asset || 'asset'} drifts ±${rule.threshold || 5}%`,
+            description: rule.description || `Monitor ${rule.monitored_asset} allocation and rebalance if drift exceeds ±${rule.threshold || 5}% from target`,
             conditions,
             actions,
             enabled: rule.enabled !== false, // Default to enabled

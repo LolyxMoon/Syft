@@ -14,14 +14,14 @@ const ConditionBlock = ({ id, data, selected }: ConditionBlockProps) => {
   const { updateNodeData } = useReactFlow();
 
   const [localOperator, setLocalOperator] = useState(operator || 'gt');
-  const [localThreshold, setLocalThreshold] = useState(threshold || 0);
+  const [localThreshold, setLocalThreshold] = useState(threshold || 5);
   const [localValue, setLocalValue] = useState(value || 0);
   const [localTimeValue, setLocalTimeValue] = useState(timeValue || 1);
   const [localTimeUnit, setLocalTimeUnit] = useState(timeUnit || 'hours');
 
   useEffect(() => {
     setLocalOperator(operator || 'gt');
-    setLocalThreshold(threshold || 0);
+    setLocalThreshold(threshold || 5);
     setLocalValue(value || 0);
     setLocalTimeValue(timeValue || 1);
     setLocalTimeUnit(timeUnit || 'hours');
@@ -102,15 +102,15 @@ const ConditionBlock = ({ id, data, selected }: ConditionBlockProps) => {
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
-                Threshold (%)
+                Deviation Threshold (±%)
               </label>
               <input
                 type="number"
-                min="0"
-                max="100"
-                step="0.1"
+                min="1"
+                max="50"
+                step="0.5"
                 value={localThreshold}
-                onChange={(e) => handleThresholdChange(parseFloat(e.target.value) || 0)}
+                onChange={(e) => handleThresholdChange(parseFloat(e.target.value) || 5)}
                 className="w-full px-2 py-1 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
@@ -191,7 +191,7 @@ const ConditionBlock = ({ id, data, selected }: ConditionBlockProps) => {
 
     switch (conditionType) {
       case 'allocation':
-        return `Allocation ${getOperatorDisplay(localOperator)} ${localThreshold}%`;
+        return `Rebalance when drift ${getOperatorDisplay(localOperator)} ±${localThreshold}%`;
       case 'apy_threshold':
         return `APY ${getOperatorDisplay(localOperator)} ${localThreshold}%`;
       case 'time_based':
