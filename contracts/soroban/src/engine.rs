@@ -53,6 +53,11 @@ fn evaluate_time_condition(env: &Env, rule: &RebalanceRule) -> bool {
             last_rebalance: 0,
         });
     
+    // If last_rebalance is 0, this is the first trigger - always allow
+    if state.last_rebalance == 0 {
+        return true;
+    }
+    
     let current_time = env.ledger().timestamp();
     let time_elapsed = current_time.saturating_sub(state.last_rebalance);
     

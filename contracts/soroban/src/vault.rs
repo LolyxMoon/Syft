@@ -829,18 +829,11 @@ impl VaultContract {
     }
 
     /// Trigger staking based on configured rules (only stake actions)
-    /// Can be called by anyone, but only executes if stake rules are met
+    /// Can be called by anyone - assumes conditions already checked by caller
     pub fn trigger_stake(env: Env) -> Result<(), VaultError> {
         // Check vault is initialized
         if !env.storage().instance().has(&CONFIG) {
             return Err(VaultError::NotInitialized);
-        }
-
-        // Check if staking should occur based on rules
-        if !crate::engine::should_stake(&env) {
-            // Emit event to indicate staking was skipped (conditions not met)
-            env.events().publish((symbol_short!("skip_stak"),), env.ledger().timestamp());
-            return Ok(()); // No staking needed
         }
 
         let _config: VaultConfig = env.storage().instance().get(&CONFIG)
@@ -849,7 +842,7 @@ impl VaultContract {
         let mut state: VaultState = env.storage().instance().get(&STATE)
             .ok_or(VaultError::NotInitialized)?;
 
-        // Execute only stake actions
+        // Execute only stake actions (no condition checking - backend already verified)
         crate::rebalance::execute_stake_only(&env)?;
 
         // Update last rebalance timestamp
