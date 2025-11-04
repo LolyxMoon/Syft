@@ -1,6 +1,7 @@
 // Shared types index - re-export all types
 export * from './vault';
 export * from './transaction';
+export * from './quest';
 
 // API Response types
 export interface ApiResponse<T = any> {

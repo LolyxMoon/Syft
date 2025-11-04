@@ -6,6 +6,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Quest Hints Styles */
+@import './styles/quest-hints.css';
+
 :root {
   /* Color System - Marginfi-inspired Dark Theme */
   --color-bg-primary: #090a0a;

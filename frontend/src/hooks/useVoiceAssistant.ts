@@ -160,8 +160,7 @@ export function useVoiceAssistant(): UseVoiceAssistantReturn {
   const pollJobStatus = async (jobId: string, maxAttempts = 60) => {
     console.log('[useVoiceAssistant] Starting to poll for job:', jobId);
     
-    const backendUrl = import.meta.env.VITE_API_URL || 
-                       import.meta.env.PUBLIC_BACKEND_URL || 
+    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 
                        'https://syft-f6ad696f49ee.herokuapp.com';
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {

@@ -26,7 +26,9 @@ export const AppHeader = ({ onMenuClick }: AppHeaderProps) => {
         <div className="hidden lg:block flex-1" />
 
         {/* Wallet Connection */}
-        <ConnectAccount />
+        <div data-tour="wallet-connect">
+          <ConnectAccount />
+        </div>
       </div>
     </motion.header>
   );

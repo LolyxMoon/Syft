@@ -1,0 +1,420 @@
+import { useState, useEffect } from 'react';
+import { useWallet } from '../providers/WalletProvider';
+import {
+  Trophy,
+  Award,
+  Sparkles,
+  CheckCircle2,
+  Clock,
+  Lightbulb,
+  Gift,
+  TrendingUp,
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+import type { QuestWithProgress, QuestStatsResponse } from '../../../shared/types';
+import { questHints } from '../services/questHints';
+
+const API_URL = `${import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api`;
+
+const categoryIcons: Record<string, any> = {
+  basics: Sparkles,
+  defi: TrendingUp,
+  vaults: Trophy,
+  advanced: Award,
+};
+
+const categoryColors: Record<string, string> = {
+  basics: 'text-blue-500',
+  defi: 'text-green-500',
+  vaults: 'text-purple-500',
+  advanced: 'text-orange-500',
+};
+
+const difficultyColors: Record<string, string> = {
+  beginner: 'bg-green-500/10 text-green-500',
+  intermediate: 'bg-yellow-500/10 text-yellow-500',
+  advanced: 'bg-red-500/10 text-red-500',
+};
+
+export default function Quests() {
+  const { address: publicKey } = useWallet();
+  const [quests, setQuests] = useState<QuestWithProgress[]>([]);
+  const [stats, setStats] = useState<QuestStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [claimingQuest, setClaimingQuest] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (publicKey) {
+      fetchQuests();
+      fetchStats();
+    }
+  }, [publicKey]);
+
+  const fetchQuests = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/quests?walletAddress=${publicKey}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setQuests(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching quests:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_URL}/quests/stats?walletAddress=${publicKey}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching quest stats:', error);
+    }
+  };
+
+  const handleClaimReward = async (questId: string) => {
+    try {
+      setClaimingQuest(questId);
+      const response = await fetch(`${API_URL}/quests/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey,
+          questId,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh quests and stats
+        await fetchQuests();
+        await fetchStats();
+        
+        // Show success message
+        alert('NFT reward claimed successfully! 🎉');
+      } else {
+        alert(`Failed to claim reward: ${data.error?.message}`);
+      }
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+      alert('Failed to claim reward. Please try again.');
+    } finally {
+      setClaimingQuest(null);
+    }
+  };
+
+  const handleStartHints = (quest: QuestWithProgress) => {
+    // Start the hint tour with driver.js
+    questHints.startHintTour(quest.hintSteps, quest.title);
+  };
+
+  const filteredQuests = selectedCategory === 'all'
+    ? quests
+    : quests.filter(q => q.category === selectedCategory);
+
+  const categories = [
+    { key: 'all', label: 'All Quests' },
+    { key: 'basics', label: 'Basics' },
+    { key: 'defi', label: 'DeFi' },
+    { key: 'vaults', label: 'Vaults' },
+    { key: 'advanced', label: 'Advanced' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 bg-neutral-800 rounded-lg animate-pulse"></div>
+            <div className="h-8 w-32 bg-neutral-800 rounded animate-pulse"></div>
+          </div>
+          <div className="h-4 w-96 bg-neutral-800 rounded animate-pulse"></div>
+        </div>
+
+        {/* Stats Overview Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-secondary border border-default rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-neutral-800 rounded-lg animate-pulse"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-20 bg-neutral-800 rounded animate-pulse"></div>
+                  <div className="h-7 w-12 bg-neutral-800 rounded animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Category Filter Skeleton */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="h-10 w-24 bg-neutral-800 rounded-lg animate-pulse"
+            ></div>
+          ))}
+        </div>
+
+        {/* Quests Grid Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-secondary border border-default rounded-lg p-6"
+            >
+              {/* Quest Header Skeleton */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="w-12 h-12 bg-neutral-800 rounded-lg animate-pulse"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 w-3/4 bg-neutral-800 rounded animate-pulse"></div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-20 bg-neutral-800 rounded animate-pulse"></div>
+                      <div className="h-4 w-8 bg-neutral-800 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quest Description Skeleton */}
+              <div className="space-y-2 mb-4">
+                <div className="h-4 w-full bg-neutral-800 rounded animate-pulse"></div>
+                <div className="h-4 w-5/6 bg-neutral-800 rounded animate-pulse"></div>
+              </div>
+
+              {/* Reward NFT Preview Skeleton */}
+              <div className="bg-app border border-default rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-neutral-800 rounded-lg animate-pulse"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-16 bg-neutral-800 rounded animate-pulse"></div>
+                    <div className="h-4 w-32 bg-neutral-800 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons Skeleton */}
+              <div className="flex gap-2">
+                <div className="flex-1 h-10 bg-neutral-800 rounded-lg animate-pulse"></div>
+                <div className="flex-1 h-10 bg-neutral-800 rounded-lg animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <Trophy className="w-8 h-8 text-primary-500" />
+          <h1 className="text-3xl font-bold text-neutral-50">Quests</h1>
+        </div>
+        <p className="text-neutral-400">
+          Complete quests to learn about DeFi and earn exclusive NFT rewards!
+        </p>
+      </div>
+
+      {/* Stats Overview */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-secondary border border-default rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Trophy className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-400">Total Quests</p>
+                <p className="text-2xl font-bold text-neutral-50">{stats.totalQuests}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-secondary border border-default rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-500/10 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-400">Completed</p>
+                <p className="text-2xl font-bold text-neutral-50">{stats.completedQuests}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-secondary border border-default rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <Gift className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-400">NFTs Earned</p>
+                <p className="text-2xl font-bold text-neutral-50">{stats.nftsEarned}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-secondary border border-default rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/10 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-400">Progress</p>
+                <p className="text-2xl font-bold text-neutral-50">
+                  {stats.completionRate.toFixed(0)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Filter */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        {categories.map((category) => (
+          <button
+            key={category.key}
+            onClick={() => setSelectedCategory(category.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              selectedCategory === category.key
+                ? 'bg-primary-500 text-black'
+                : 'bg-secondary border border-default text-neutral-400 hover:text-neutral-50'
+            }`}
+          >
+            {category.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Quests Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {filteredQuests.map((quest, index) => {
+          const CategoryIcon = categoryIcons[quest.category];
+          const status = quest.userQuest?.status || 'not_started';
+          const isCompleted = status === 'completed';
+          const isClaimed = status === 'claimed';
+          const isInProgress = status === 'in_progress';
+
+          return (
+            <motion.div
+              key={quest.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="bg-secondary border border-default rounded-lg p-6 hover:border-primary-500/50 transition-all"
+            >
+              {/* Quest Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-opacity-10 rounded-lg ${categoryColors[quest.category]}`}>
+                    <CategoryIcon className={`w-6 h-6 ${categoryColors[quest.category]}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-50 mb-1">{quest.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${difficultyColors[quest.difficulty]}`}
+                      >
+                        {quest.difficulty}
+                      </span>
+                      <span className="text-xs text-neutral-500">#{quest.orderIndex}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {isClaimed && (
+                  <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />
+                )}
+                {isInProgress && (
+                  <Clock className="w-6 h-6 text-yellow-500 flex-shrink-0" />
+                )}
+              </div>
+
+              {/* Quest Description */}
+              <p className="text-neutral-400 text-sm mb-4">{quest.description}</p>
+
+              {/* Reward NFT Preview */}
+              <div className="bg-app border border-default rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Gift className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-400">Reward</p>
+                    <p className="text-sm font-medium text-neutral-50">{quest.rewardNftName}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                {!isClaimed && (
+                  <button
+                    onClick={() => handleStartHints(quest)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-secondary border border-default rounded-lg text-neutral-300 hover:text-neutral-50 hover:border-primary-500/50 transition-all"
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    <span>Hints</span>
+                  </button>
+                )}
+
+                {isCompleted && (
+                  <button
+                    onClick={() => handleClaimReward(quest.id)}
+                    disabled={claimingQuest === quest.id}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Gift className="w-4 h-4" />
+                    <span>{claimingQuest === quest.id ? 'Claiming...' : 'Claim NFT'}</span>
+                  </button>
+                )}
+
+                {isClaimed && (
+                  <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 text-green-500 rounded-lg font-medium">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Claimed</span>
+                  </div>
+                )}
+
+                {!isCompleted && !isClaimed && !isInProgress && (
+                  <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-secondary border border-default text-neutral-400 rounded-lg">
+                    <span>Not Started</span>
+                  </div>
+                )}
+
+                {isInProgress && !isCompleted && (
+                  <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 rounded-lg font-medium">
+                    <Clock className="w-4 h-4" />
+                    <span>In Progress</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {filteredQuests.length === 0 && (
+        <div className="text-center py-12">
+          <Trophy className="w-16 h-16 text-neutral-600 mx-auto mb-4" />
+          <p className="text-neutral-400">No quests found in this category.</p>
+        </div>
+      )}
+    </div>
+  );
+}

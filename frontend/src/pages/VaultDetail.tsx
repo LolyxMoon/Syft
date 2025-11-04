@@ -1,8 +1,27 @@
 import { useParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import { VaultDetail as VaultDetailComponent } from '../components/marketplace/VaultDetail';
+import { questValidation } from '../services/questValidation';
 
 const VaultDetail = () => {
   const { vaultId } = useParams<{ vaultId: string }>();
+  
+  useEffect(() => {
+    if (vaultId) {
+      // Track page visit for quest validation
+      questValidation.trackPageVisit('vault_detail');
+      
+      // Check if user spent enough time viewing vault details
+      const timer = setTimeout(() => {
+        questValidation.validateViewVaultDetails();
+      }, 10000); // 10 seconds
+      
+      return () => {
+        clearTimeout(timer);
+        questValidation.clearPageVisit('vault_detail');
+      };
+    }
+  }, [vaultId]);
 
   if (!vaultId) {
     return (

@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Box, Home, X, ShoppingBag, BarChart3, TestTube, Lightbulb, Wallet } from 'lucide-react';
+import { LayoutDashboard, Box, Home, X, ShoppingBag, BarChart3, TestTube, Lightbulb, Wallet, Trophy } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface SidebarProps {
@@ -12,13 +12,14 @@ export const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/app/vaults', label: 'Vaults', icon: Wallet },
-    { path: '/app/builder', label: 'Vault Builder', icon: Box },
-    { path: '/app/marketplace', label: 'Marketplace', icon: ShoppingBag },
-    { path: '/app/analytics', label: 'Analytics', icon: BarChart3 },
-    { path: '/app/backtests', label: 'Backtests', icon: TestTube },
-    { path: '/app/suggestions', label: 'AI Suggestions', icon: Lightbulb },
+    { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, tourId: 'dashboard-nav' },
+    { path: '/app/quests', label: 'Quests', icon: Trophy, tourId: 'quests-nav' },
+    { path: '/app/vaults', label: 'Vaults', icon: Wallet, tourId: 'vaults-nav' },
+    { path: '/app/builder', label: 'Vault Builder', icon: Box, tourId: 'builder-nav' },
+    { path: '/app/marketplace', label: 'Marketplace', icon: ShoppingBag, tourId: 'marketplace-nav' },
+    { path: '/app/analytics', label: 'Analytics', icon: BarChart3, tourId: 'analytics-nav' },
+    { path: '/app/backtests', label: 'Backtests', icon: TestTube, tourId: 'backtests-nav' },
+    { path: '/app/suggestions', label: 'AI Suggestions', icon: Lightbulb, tourId: 'suggestions-nav' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -57,6 +58,7 @@ export const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
+                data-tour={item.tourId}
                 className={clsx(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
                   isActive(item.path)

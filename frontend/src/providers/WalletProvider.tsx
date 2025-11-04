@@ -7,6 +7,7 @@ import {
 } from "react";
 import { wallet } from "../util/wallet";
 import storage from "../util/storage";
+import { questValidation } from "../services/questValidation";
 
 export interface WalletContextType {
   address?: string;
@@ -50,14 +51,28 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 
   const updateState = (newState: Omit<WalletContextType, "isPending">) => {
     setState((prev: Omit<WalletContextType, "isPending">) => {
-      if (
+      const hasChanged =
         prev.address !== newState.address ||
         prev.network !== newState.network ||
-        prev.networkPassphrase !== newState.networkPassphrase
-      ) {
-        return newState;
+        prev.networkPassphrase !== newState.networkPassphrase;
+
+      if (hasChanged) {
+        console.log("[WalletProvider] State updated:", newState);
+        
+        // Track wallet connection for quests
+        if (newState.address && !prev.address) {
+          questValidation.setWalletAddress(newState.address);
+          // Validate connect wallet quest
+          questValidation.validateConnectWallet();
+        }
+        
+        // Reset quest validation when disconnecting
+        if (!newState.address && prev.address) {
+          questValidation.reset();
+        }
       }
-      return prev;
+
+      return newState;
     });
   };
 

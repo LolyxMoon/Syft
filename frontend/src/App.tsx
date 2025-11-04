@@ -10,6 +10,7 @@ import Marketplace from "./pages/Marketplace";
 import Analytics from "./pages/Analytics";
 import Backtests from "./pages/Backtests";
 import Suggestions from "./pages/Suggestions";
+import Quests from "./pages/Quests";
 
 import AppLayout from "./layouts/AppLayout";
 
@@ -51,6 +52,7 @@ function App() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="backtests" element={<Backtests />} />
         <Route path="suggestions" element={<Suggestions />} />
+        <Route path="quests" element={<Quests />} />
 
         <Route path="vaults/:vaultId" element={<VaultDetail />} />
       </Route>

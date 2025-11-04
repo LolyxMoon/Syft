@@ -10,6 +10,7 @@ import { Card, Button, Skeleton } from '../components/ui';
 import { useWallet } from '../providers/WalletProvider';
 import { resolveAssetNames } from '../services/tokenService';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { questValidation } from '../services/questValidation';
 
 interface Vault {
   vault_id: string;
@@ -78,7 +79,7 @@ const Vaults = () => {
 
   const fetchXLMPrice = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/price/xlm`);
       if (response.ok) {
         const data = await response.json();
@@ -99,7 +100,7 @@ const Vaults = () => {
 
     try {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
       // Fetch owned vaults
       const ownedResponse = await fetch(
@@ -157,6 +158,19 @@ const Vaults = () => {
   useEffect(() => {
     if (address) {
       void fetchVaults();
+      
+      // Track page visit for quest validation
+      questValidation.trackPageVisit('vaults');
+      
+      // Check if user spent enough time on the page
+      const timer = setTimeout(() => {
+        questValidation.validateExploreVaults();
+      }, 5000); // 5 seconds
+      
+      return () => {
+        clearTimeout(timer);
+        questValidation.clearPageVisit('vaults');
+      };
     }
   }, [address, network, fetchVaults]); // Only refetch when address or network changes
 

@@ -26,7 +26,7 @@ export function YieldComparison({
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'comparison' | 'routing'>('comparison');
 
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+  const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
   useEffect(() => {
     fetchYieldData();
