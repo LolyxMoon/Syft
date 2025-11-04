@@ -361,21 +361,21 @@ function resamplePrices(
   const endTime = new Date(prices[prices.length - 1].timestamp).getTime();
   
   let currentTime = startTime;
-  let priceIndex = 0;
 
   while (currentTime <= endTime) {
-    // Find the closest price point
-    let closestPrice = prices[priceIndex];
+    // Find the closest price point for this timestamp
+    // Search through ALL prices, not just from a saved index
+    let closestPrice = prices[0];
     let closestDiff = Math.abs(new Date(closestPrice.timestamp).getTime() - currentTime);
 
-    for (let i = priceIndex; i < prices.length; i++) {
+    for (let i = 1; i < prices.length; i++) {
       const diff = Math.abs(new Date(prices[i].timestamp).getTime() - currentTime);
       if (diff < closestDiff) {
         closestPrice = prices[i];
         closestDiff = diff;
-        priceIndex = i;
-      } else {
-        break; // Prices are sorted, so we can stop
+      } else if (diff > closestDiff) {
+        // Prices are sorted by time, so once diff starts increasing, we can stop
+        break;
       }
     }
 
@@ -385,6 +385,11 @@ function resamplePrices(
     });
 
     currentTime += targetResolution;
+  }
+
+  console.log(`[PriceService] Resampled from ${prices.length} to ${resampled.length} price points`);
+  if (resampled.length > 0) {
+    console.log(`[PriceService] Sample prices: Day 0=$${resampled[0].price.toFixed(4)}, Day ${Math.floor(resampled.length/2)}=$${resampled[Math.floor(resampled.length/2)].price.toFixed(4)}, Day ${resampled.length-1}=$${resampled[resampled.length-1].price.toFixed(4)}`);
   }
 
   return resampled;
