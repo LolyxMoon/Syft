@@ -311,8 +311,7 @@ impl VaultContract {
     }
     
     /// Find XLM token address in the vault's configured assets
-    /// XLM should be the last asset, or we check token symbol/name
-    /// Falls back to last asset in the list if not found
+    /// XLM is identified by its contract address (native wrapped XLM)
     fn find_xlm_token(
         env: &Env,
         config: &VaultConfig,
@@ -321,16 +320,26 @@ impl VaultContract {
             return Err(VaultError::InvalidConfiguration);
         }
         
-        // STRATEGY: Try to identify XLM by checking token metadata
-        // For now, use a simpler approach: assume XLM is the LAST asset in the vault config
-        // This is a reasonable assumption since vaults are typically configured with
-        // their base asset (USDC, EURC, etc.) first, and XLM last for withdrawals
+        // XLM (native wrapped) address on testnet: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+        use soroban_sdk::String;
+        let xlm_address_str = String::from_str(env, "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC");
+        let xlm_address = Address::from_string(&xlm_address_str);
         
+        // Check if XLM is in the vault's assets
         let asset_count = config.assets.len();
+        for i in 0..asset_count {
+            if let Some(asset) = config.assets.get(i) {
+                if asset == xlm_address {
+                    log!(env, "Found XLM at asset index {}", i);
+                    return Ok(asset);
+                }
+            }
+        }
+        
+        // Fallback: use last asset if XLM not found
+        log!(env, "XLM not found in assets, using last asset as fallback");
         let xlm_candidate = config.assets.get(asset_count - 1)
             .ok_or(VaultError::InvalidConfiguration)?;
-        
-        log!(env, "Using asset at index {} as XLM for withdrawal", asset_count - 1);
         
         Ok(xlm_candidate)
     }
@@ -372,7 +381,13 @@ impl VaultContract {
             }
         }
         
-        // TODO: Add liquidity position liquidation here if needed
+        // FAKE: Remove fake liquidity position (tokens never left vault, so nothing to do)
+        use soroban_sdk::String;
+        let position_key = String::from_str(env, "lp_position");
+        if env.storage().instance().has(&position_key) {
+            log!(env, "FAKE: Removing fake liquidity position (tokens were always in vault)");
+            env.storage().instance().remove(&position_key);
+        }
         
         Ok(())
     }
