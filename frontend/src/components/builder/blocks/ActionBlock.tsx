@@ -13,13 +13,17 @@ interface ActionBlockProps {
 
 const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
   const { actionType, targetAsset, targetAllocation, protocol } = data;
-  const { updateNodeData } = useReactFlow();
+  const { updateNodeData, getNodes } = useReactFlow();
   const { network } = useWallet();
 
   const [localTargetAsset, setLocalTargetAsset] = useState(targetAsset || '');
   const [localTargetAllocation, setLocalTargetAllocation] = useState(targetAllocation || 0);
   const [localProtocol, setLocalProtocol] = useState(protocol || '');
   const [availableProtocols, setAvailableProtocols] = useState<ProtocolInfo[]>([]);
+  
+  // Count asset nodes for liquidity validation
+  const assetCount = getNodes().filter(node => node.type === 'asset').length;
+  const showLiquidityWarning = actionType === 'provide_liquidity' && assetCount < 2;
 
   useEffect(() => {
     setLocalTargetAsset(targetAsset || '');
@@ -364,6 +368,18 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
           {getDescription()}
         </p>
       </div>
+
+      {/* Liquidity Provision Warning */}
+      {showLiquidityWarning && (
+        <div className="mt-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded p-3">
+          <p className="text-xs text-red-700 dark:text-red-400 font-semibold mb-1">
+            ⚠️ Requires 2+ Assets
+          </p>
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Liquidity pools need a pair of tokens. Add another asset to the vault.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

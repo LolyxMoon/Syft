@@ -242,6 +242,22 @@ export class BlockValidator {
         }
       }
 
+      // Validate liquidity provision requires at least 2 assets
+      if (actionType === 'provide_liquidity') {
+        if (assetBlocks.length < 2) {
+          errors.push({
+            blockId: block.id,
+            message: 'Liquidity provision requires at least 2 assets in the vault',
+            field: 'actionType',
+          });
+          warnings.push({
+            blockId: 'canvas',
+            message: 'Add another asset to enable liquidity provision',
+            suggestion: 'Liquidity pools require a pair of tokens (e.g., XLM and USDC)',
+          });
+        }
+      }
+
       if (actionType === 'swap') {
         if (!targetAsset) {
           errors.push({
