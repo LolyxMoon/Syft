@@ -325,6 +325,16 @@ export class ConfigSerializer {
           console.warn('[ConfigSerializer] No monitored_asset found, inferring:', assetForCondition);
         }
         
+        // Map contract condition types back to frontend types
+        const contractToFrontendConditionType: Record<string, string> = {
+          'time': 'time_based',
+          'price': 'price_change',
+          'apy': 'apy_threshold',
+          'allocation': 'allocation',
+        };
+        
+        const frontendConditionType = contractToFrontendConditionType[rule.condition_type] || rule.condition_type;
+        
         // Build condition parameters - restore all saved fields
         const conditionParameters: Record<string, unknown> = {
           asset: assetForCondition,
@@ -356,11 +366,6 @@ export class ConfigSerializer {
           conditionParameters.description = rule.description;
         }
         
-        condition = {
-          type: rule.condition_type,
-          parameters: conditionParameters,
-        };
-        
         // Build action parameters - restore all saved fields
         const actionParameters: Record<string, unknown> = {};
         
@@ -388,6 +393,11 @@ export class ConfigSerializer {
         if (rule.parameters) {
           actionParameters.parameters = rule.parameters;
         }
+        
+        condition = {
+          type: frontendConditionType,
+          parameters: conditionParameters,
+        };
         
         action = {
           type: rule.action,
@@ -488,6 +498,16 @@ export class ConfigSerializer {
         // Store as timeValue and timeUnit for the condition block
         conditionData.timeValue = conditionData.interval;
         conditionData.timeUnit = conditionData.unit;
+      }
+      
+      // For apy_threshold conditions, ensure operator has a default
+      if (condition?.type === 'apy_threshold' && !conditionData.operator) {
+        conditionData.operator = 'gt';
+      }
+      
+      // For allocation conditions, ensure operator has a default
+      if (condition?.type === 'allocation' && !conditionData.operator) {
+        conditionData.operator = 'gt';
       }
       
       // For price_change conditions, map percentage to value
