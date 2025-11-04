@@ -81,8 +81,12 @@ pub fn add_liquidity_to_pool(
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
+    // CRITICAL: Authorize sub-contract calls for the mock pool
+    // This allows the pool to call token.transfer on behalf of the vault
+    env.authorize_as_current_contract(soroban_sdk::vec![env]);
+    
     // Add liquidity through mock pool
-    // The mock pool will call token.transfer internally with proper authorization
+    // The mock pool will call token.transfer internally
     let (lp_tokens, actual_a, actual_b) = pool_client.add_liquidity(
         &vault_address,
         &token_a,
@@ -131,6 +135,10 @@ pub fn remove_liquidity_from_pool(
     
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
+    
+    // CRITICAL: Authorize sub-contract calls for the mock pool
+    // This allows the pool to call token.transfer on behalf of the vault
+    env.authorize_as_current_contract(soroban_sdk::vec![env]);
     
     // Remove liquidity through mock pool
     let (amount_a, amount_b) = pool_client.remove_liquidity(
