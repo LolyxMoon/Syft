@@ -441,7 +441,7 @@ export function startRuleMonitoring(
         console.error('Error in rule monitoring loop:', error);
       }
     })(); // Fire and forget - don't block the interval
-  }, 60000); // Check every 1 minute
+  }, 30000); // Check every 1 minute
 
   return interval;
 }
