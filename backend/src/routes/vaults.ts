@@ -62,12 +62,12 @@ async function initializeVaultContract(
     let targetAllocation = rule.target_allocation || [];
     
     // For liquidity/stake actions, target_allocation must match number of assets (contract validation requirement)
-    // For liquidity, the actual percentage is in the threshold field, target_allocation is just a placeholder
+    // Use the vault's asset allocations (in 6-decimal format: 50% = 50_0000)
     if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
         targetAllocation.length !== (config.assets || []).length) {
       console.log(`[initializeVaultContract] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
-      // Create array of zeros matching asset count (placeholder values, actual amount is in threshold)
-      targetAllocation = new Array((config.assets || []).length).fill(0);
+      // Use asset allocations from config (convert from percentage to 6-decimal format)
+      targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
     }
     
     // Convert frontend action names to contract names
@@ -121,7 +121,7 @@ async function initializeVaultContract(
             StellarSdk.Address.fromString(factoryAddress).toScVal()
           ]); // Option::Some(Address)
         }
-        return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+        return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
       })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
@@ -144,7 +144,7 @@ async function initializeVaultContract(
             StellarSdk.Address.fromString(routerAddress).toScVal()
           ]); // Option::Some(Address)
         }
-        return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+        return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
       })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
@@ -162,7 +162,7 @@ async function initializeVaultContract(
             StellarSdk.Address.fromString(stakingPoolAddress).toScVal()
           ]); // Option::Some(Address)
         }
-        return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+        return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
       })(),
     }),
   ]);
@@ -828,12 +828,12 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       let targetAllocation = rule.target_allocation || [];
       
       // For liquidity/stake actions, target_allocation must match number of assets (contract validation requirement)
-      // For liquidity, the actual percentage is in the threshold field, target_allocation is just a placeholder
+      // Use the vault's asset allocations (in 6-decimal format: 50% = 50_0000)
       if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
           targetAllocation.length !== (config.assets || []).length) {
         console.log(`[Build Initialize] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
-        // Create array of zeros matching asset count (placeholder values, actual amount is in threshold)
-        targetAllocation = new Array((config.assets || []).length).fill(0);
+        // Use asset allocations from config (convert from percentage to 6-decimal format)
+        targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
       }
       
       // Convert frontend action names to contract names
@@ -885,7 +885,7 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
               StellarSdk.Address.fromString(factoryAddress).toScVal()
             ]); // Option::Some(Address)
           }
-          return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+          return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
         })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
@@ -906,7 +906,7 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
               StellarSdk.Address.fromString(routerAddress).toScVal()
             ]); // Option::Some(Address)
           }
-          return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+          return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
         })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
@@ -924,7 +924,7 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
               StellarSdk.Address.fromString(stakingPoolAddress).toScVal()
             ]); // Option::Some(Address)
           }
-          return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+          return StellarSdk.xdr.ScVal.scvVec([]); // Option::None - empty Vec
         })(),
       }),
     ]);

@@ -424,11 +424,19 @@ const VaultBuilder = () => {
               config.assets.map(a => `${a.code}: ${a.allocation}%`).join(', ')
             );
             console.log('[VaultBuilder] Target allocation (basis points):', targetAllocation);
-          } else if (rule.action.type === 'stake' || rule.action.type === 'provide_liquidity') {
-            // For stake/liquidity actions, use targetAllocation as percentage of vault to stake
+          } else if (rule.action.type === 'provide_liquidity') {
+            // For liquidity actions, use vault's asset allocations (contract validation requires it)
+            // The actual liquidity percentage is in threshold field, target_allocation is just for validation
+            targetAllocation = config.assets.map(asset => {
+              const percentage = asset.allocation || 0;
+              return Math.round(percentage * 10000);
+            });
+            console.log(`[VaultBuilder] Liquidity action using vault allocations: ${targetAllocation.join(', ')} basis points`);
+          } else if (rule.action.type === 'stake') {
+            // For stake actions, use targetAllocation as percentage of vault to stake
             const percentage = rule.action.parameters.targetAllocation || 0;
             targetAllocation = [Math.round((percentage as number) * 10000)];
-            console.log(`[VaultBuilder] ${rule.action.type} percentage: ${percentage}% -> ${targetAllocation[0]} basis points`);
+            console.log(`[VaultBuilder] Stake percentage: ${percentage}% -> ${targetAllocation[0]} basis points`);
           } else if (rule.action.parameters.targetAllocation) {
             // For other actions, use the provided target allocation
             targetAllocation = [rule.action.parameters.targetAllocation as number];
