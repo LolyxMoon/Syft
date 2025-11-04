@@ -490,7 +490,7 @@ export async function deployVault(
     
     // Default addresses for staking and liquidity factory (Soroswap testnet)
     const stakingPoolAddress = config.stakingPoolAddress || process.env.STAKING_POOL_ADDRESS || 
-      'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK'; // Mock staking pool for testnet
+      'CCZDUXOB6C77XD4JDG42NOOOXHDV7K2RT7OVVCR3BHU6LKEVYMEXB3KJ'; // Mock staking pool for testnet (with deposit/withdraw interface)
     
     const soroswapFactoryAddress = config.factoryAddress || process.env.SOROSWAP_FACTORY_ADDRESS || 
       'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES'; // Soroswap testnet factory

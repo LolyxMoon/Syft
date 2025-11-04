@@ -57,6 +57,38 @@ impl MockStakingPool {
         amount
     }
 
+    /// Deposit tokens (vault-compatible interface)
+    /// Assumes tokens have already been transferred to this contract
+    /// This is called by the vault after it transfers tokens
+    pub fn deposit(env: Env, sender: Address, amount: i128) -> i128 {
+        // No auth required since tokens should already be in the contract
+        if amount <= 0 {
+            panic!("amount must be positive");
+        }
+
+        // Update sender's staked amount
+        let user_key = DataKey::UserStake(sender.clone());
+        let current_stake: i128 = env.storage()
+            .persistent()
+            .get(&user_key)
+            .unwrap_or(0);
+        let new_stake = current_stake + amount;
+        env.storage().persistent().set(&user_key, &new_stake);
+
+        // Update total staked
+        let total: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap_or(0);
+        env.storage().instance().set(&DataKey::TotalStaked, &(total + amount));
+
+        // Emit event for tracking
+        env.events().publish(
+            (soroban_sdk::symbol_short!("deposit"),),
+            (sender.clone(), amount)
+        );
+
+        // Return amount staked (1:1 ratio, so same as input)
+        amount
+    }
+
     /// Unstake tokens - transfers tokens back to user
     pub fn unstake_tokens(env: Env, from: Address, amount: i128) -> i128 {
         from.require_auth();
@@ -99,14 +131,75 @@ impl MockStakingPool {
         amount
     }
 
+    /// Withdraw tokens (vault-compatible interface)
+    /// Transfers staked tokens back to sender
+    pub fn withdraw(env: Env, sender: Address, amount: i128) -> i128 {
+        // No auth required since this is called by vault on behalf of user
+        if amount <= 0 {
+            panic!("amount must be positive");
+        }
+
+        // Check sender has enough staked
+        let user_key = DataKey::UserStake(sender.clone());
+        let current_stake: i128 = env.storage()
+            .persistent()
+            .get(&user_key)
+            .unwrap_or(0);
+        
+        if current_stake < amount {
+            panic!("insufficient stake");
+        }
+
+        let token: Address = env.storage().instance().get(&DataKey::Token)
+            .expect("not initialized");
+
+        // Transfer tokens back to sender
+        let token_client = token::Client::new(&env, &token);
+        token_client.transfer(&env.current_contract_address(), &sender, &amount);
+
+        // Update sender's staked amount
+        let new_stake = current_stake - amount;
+        if new_stake == 0 {
+            env.storage().persistent().remove(&user_key);
+        } else {
+            env.storage().persistent().set(&user_key, &new_stake);
+        }
+
+        // Update total staked
+        let total: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap_or(0);
+        env.storage().instance().set(&DataKey::TotalStaked, &(total - amount));
+
+        // Emit event for tracking
+        env.events().publish(
+            (soroban_sdk::symbol_short!("withdraw"),),
+            (sender.clone(), amount)
+        );
+
+        // Return amount withdrawn
+        amount
+    }
+
     /// Get current staking rate (1:1 for mock, returns 1_000_000 which represents 1.0 with 6 decimals)
     pub fn get_staking_rate(env: Env) -> i128 {
         let _ = env; // Prevent unused variable warning
         1_000_000 // 1.0 with 6 decimal places
     }
 
+    /// Get exchange rate (vault-compatible interface)
+    /// Returns (xlm_amount, st_token_amount) representing 1:1 ratio
+    pub fn get_exchange_rate(env: Env) -> (i128, i128) {
+        let _ = env; // Prevent unused variable warning
+        (1_000_000, 1_000_000) // 1:1 ratio with 6 decimal places
+    }
+
     /// Get user's staked amount
     pub fn get_user_stake(env: Env, user: Address) -> i128 {
+        let user_key = DataKey::UserStake(user);
+        env.storage().persistent().get(&user_key).unwrap_or(0)
+    }
+
+    /// Get staked balance (vault-compatible interface)
+    pub fn get_staked_balance(env: Env, user: Address) -> i128 {
         let user_key = DataKey::UserStake(user);
         env.storage().persistent().get(&user_key).unwrap_or(0)
     }
