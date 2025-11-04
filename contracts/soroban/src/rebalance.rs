@@ -1,5 +1,5 @@
 // Rebalancing execution logic
-use soroban_sdk::{Env, Address, symbol_short, Symbol, Vec, String};
+use soroban_sdk::{Env, Address, symbol_short, Symbol, Vec, String, log};
 use crate::errors::VaultError;
 
 const CONFIG: Symbol = symbol_short!("CONFIG");
