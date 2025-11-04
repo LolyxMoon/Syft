@@ -130,16 +130,27 @@ export const tokenAddresses: { [key: string]: { [key: string]: string } } = {
  * @param network - Network name (testnet, futurenet, mainnet)
  * @returns Contract address for the asset
  */
-export function getAssetAddress(asset: string, network: string = 'testnet'): string {
+export function getAssetAddress(asset: any, network: string = 'testnet'): string {
   const normalizedNetwork = network.toLowerCase();
   
+  // Convert asset to string if it's an object
+  let assetStr: string;
+  if (typeof asset === 'string') {
+    assetStr = asset;
+  } else if (asset && typeof asset === 'object') {
+    // Handle object format: {code: 'XLM'} or {assetCode: 'XLM'} or {address: '...'}
+    assetStr = asset.code || asset.assetCode || asset.symbol || asset.address || String(asset);
+  } else {
+    assetStr = String(asset);
+  }
+  
   // If it's already a valid contract address, return it
-  if (asset.startsWith('C') && asset.length === 56) {
-    return asset;
+  if (assetStr.startsWith('C') && assetStr.length === 56) {
+    return assetStr;
   }
   
   // Warn about classic Stellar assets
-  if (asset.startsWith('G') && asset.length === 56) {
+  if (assetStr.startsWith('G') && assetStr.length === 56) {
     throw new Error(
       `Classic Stellar asset address detected. Please provide the Stellar Asset Contract (SAC) wrapper address instead. ` +
       `Learn more: https://developers.stellar.org/docs/tokens/stellar-asset-contract`
@@ -147,12 +158,12 @@ export function getAssetAddress(asset: string, network: string = 'testnet'): str
   }
   
   // Look up asset symbol
-  const assetSymbol = asset.toUpperCase();
+  const assetSymbol = assetStr.toUpperCase();
   const networkAddresses = tokenAddresses[assetSymbol];
   
   if (!networkAddresses) {
     throw new Error(
-      `Unknown asset symbol: "${asset}". ` +
+      `Unknown asset symbol: "${assetStr}". ` +
       `Please use a known symbol (XLM, USDC, EURC, AQUA) or provide a Stellar contract address (starts with 'C', 56 characters).`
     );
   }
@@ -160,7 +171,7 @@ export function getAssetAddress(asset: string, network: string = 'testnet'): str
   const address = networkAddresses[normalizedNetwork as keyof typeof networkAddresses];
   
   if (!address) {
-    console.warn(`⚠️  ${asset} not available on ${network}, using Native XLM instead`);
+    console.warn(`⚠️  ${assetSymbol} not available on ${network}, using Native XLM instead`);
     return nativeXLMAddresses[normalizedNetwork as keyof typeof nativeXLMAddresses] || 
            nativeXLMAddresses['testnet'];
   }

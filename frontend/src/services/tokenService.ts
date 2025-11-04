@@ -57,6 +57,11 @@ export async function getTokenInfo(address: string, network: string = 'testnet')
  * Get token display name (symbol or truncated address)
  */
 export function getTokenDisplayName(asset: any): string {
+  // Handle null/undefined
+  if (!asset) {
+    return 'Unknown';
+  }
+  
   // Handle string format
   if (typeof asset === 'string') {
     // If it's a known short name, return it
@@ -68,11 +73,20 @@ export function getTokenDisplayName(asset: any): string {
   }
   
   // Handle object format
-  if (asset.code || asset.assetCode) {
-    return asset.code || asset.assetCode;
+  if (typeof asset === 'object') {
+    if (asset.code || asset.assetCode) {
+      return asset.code || asset.assetCode;
+    }
+    if (asset.symbol) {
+      return asset.symbol;
+    }
+    if (asset.address) {
+      return asset.address;
+    }
   }
   
-  return asset.address || 'Unknown';
+  // Fallback to string conversion
+  return String(asset);
 }
 
 /**
@@ -81,6 +95,11 @@ export function getTokenDisplayName(asset: any): string {
  */
 export async function resolveAssetName(asset: any, network: string = 'testnet'): Promise<string> {
   const displayName = getTokenDisplayName(asset);
+  
+  // Safety check for non-string displayName
+  if (typeof displayName !== 'string') {
+    return 'Unknown';
+  }
   
   // If it's already a short name, return it
   if (displayName.length <= 10 && !displayName.startsWith('C')) {
