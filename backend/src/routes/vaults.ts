@@ -1246,26 +1246,29 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
     try {
       console.log(`[Submit Deposit] Checking if auto-rebalance is needed...`);
       
-      // Get vault info to check if it has rules requiring rebalance
+      // Get vault info to check if rebalancing is needed
       const { data: vault } = await supabase
         .from('vaults')
         .select('config')
         .eq('vault_id', vaultId)
         .single();
       
-      // Only auto-rebalance if:
-      // 1. Vault has rebalance rules configured
-      // 2. Vault has multiple assets (single-asset vaults don't need rebalancing)
+      // Auto-rebalance after deposit if:
+      // - Vault has multiple assets (to maintain target allocation)
+      // Note: We use force_rebalance which bypasses scheduled rule checks
+      // This is different from scheduled rebalancing - post-deposit rebalancing
+      // should always happen to maintain proper asset allocation
       const hasMultipleAssets = vault?.config?.assets && vault.config.assets.length > 1;
-      const hasRebalanceRules = vault?.config?.rules && vault.config.rules.length > 0;
       
-      if (hasRebalanceRules && hasMultipleAssets) {
-        console.log(`[Submit Deposit] Building rebalance transaction for user to sign...`);
+      if (hasMultipleAssets) {
+        console.log(`[Submit Deposit] Multi-asset vault detected, building rebalance transaction...`);
+        console.log(`[Submit Deposit] Target allocation:`, vault.config.assets);
         
         // Import the rebalance helper
         const { buildRebalanceTransaction } = await import('../services/vaultActionService.js');
         
         // Build rebalance transaction (force_rebalance, not trigger_rebalance)
+        // force_rebalance bypasses rule checks and rebalances immediately
         const result = await buildRebalanceTransaction(
           vaultId,
           userAddress,
@@ -1277,10 +1280,8 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
         needsRebalance = true;
         
         console.log(`[Submit Deposit] ✅ Rebalance transaction built, ready for user signature`);
-      } else if (!hasMultipleAssets) {
-        console.log(`[Submit Deposit] Single-asset vault, skipping auto-rebalance`);
       } else {
-        console.log(`[Submit Deposit] No rebalance rules configured, skipping auto-rebalance`);
+        console.log(`[Submit Deposit] Single-asset vault, skipping auto-rebalance`);
       }
     } catch (rebalanceError) {
       console.error('[Submit Deposit] Failed to build rebalance transaction (non-critical):', rebalanceError);
