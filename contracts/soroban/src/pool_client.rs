@@ -5,6 +5,7 @@ use soroban_sdk::{contractclient, Address, Env};
 /// Soroswap Liquidity Pool interface
 /// Based on Uniswap V2 Pair interface
 #[contractclient(name = "LiquidityPoolClient")]
+#[allow(dead_code)]
 pub trait LiquidityPoolInterface {
     /// Swap tokens directly through the pool
     /// amount0Out or amount1Out should be 0 (only one can be non-zero)
@@ -33,7 +34,7 @@ pub fn swap_via_pool(
     env: &Env,
     pool_address: &Address,
     from_token: &Address,
-    to_token: &Address,
+    _to_token: &Address,
     amount_in: i128,
     min_amount_out: i128,
 ) -> Result<i128, crate::errors::VaultError> {
@@ -51,7 +52,7 @@ pub fn swap_via_pool(
     let token1 = pool_client.token_1();
     
     // Determine which token we're swapping from/to
-    let (is_token0_in, is_token0_out) = if from_token == &token0 {
+    let (is_token0_in, _is_token0_out) = if from_token == &token0 {
         (true, false)
     } else if from_token == &token1 {
         (false, true)
@@ -140,7 +141,7 @@ pub fn calculate_swap_output(
     env: &Env,
     pool_address: &Address,
     from_token: &Address,
-    to_token: &Address,
+    _to_token: &Address,
     amount_in: i128,
 ) -> Result<i128, crate::errors::VaultError> {
     use crate::errors::VaultError;
@@ -198,7 +199,7 @@ pub fn calculate_swap_input(
     env: &Env,
     pool_address: &Address,
     from_token: &Address,
-    to_token: &Address,
+    _to_token: &Address,
     amount_out_desired: i128,
 ) -> Result<i128, crate::errors::VaultError> {
     use crate::errors::VaultError;
@@ -280,6 +281,7 @@ pub fn get_pool_for_pair(
     
     // Soroswap Factory interface
     #[contractclient(name = "FactoryClient")]
+    #[allow(dead_code)]
     pub trait FactoryInterface {
         fn get_pair(env: Env, token_a: Address, token_b: Address) -> Result<Address, FactoryError>;
     }

@@ -5,6 +5,7 @@ use soroban_sdk::{contractclient, Address, Env};
 /// Liquid Staking Pool interface
 /// Compatible with protocols like Lumenswap's stXLM or similar liquid staking
 #[contractclient(name = "StakingPoolClient")]
+#[allow(dead_code)]
 pub trait StakingPoolInterface {
     /// Deposit XLM and receive staking tokens (e.g., stXLM)
     /// Returns the amount of staking tokens minted
@@ -103,6 +104,7 @@ pub fn unstake_tokens(
 
 /// Get the current staking exchange rate
 /// Returns (base_amount, st_token_amount) ratio
+#[allow(dead_code)]
 pub fn get_staking_rate(
     env: &Env,
     pool_address: &Address,
@@ -113,6 +115,7 @@ pub fn get_staking_rate(
 }
 
 /// Get staked balance for the vault
+#[allow(dead_code)]
 pub fn get_staked_balance(
     env: &Env,
     pool_address: &Address,

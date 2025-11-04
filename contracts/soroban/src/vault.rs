@@ -378,6 +378,7 @@ impl VaultContract {
     }
     
     /// Liquidate positions to cover withdrawal shortfall (OLD - kept for compatibility)
+    #[allow(dead_code)]
     fn liquidate_positions_for_withdrawal(
         env: &Env,
         config: &VaultConfig,
@@ -387,7 +388,7 @@ impl VaultContract {
         
         log!(env, "Liquidating positions to cover withdrawal. Amount needed: {}", amount_needed);
         
-        let vault_address = env.current_contract_address();
+        let _vault_address = env.current_contract_address();
         let mut amount_liquidated: i128 = 0;
         
         // Try to unstake from staking pool if configured
@@ -579,6 +580,7 @@ impl VaultContract {
     /// Swap other assets back to base token for withdrawal (OLD - kept for compatibility)
     /// SMART APPROACH: Scan ALL configured assets for balances and swap to base token
     /// This works even if vault config is incomplete - we swap whatever tokens the vault actually holds
+    #[allow(dead_code)]
     fn swap_assets_to_base_token(
         env: &Env,
         config: &VaultConfig,

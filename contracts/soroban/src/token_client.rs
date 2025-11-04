@@ -23,6 +23,7 @@ pub fn transfer_tokens(
 }
 
 /// Transfer tokens from vault to user (for withdrawals)
+#[allow(dead_code)]
 pub fn transfer_from_vault(
     env: &Env,
     token_address: &Address,
@@ -34,6 +35,7 @@ pub fn transfer_from_vault(
 }
 
 /// Transfer tokens from user to vault (for deposits)
+#[allow(dead_code)]
 pub fn transfer_to_vault(
     env: &Env,
     token_address: &Address,
@@ -84,6 +86,7 @@ pub fn approve_router(
 }
 
 /// Check if router has sufficient allowance
+#[allow(dead_code)]
 pub fn check_allowance(
     env: &Env,
     token_address: &Address,
@@ -97,6 +100,7 @@ pub fn check_allowance(
 /// Check if an account has a trustline for a token
 /// Returns true if the account can receive the token (trustline exists)
 /// Returns false if the trustline is missing
+#[allow(dead_code)]
 pub fn has_trustline(
     env: &Env,
     token_address: &Address,

@@ -5,6 +5,7 @@ use crate::soroswap_router::SoroswapRouterClient;
 
 /// Interface for Soroswap Aggregator Router
 /// Allows swapping tokens through multiple liquidity sources
+#[allow(dead_code)]
 pub trait SwapRouterInterface {
     /// Execute a chained swap through multiple pools
     /// Returns the amount of output tokens received
@@ -152,12 +153,13 @@ pub fn get_soroswap_factory_address_internal(env: &Env) -> Address {
 
 /// Find optimal swap route between two tokens
 /// In production, this queries available pools and calculates best route
+#[allow(dead_code)]
 pub fn find_optimal_route(
     env: &Env,
-    router_address: &Address,
+    _router_address: &Address,
     from_token: &Address,
     to_token: &Address,
-    amount_in: i128,
+    _amount_in: i128,
 ) -> Result<Vec<(Vec<Address>, BytesN<32>, Address)>, VaultError> {
     // In production, this would:
     // 1. Query all available pools from Soroswap/Phoenix
@@ -182,6 +184,7 @@ pub fn find_optimal_route(
 }
 
 /// Get quote for swap without executing
+#[allow(dead_code)]
 pub fn get_swap_quote(
     env: &Env,
     router_address: &Address,

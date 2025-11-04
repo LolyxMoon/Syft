@@ -4,6 +4,7 @@ use soroban_sdk::{contractclient, Address, Env, Vec};
 /// Soroswap Router interface
 /// Based on Uniswap V2 Router interface adapted for Soroban
 #[contractclient(name = "SoroswapRouterClient")]
+#[allow(dead_code)]
 pub trait SoroswapRouterInterface {
     /// Swap exact tokens for tokens along a specified path
     /// Returns the amount of output tokens received

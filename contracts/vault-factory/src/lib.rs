@@ -69,7 +69,7 @@ impl VaultFactory {
     }
 
     /// Deploy a new vault instance
-    pub fn create_vault(env: Env, config: VaultConfig) -> Result<Address, VaultFactoryError> {
+    pub fn create_vault(env: Env, _config: VaultConfig) -> Result<Address, VaultFactoryError> {
         // Get WASM hash
         let wasm_hash: BytesN<32> = env.storage().instance()
             .get(&WASM_HASH)

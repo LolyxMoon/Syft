@@ -6,6 +6,7 @@ const CONFIG: Symbol = symbol_short!("CONFIG");
 const STATE: Symbol = symbol_short!("STATE");
 
 /// Execute rebalancing of vault assets according to rules
+#[allow(dead_code)]
 pub fn execute_rebalance(env: &Env) -> Result<(), VaultError> {
     use soroban_sdk::symbol_short;
     
@@ -47,7 +48,7 @@ pub fn execute_rebalance_only(env: &Env) -> Result<(), VaultError> {
         .get(&CONFIG)
         .ok_or(VaultError::NotInitialized)?;
     
-    let state: crate::types::VaultState = env.storage().instance()
+    let _state: crate::types::VaultState = env.storage().instance()
         .get(&STATE)
         .ok_or(VaultError::NotInitialized)?;
     
@@ -90,7 +91,7 @@ pub fn execute_stake_only(env: &Env) -> Result<(), VaultError> {
         .get(&CONFIG)
         .ok_or(VaultError::NotInitialized)?;
     
-    let state: crate::types::VaultState = env.storage().instance()
+    let _state: crate::types::VaultState = env.storage().instance()
         .get(&STATE)
         .ok_or(VaultError::NotInitialized)?;
     
@@ -133,7 +134,7 @@ pub fn execute_liquidity_only(env: &Env) -> Result<(), VaultError> {
         .get(&CONFIG)
         .ok_or(VaultError::NotInitialized)?;
     
-    let state: crate::types::VaultState = env.storage().instance()
+    let _state: crate::types::VaultState = env.storage().instance()
         .get(&STATE)
         .ok_or(VaultError::NotInitialized)?;
     
@@ -169,6 +170,7 @@ pub fn execute_liquidity_only(env: &Env) -> Result<(), VaultError> {
 }
 
 /// Execute the action specified in a rebalancing rule
+#[allow(dead_code)]
 fn execute_rule_action(
     env: &Env, 
     rule: &crate::types::RebalanceRule,
@@ -613,6 +615,11 @@ fn execute_liquidity_action(
         return Err(VaultError::InsufficientBalance);
     }
     
+    // CRITICAL: Authorize the vault contract to act on behalf of itself
+    // This allows the mock pool to call token.transfer with the vault as sender
+    // The mock pool requires user.require_auth() which expects authorization
+    env.authorize_as_current_contract(soroban_sdk::Vec::new(env));
+    
     // Add liquidity through mock pool with 5% slippage tolerance
     let (lp_tokens, actual_a, actual_b) = crate::liquidity_router::add_liquidity_to_pool(
         env,
@@ -651,6 +658,7 @@ fn execute_liquidity_action(
 }
 
 /// Helper function to swap tokens using Stellar liquidity pools
+#[allow(dead_code)]
 fn swap_tokens(
     env: &Env,
     from_token: &Address,
@@ -694,6 +702,7 @@ fn swap_tokens(
 }
 
 /// Get optimal swap route between two tokens
+#[allow(dead_code)]
 fn get_swap_route(
     env: &Env,
     from_token: &Address,
@@ -717,6 +726,7 @@ fn get_swap_route(
 }
 
 /// Execute token swap through Stellar AMM
+#[allow(dead_code)]
 fn execute_amm_swap(
     env: &Env,
     from_token: &Address,

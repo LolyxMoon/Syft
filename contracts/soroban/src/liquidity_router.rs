@@ -1,10 +1,11 @@
 // Mock Liquidity Pool interface for liquidity provision
 // This handles adding and removing liquidity from a mock DEX pool
-use soroban_sdk::{contractclient, Address, Env, Vec};
+use soroban_sdk::{contractclient, Address, Env};
 
 /// Mock Liquidity Pool interface
 /// Simplified interface for testing liquidity operations
 #[contractclient(name = "MockLiquidityPoolClient")]
+#[allow(dead_code)]
 pub trait MockLiquidityPoolInterface {
     /// Add liquidity to a token pair pool
     /// Returns (liquidity_tokens, amount_a_used, amount_b_used)
@@ -81,16 +82,12 @@ pub fn add_liquidity_to_pool(
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
-    // CRITICAL: Authorize sub-contract calls for the mock pool
-    // This allows the pool to call token.transfer on behalf of the vault
-    env.authorize_as_current_contract(soroban_sdk::vec![env]);
-    
     // Add liquidity through mock pool
     // The mock pool will call token.transfer internally
     let (lp_tokens, actual_a, actual_b) = pool_client.add_liquidity(
         &vault_address,
-        &token_a,
-        &token_b,
+        token_a,
+        token_b,
         &amount_a,
         &amount_b,
         &amount_a_min,
@@ -107,6 +104,7 @@ pub fn add_liquidity_to_pool(
 
 /// Remove liquidity from a mock liquidity pool
 /// This burns LP tokens and receives both tokens back
+#[allow(dead_code)]
 pub fn remove_liquidity_from_pool(
     env: &Env,
     pool_address: &Address,
@@ -136,10 +134,6 @@ pub fn remove_liquidity_from_pool(
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
-    // CRITICAL: Authorize sub-contract calls for the mock pool
-    // This allows the pool to call token.transfer on behalf of the vault
-    env.authorize_as_current_contract(soroban_sdk::vec![env]);
-    
     // Remove liquidity through mock pool
     let (amount_a, amount_b) = pool_client.remove_liquidity(
         &vault_address,
@@ -160,6 +154,7 @@ pub fn remove_liquidity_from_pool(
 
 /// Get optimal amount_b for adding liquidity with amount_a
 /// This helps maintain the correct ratio when adding liquidity
+#[allow(dead_code)]
 pub fn get_optimal_liquidity_amounts(
     env: &Env,
     pool_address: &Address,

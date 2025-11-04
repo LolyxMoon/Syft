@@ -5,6 +5,7 @@ use crate::types::RebalanceRule;
 const STATE: Symbol = symbol_short!("STATE");
 
 /// Evaluate all rebalancing rules and return true if any should trigger
+#[allow(dead_code)]
 pub fn evaluate_rules(env: &Env, rules: &Vec<RebalanceRule>) -> bool {
     for i in 0..rules.len() {
         if let Some(rule) = rules.get(i) {
@@ -126,6 +127,7 @@ pub fn should_rebalance(env: &Env) -> bool {
 }
 
 /// Check if any rule should trigger staking
+#[allow(dead_code)]
 pub fn should_stake(env: &Env) -> bool {
     let config: Result<crate::types::VaultConfig, crate::errors::VaultError> = 
         env.storage().instance().get(&symbol_short!("CONFIG"))
@@ -149,6 +151,7 @@ pub fn should_stake(env: &Env) -> bool {
 }
 
 /// Check if any rule should trigger liquidity provision
+#[allow(dead_code)]
 pub fn should_provide_liquidity(env: &Env) -> bool {
     let config: Result<crate::types::VaultConfig, crate::errors::VaultError> = 
         env.storage().instance().get(&symbol_short!("CONFIG"))
