@@ -105,6 +105,53 @@ CREATE TABLE public.marketplace_listings (
   CONSTRAINT marketplace_listings_pkey PRIMARY KEY (id),
   CONSTRAINT marketplace_listings_nft_id_fkey FOREIGN KEY (nft_id) REFERENCES public.vault_nfts(id)
 );
+CREATE TABLE public.quests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  quest_key text NOT NULL UNIQUE CHECK (length(quest_key) > 0),
+  title text NOT NULL,
+  description text NOT NULL,
+  category text NOT NULL,
+  difficulty text NOT NULL,
+  order_index integer NOT NULL,
+  reward_nft_image text,
+  reward_nft_name text NOT NULL,
+  reward_nft_description text,
+  validation_type text NOT NULL,
+  validation_config jsonb DEFAULT '{}'::jsonb,
+  hint_steps jsonb DEFAULT '[]'::jsonb,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT quests_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.user_onboarding (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  has_seen_quest_modal boolean DEFAULT false,
+  wants_quests boolean DEFAULT false,
+  quests_started_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_onboarding_pkey PRIMARY KEY (id),
+  CONSTRAINT user_onboarding_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.user_quests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  quest_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'not_started'::text,
+  progress jsonb DEFAULT '{}'::jsonb,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  claimed_at timestamp with time zone,
+  nft_token_id text,
+  nft_transaction_hash text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_quests_pkey PRIMARY KEY (id),
+  CONSTRAINT user_quests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT user_quests_quest_id_fkey FOREIGN KEY (quest_id) REFERENCES public.quests(id)
+);
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   wallet_address text NOT NULL UNIQUE CHECK (length(wallet_address) > 0),
