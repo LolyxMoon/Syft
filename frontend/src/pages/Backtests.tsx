@@ -390,9 +390,27 @@ const Backtests = () => {
             });
           } else if (rule.condition_type === 'allocation_based' || rule.condition_type === 'allocation') {
             // Handle allocation-based rebalancing
-            // Threshold always represents deviation from target (e.g., 5% means "rebalance when allocation deviates by ±5%")
+            // Threshold represents deviation from target (e.g., 5% means "rebalance when allocation deviates by ±5%")
             // Industry standard: 5% deviation threshold (Vanguard, Fidelity best practices)
-            const thresholdValue = rule.threshold || 5;
+            
+            let thresholdValue = rule.threshold || 5;
+            
+            // BACKWARD COMPATIBILITY: Detect old-style "absolute threshold" format
+            // Old format: threshold=80 with target=70 meant "rebalance at 80%" (deviation was implicit)
+            // New format: threshold=5 means "rebalance at ±5% deviation"
+            // Heuristic: If threshold > 20%, it's likely old format
+            if (thresholdValue > 20) {
+              // Calculate target allocation from target_allocation array
+              const targetAllocation = rule.target_allocation && Array.isArray(rule.target_allocation) 
+                ? (rule.target_allocation[0] / 10000) // First asset percentage from basis points
+                : 50; // Default 50-50 split
+              
+              // Convert old absolute threshold to deviation
+              // Example: target=70%, threshold=80% → deviation=10%
+              thresholdValue = Math.abs(thresholdValue - targetAllocation);
+              
+              console.log(`[Backtests] Converted old threshold format: ${rule.threshold}% → ±${thresholdValue}% deviation (target: ${targetAllocation}%)`);
+            }
             
             conditions.push({
               type: 'allocation',
