@@ -83,7 +83,7 @@ function getProtocolRegistry(): ProtocolInfo[] {
       type: 'liquidity',
       networks: ['testnet', 'futurenet', 'mainnet'],
       contractAddress: {
-        testnet: 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS',
+        testnet: 'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G', // Mock Liquidity Pool for testing
         futurenet: process.env.PUBLIC_SOROSWAP_ROUTER_FUTURENET || '',
         mainnet: 'CAG5LRYQ5JVEUI5TEID72EYOVX44TTUJT5BQR2J6J77FH65PCCFAJDDH',
       },
@@ -96,6 +96,11 @@ function getProtocolRegistry(): ProtocolInfo[] {
       description: 'Liquidity protocol and AMM',
       type: 'liquidity',
       networks: ['testnet', 'mainnet'],
+      contractAddress: {
+        testnet: 'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G', // Mock Liquidity Pool for testing
+        futurenet: '',
+        mainnet: '',
+      },
       website: 'https://aqua.network',
     },
     {

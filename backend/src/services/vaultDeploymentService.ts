@@ -485,8 +485,9 @@ export async function deployVault(
 ): Promise<DeploymentResult> {
   try {
     const vaultId = generateVaultId();
-    const routerAddress = config.routerAddress || process.env.SOROSWAP_ROUTER_ADDRESS || 
-      'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
+    // Use Mock Liquidity Pool for testing - bypasses Soroswap authorization issues
+    const routerAddress = config.routerAddress || process.env.MOCK_LIQUIDITY_POOL || 
+      'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G';
     
     // Default addresses for staking and liquidity factory (Soroswap testnet)
     const stakingPoolAddress = config.stakingPoolAddress || process.env.STAKING_POOL_ADDRESS || 

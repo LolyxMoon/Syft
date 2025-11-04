@@ -1,22 +1,22 @@
-// Soroswap Router interface for liquidity provision
-// This handles adding and removing liquidity from AMM pools
+// Mock Liquidity Pool interface for liquidity provision
+// This handles adding and removing liquidity from a mock DEX pool
 use soroban_sdk::{contractclient, Address, Env, Vec};
 
-/// Soroswap Router Liquidity interface
-/// Based on Uniswap V2 Router liquidity functions
-#[contractclient(name = "LiquidityRouterClient")]
-pub trait LiquidityRouterInterface {
+/// Mock Liquidity Pool interface
+/// Simplified interface for testing liquidity operations
+#[contractclient(name = "MockLiquidityPoolClient")]
+pub trait MockLiquidityPoolInterface {
     /// Add liquidity to a token pair pool
     /// Returns (liquidity_tokens, amount_a_used, amount_b_used)
     fn add_liquidity(
         env: Env,
+        user: Address,
         token_a: Address,
         token_b: Address,
         amount_a_desired: i128,
         amount_b_desired: i128,
         amount_a_min: i128,
         amount_b_min: i128,
-        to: Address,
         deadline: u64,
     ) -> (i128, i128, i128);
     
@@ -24,12 +24,12 @@ pub trait LiquidityRouterInterface {
     /// Returns (amount_a, amount_b)
     fn remove_liquidity(
         env: Env,
+        user: Address,
         token_a: Address,
         token_b: Address,
-        liquidity: i128,
+        lp_tokens: i128,
         amount_a_min: i128,
         amount_b_min: i128,
-        to: Address,
         deadline: u64,
     ) -> (i128, i128);
     
@@ -43,11 +43,11 @@ pub trait LiquidityRouterInterface {
     ) -> i128;
 }
 
-/// Add liquidity to a Soroswap pool
+/// Add liquidity to a mock liquidity pool
 /// This adds both tokens to the pool and receives LP tokens
 pub fn add_liquidity_to_pool(
     env: &Env,
-    router_address: &Address,
+    pool_address: &Address,
     token_a: &Address,
     token_b: &Address,
     amount_a: i128,
@@ -64,7 +64,7 @@ pub fn add_liquidity_to_pool(
         return Err(VaultError::InvalidConfiguration);
     }
 
-    let router_client = LiquidityRouterClient::new(env, router_address);
+    let pool_client = MockLiquidityPoolClient::new(env, pool_address);
     let vault_address = env.current_contract_address();
     
     // Calculate minimum amounts based on slippage tolerance
@@ -78,36 +78,19 @@ pub fn add_liquidity_to_pool(
         .and_then(|v| v.checked_div(100))
         .ok_or(VaultError::InvalidAmount)?;
     
-    // CRITICAL FIX: We need to authorize the router to transfer tokens on our behalf
-    // The router's add_liquidity function will call token.transfer(vault, pair, amount)
-    // We must pre-authorize these transfers using authorize_as_current_contract
-    
-    use soroban_sdk::IntoVal;
-    
-    // Pre-authorize the token transfers that will happen during add_liquidity
-    // We authorize the vault contract to allow sub-contract calls
-    env.authorize_as_current_contract(soroban_sdk::vec![
-        env,
-    ]);
-    
-    // Approve router to spend our tokens
-    // The router needs this approval to call transfer_from
-    crate::token_client::approve_router(env, token_a, router_address, amount_a)?;
-    crate::token_client::approve_router(env, token_b, router_address, amount_b)?;
-    
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
-    // Add liquidity through router
-    // The router will internally call token.transfer on behalf of the vault
-    let (lp_tokens, actual_a, actual_b) = router_client.add_liquidity(
+    // Add liquidity through mock pool
+    // The mock pool will call token.transfer internally with proper authorization
+    let (lp_tokens, actual_a, actual_b) = pool_client.add_liquidity(
+        &vault_address,
         &token_a,
         &token_b,
         &amount_a,
         &amount_b,
         &amount_a_min,
         &amount_b_min,
-        &vault_address,
         &deadline,
     );
     
@@ -118,11 +101,11 @@ pub fn add_liquidity_to_pool(
     Ok((lp_tokens, actual_a, actual_b))
 }
 
-/// Remove liquidity from a Soroswap pool
+/// Remove liquidity from a mock liquidity pool
 /// This burns LP tokens and receives both tokens back
 pub fn remove_liquidity_from_pool(
     env: &Env,
-    router_address: &Address,
+    pool_address: &Address,
     token_a: &Address,
     token_b: &Address,
     lp_tokens: i128,
@@ -138,25 +121,25 @@ pub fn remove_liquidity_from_pool(
         return Err(VaultError::InvalidConfiguration);
     }
 
-    let router_client = LiquidityRouterClient::new(env, router_address);
+    let pool_client = MockLiquidityPoolClient::new(env, pool_address);
     let vault_address = env.current_contract_address();
     
-    // Get current pool reserves to estimate minimum amounts
-    // We'll set minimums to 0 for simplicity, or calculate based on reserves
+    // Calculate minimum amounts based on slippage tolerance
+    // For mock pool, we'll use 0 for simplicity
     let amount_a_min = 0;
     let amount_b_min = 0;
     
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
-    // Remove liquidity through router
-    let (amount_a, amount_b) = router_client.remove_liquidity(
+    // Remove liquidity through mock pool
+    let (amount_a, amount_b) = pool_client.remove_liquidity(
+        &vault_address,
         &token_a,
         &token_b,
         &lp_tokens,
         &amount_a_min,
         &amount_b_min,
-        &vault_address,
         &deadline,
     );
     
@@ -171,7 +154,7 @@ pub fn remove_liquidity_from_pool(
 /// This helps maintain the correct ratio when adding liquidity
 pub fn get_optimal_liquidity_amounts(
     env: &Env,
-    router_address: &Address,
+    pool_address: &Address,
     amount_a: i128,
     reserve_a: i128,
     reserve_b: i128,
@@ -182,9 +165,9 @@ pub fn get_optimal_liquidity_amounts(
         return Err(VaultError::InvalidAmount);
     }
 
-    let router_client = LiquidityRouterClient::new(env, router_address);
+    let pool_client = MockLiquidityPoolClient::new(env, pool_address);
     
-    let amount_b = router_client.quote(
+    let amount_b = pool_client.quote(
         &amount_a,
         &reserve_a,
         &reserve_b,
