@@ -1,18 +1,87 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Text } from "@stellar/design-system";
 import { Wallet, LogOut, RefreshCw, Copy, Check } from "lucide-react";
 import { useWallet } from "../hooks/useWallet";
 import { useWalletBalance } from "../hooks/useWalletBalance";
-import { connectWallet, disconnectWallet } from "../util/wallet";
+import { connectWallet, disconnectWallet, wallet } from "../util/wallet";
+import storage from "../util/storage";
 import { Button } from "./ui";
+import { NetworkValidationModal } from "./wallet/NetworkValidationModal";
+import { isValidNetwork } from "../util/networkValidation";
 
 export const WalletButton = () => {
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { address, isPending } = useWallet();
+  const { address, network, isPending } = useWallet();
   const { xlm, isLoading: isLoadingBalance, error: balanceError, updateBalance } = useWalletBalance();
   const buttonLabel = isPending ? "Connecting..." : "Connect Wallet";
+
+  // Validate network whenever wallet connects or network changes
+  useEffect(() => {
+    console.log('[WalletButton] Network validation check:', { address, network });
+    
+    if (address && network) {
+      const networkIsValid = isValidNetwork(network);
+      console.log('[WalletButton] Network valid?', networkIsValid, 'Network:', network);
+      
+      if (!networkIsValid) {
+        // Show network validation modal if not on testnet
+        console.log('[WalletButton] Showing network validation modal');
+        setIsNetworkModalOpen(true);
+      } else {
+        // Close modal if user is on testnet
+        console.log('[WalletButton] Network is valid, closing modal');
+        setIsNetworkModalOpen(false);
+      }
+    }
+  }, [address, network]);
+
+  // Listen for network changes from the wallet
+  useEffect(() => {
+    if (!address) return;
+
+    const checkNetworkChange = async () => {
+      try {
+        const networkData = await wallet.getNetwork();
+        console.log('[WalletButton] Network check:', networkData);
+        
+        if (networkData.network && networkData.network.toLowerCase() !== network?.toLowerCase()) {
+          console.log('[WalletButton] Network changed! Updating storage...');
+          // Update storage with new network
+          storage.setItem('walletNetwork', networkData.network);
+          storage.setItem('networkPassphrase', networkData.networkPassphrase);
+          
+          // Dispatch event to update WalletProvider
+          window.dispatchEvent(new CustomEvent('walletConnected', {
+            detail: {
+              address,
+              network: networkData.network,
+              networkPassphrase: networkData.networkPassphrase,
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('[WalletButton] Error checking network:', error);
+      }
+    };
+
+    // Check network every 2 seconds
+    const interval = setInterval(checkNetworkChange, 2000);
+
+    return () => clearInterval(interval);
+  }, [address, network]);
+
+  const handleSwitchNetwork = () => {
+    // Since we can't programmatically switch networks, we guide users to do it manually
+    alert('Please open your wallet extension and switch to Testnet network.');
+    setIsNetworkModalOpen(false);
+  };
+
+  const handleCloseNetworkModal = () => {
+    setIsNetworkModalOpen(false);
+  };
 
   const handleCopyAddress = () => {
     if (address) {
@@ -176,6 +245,14 @@ export const WalletButton = () => {
           {address.slice(0, 4)}...{address.slice(-4)}
         </span>
       </button>
+
+      {/* Network validation modal - always rendered so it can show when connected */}
+      <NetworkValidationModal
+        isOpen={isNetworkModalOpen}
+        currentNetwork={network || ''}
+        onClose={handleCloseNetworkModal}
+        onSwitchNetwork={handleSwitchNetwork}
+      />
     </div>
   );
 };
