@@ -8,7 +8,8 @@ pub struct VaultConfig {
     pub name: String,
     pub assets: Vec<Address>,
     pub rules: Vec<RebalanceRule>,
-    pub router_address: Option<Address>, // Soroswap/Phoenix router for swaps
+    pub router_address: Option<Address>, // Soroswap/Phoenix router for swaps and rebalancing
+    pub liquidity_pool_address: Option<Address>, // Mock liquidity pool for add/remove liquidity
     pub staking_pool_address: Option<Address>, // Liquid staking pool (e.g., stXLM)
     pub factory_address: Option<Address>, // Soroswap factory for finding pools
 }

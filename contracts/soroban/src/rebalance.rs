@@ -587,12 +587,12 @@ fn execute_liquidity_action(
         return Err(VaultError::InsufficientBalance);
     }
     
-    // Get pool address from config (mock liquidity pool)
+    // Get pool address from config (mock liquidity pool for add/remove liquidity)
     let config: crate::types::VaultConfig = env.storage().instance()
         .get(&CONFIG)
         .ok_or(VaultError::NotInitialized)?;
     
-    let pool_address = config.router_address
+    let pool_address = config.liquidity_pool_address
         .ok_or(VaultError::InvalidConfiguration)?;
     
     // Use first two assets as liquidity pair
