@@ -78,62 +78,20 @@ pub fn add_liquidity_to_pool(
         .and_then(|v| v.checked_div(100))
         .ok_or(VaultError::InvalidAmount)?;
     
-    // CRITICAL: Authorize sub-contract calls for token operations
-    // We need to authorize the router to transfer tokens on behalf of the vault
-    use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
-    use soroban_sdk::{vec as soroban_vec, IntoVal, Symbol};
+    // CRITICAL FIX: We need to authorize the router to transfer tokens on our behalf
+    // The router's add_liquidity function will call token.transfer(vault, pair, amount)
+    // We must pre-authorize these transfers using authorize_as_current_contract
     
-    env.authorize_as_current_contract(soroban_vec![
+    use soroban_sdk::IntoVal;
+    
+    // Pre-authorize the token transfers that will happen during add_liquidity
+    // We authorize the vault contract to allow sub-contract calls
+    env.authorize_as_current_contract(soroban_sdk::vec![
         env,
-        // Authorize token_a approve call
-        InvokerContractAuthEntry::Contract(SubContractInvocation {
-            context: ContractContext {
-                contract: token_a.clone(),
-                fn_name: Symbol::new(env, "approve"),
-                args: (
-                    env.current_contract_address(),
-                    router_address.clone(),
-                    amount_a,
-                    env.ledger().sequence() + 100u32,
-                ).into_val(env),
-            },
-            sub_invocations: soroban_vec![env],
-        }),
-        // Authorize token_b approve call
-        InvokerContractAuthEntry::Contract(SubContractInvocation {
-            context: ContractContext {
-                contract: token_b.clone(),
-                fn_name: Symbol::new(env, "approve"),
-                args: (
-                    env.current_contract_address(),
-                    router_address.clone(),
-                    amount_b,
-                    env.ledger().sequence() + 100u32,
-                ).into_val(env),
-            },
-            sub_invocations: soroban_vec![env],
-        }),
-        // Authorize router's add_liquidity call which will transfer tokens
-        InvokerContractAuthEntry::Contract(SubContractInvocation {
-            context: ContractContext {
-                contract: router_address.clone(),
-                fn_name: Symbol::new(env, "add_liquidity"),
-                args: (
-                    token_a.clone(),
-                    token_b.clone(),
-                    amount_a,
-                    amount_b,
-                    amount_a_min,
-                    amount_b_min,
-                    vault_address.clone(),
-                    env.ledger().timestamp() + 3600,
-                ).into_val(env),
-            },
-            sub_invocations: soroban_vec![env],
-        }),
     ]);
     
     // Approve router to spend our tokens
+    // The router needs this approval to call transfer_from
     crate::token_client::approve_router(env, token_a, router_address, amount_a)?;
     crate::token_client::approve_router(env, token_b, router_address, amount_b)?;
     
@@ -141,6 +99,7 @@ pub fn add_liquidity_to_pool(
     let deadline = env.ledger().timestamp() + 3600;
     
     // Add liquidity through router
+    // The router will internally call token.transfer on behalf of the vault
     let (lp_tokens, actual_a, actual_b) = router_client.add_liquidity(
         &token_a,
         &token_b,
