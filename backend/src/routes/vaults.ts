@@ -96,7 +96,18 @@ async function initializeVaultContract(
     }),
     new StellarSdk.xdr.ScMapEntry({
       key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('factory_address')),
-      val: StellarSdk.xdr.ScVal.scvVoid(), // Option::None
+      val: (() => {
+        // Set factory address for testnet if any liquidity rules exist
+        const hasLiquidityRules = config.rules?.some((r: any) => r.action === 'liquidity' || r.action === 'provide_liquidity');
+        if (hasLiquidityRules && network === 'testnet') {
+          // Soroswap Factory address on testnet
+          const factoryAddress = process.env.SOROSWAP_FACTORY_ADDRESS || 'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES';
+          return StellarSdk.xdr.ScVal.scvVec([
+            StellarSdk.Address.fromString(factoryAddress).toScVal()
+          ]); // Option::Some(Address)
+        }
+        return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+      })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
       key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('name')),
@@ -108,7 +119,18 @@ async function initializeVaultContract(
     }),
     new StellarSdk.xdr.ScMapEntry({
       key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('router_address')),
-      val: StellarSdk.xdr.ScVal.scvVoid(), // Option::None
+      val: (() => {
+        // Set router address for testnet if any liquidity rules exist
+        const hasLiquidityRules = config.rules?.some((r: any) => r.action === 'liquidity' || r.action === 'provide_liquidity');
+        if (hasLiquidityRules && network === 'testnet') {
+          // Soroswap Router address on testnet
+          const routerAddress = process.env.SOROSWAP_ROUTER_ADDRESS || 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
+          return StellarSdk.xdr.ScVal.scvVec([
+            StellarSdk.Address.fromString(routerAddress).toScVal()
+          ]); // Option::Some(Address)
+        }
+        return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+      })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
       key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('rules')),
@@ -793,7 +815,16 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('factory_address')),
-        val: StellarSdk.xdr.ScVal.scvVoid(), // Option::None
+        val: (() => {
+          // Set factory address for testnet (Soroswap Factory)
+          if (network === 'testnet') {
+            const factoryAddress = process.env.SOROSWAP_FACTORY_ADDRESS || 'CDJTMBYKNUGINFQALHDMPLZYNGUV42GPN4B7QOYTWHRC4EE5IYJM6AES';
+            return StellarSdk.xdr.ScVal.scvVec([
+              StellarSdk.Address.fromString(factoryAddress).toScVal()
+            ]); // Option::Some(Address)
+          }
+          return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+        })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('name')),
@@ -805,7 +836,16 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('router_address')),
-        val: StellarSdk.xdr.ScVal.scvVoid(), // Option::None
+        val: (() => {
+          // Set router address for testnet (Soroswap Router)
+          if (network === 'testnet') {
+            const routerAddress = process.env.SOROSWAP_ROUTER_ADDRESS || 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
+            return StellarSdk.xdr.ScVal.scvVec([
+              StellarSdk.Address.fromString(routerAddress).toScVal()
+            ]); // Option::Some(Address)
+          }
+          return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+        })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('rules')),
