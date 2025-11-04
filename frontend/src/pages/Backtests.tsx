@@ -1016,10 +1016,10 @@ const Backtests = () => {
                             <p className="text-xs text-neutral-500 mb-2">Assets:</p>
                             <div className="space-y-1">
                               {selectedVault.config.assets.map((asset, idx) => {
-                                const assetCode = typeof asset === 'string' ? asset : asset.assetCode;
+                                const assetCode = typeof asset === 'string' ? asset : (asset.code || asset.assetCode);
                                 const percentage = typeof asset === 'string' 
                                   ? Math.round(100 / selectedVault.config.assets.length) 
-                                  : asset.percentage;
+                                  : (asset.allocation || asset.percentage);
                                 
                                 // Resolve token name asynchronously
                                 const cacheKey = `selected-${idx}`;
