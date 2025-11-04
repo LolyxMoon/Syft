@@ -283,13 +283,20 @@ const Backtests = () => {
         }
         
         // If asset is an object (new format)
-        if (asset && typeof asset === 'object' && asset.assetCode) {
-          return {
-            assetId: asset.assetId || `asset_${asset.assetCode.toLowerCase()}`,
-            assetCode: asset.assetCode,
-            assetIssuer: asset.assetIssuer,
-            percentage: asset.percentage || 0,
-          };
+        // Support both 'code' and 'assetCode' properties
+        // Support both 'allocation' and 'percentage' properties
+        if (asset && typeof asset === 'object') {
+          const code = asset.code || asset.assetCode;
+          const allocation = asset.allocation || asset.percentage;
+          
+          if (code) {
+            return {
+              assetId: asset.assetId || `asset_${code.toLowerCase()}`,
+              assetCode: code,
+              assetIssuer: asset.assetIssuer || asset.issuer,
+              percentage: allocation || 0,
+            };
+          }
         }
         
         // Invalid asset
