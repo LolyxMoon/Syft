@@ -885,19 +885,68 @@ impl VaultContract {
     /// Force rebalance to target allocation (for post-deposit swaps)
     /// Always executes rebalance regardless of rules
     pub fn force_rebalance(env: Env) -> Result<(), VaultError> {
+        use soroban_sdk::{Vec as SdkVec, String};
+        
         // Check vault is initialized
         if !env.storage().instance().has(&CONFIG) {
             return Err(VaultError::NotInitialized);
         }
 
-        let _config: VaultConfig = env.storage().instance().get(&CONFIG)
+        let config: VaultConfig = env.storage().instance().get(&CONFIG)
             .ok_or(VaultError::NotInitialized)?;
 
         let mut state: VaultState = env.storage().instance().get(&STATE)
             .ok_or(VaultError::NotInitialized)?;
 
-        // Execute rebalance logic without checking rules
-        crate::rebalance::execute_rebalance(&env)?;
+        // For multi-asset vaults, force rebalance to target allocation
+        if config.assets.len() > 1 {
+            // Get target allocation from existing rebalance rules
+            let mut target_allocation: SdkVec<i128> = SdkVec::new(&env);
+            
+            // Look for a rebalance rule to get target allocation
+            let mut found_allocation = false;
+            for i in 0..config.rules.len() {
+                if let Some(rule) = config.rules.get(i) {
+                    if rule.action == String::from_str(&env, "rebalance") && 
+                       rule.target_allocation.len() == config.assets.len() {
+                        // Use this rule's target allocation
+                        for j in 0..rule.target_allocation.len() {
+                            if let Some(alloc) = rule.target_allocation.get(j) {
+                                target_allocation.push_back(alloc);
+                            }
+                        }
+                        found_allocation = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If no rebalance rule found, default to equal distribution
+            if !found_allocation {
+                let equal_share = 100_0000 / (config.assets.len() as i128);
+                for _ in 0..config.assets.len() {
+                    target_allocation.push_back(equal_share);
+                }
+            }
+            
+            // Calculate actual total value from real balances
+            let mut actual_total_value: i128 = 0;
+            for i in 0..config.assets.len() {
+                if let Some(asset) = config.assets.get(i) {
+                    let balance = crate::token_client::get_vault_balance(&env, &asset);
+                    actual_total_value = actual_total_value.checked_add(balance)
+                        .ok_or(VaultError::InvalidAmount)?;
+                }
+            }
+            
+            // Execute the rebalance action directly
+            crate::rebalance::force_rebalance_to_allocation(
+                &env,
+                &config.assets,
+                &target_allocation,
+                actual_total_value,
+            )?;
+        }
 
         // Update last rebalance timestamp
         state.last_rebalance = env.ledger().timestamp();

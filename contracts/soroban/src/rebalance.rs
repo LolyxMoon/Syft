@@ -781,3 +781,246 @@ fn execute_amm_swap(
     
     Ok(amount_out)
 }
+
+/// Force rebalance vault assets to target allocation (used by force_rebalance)
+/// This bypasses rule checks and immediately rebalances to target percentages
+pub fn force_rebalance_to_allocation(
+    env: &Env,
+    assets: &Vec<Address>,
+    target_allocation: &Vec<i128>,
+    total_value: i128,
+) -> Result<(), VaultError> {
+    use soroban_sdk::symbol_short;
+    
+    // Validate target allocation matches number of assets
+    if target_allocation.len() != assets.len() {
+        return Err(VaultError::InvalidConfiguration);
+    }
+    
+    // Validate allocations sum to 100% (represented as 100_0000 for 2 decimal precision)
+    let mut total_allocation: i128 = 0;
+    for i in 0..target_allocation.len() {
+        if let Some(alloc) = target_allocation.get(i) {
+            total_allocation = total_allocation.checked_add(alloc)
+                .ok_or(VaultError::InvalidConfiguration)?;
+        }
+    }
+    
+    // Allow 100% allocation (100_0000 in our precision)
+    if total_allocation != 100_0000 && total_allocation != 0 {
+        return Err(VaultError::InvalidConfiguration);
+    }
+    
+    env.events().publish(
+        (symbol_short!("force_reb"),),
+        total_value
+    );
+
+    // Get router address from config
+    let config: crate::types::VaultConfig = env.storage().instance()
+        .get(&CONFIG)
+        .ok_or(VaultError::NotInitialized)?;
+    
+    let router_address = config.router_address
+        .ok_or(VaultError::InvalidConfiguration)?;
+    
+    // Calculate current balances and target amounts
+    let mut current_balances: Vec<i128> = Vec::new(env);
+    let mut target_amounts: Vec<i128> = Vec::new(env);
+    
+    for i in 0..assets.len() {
+        if let (Some(asset), Some(target_pct)) = (assets.get(i), target_allocation.get(i)) {
+            // Get current balance of this asset in vault
+            let current_balance = crate::token_client::get_vault_balance(env, &asset);
+            current_balances.push_back(current_balance);
+            
+            // Calculate target amount
+            let target_amount = total_value
+                .checked_mul(target_pct)
+                .and_then(|v| v.checked_div(100_0000))
+                .ok_or(VaultError::InvalidAmount)?;
+            
+            target_amounts.push_back(target_amount);
+            
+            env.events().publish(
+                (symbol_short!("target"),),
+                (asset.clone(), current_balance, target_amount)
+            );
+        }
+    }
+    
+    // Always execute rebalance for force_rebalance (no tolerance check)
+    env.events().publish(
+        (symbol_short!("reb_exec"),),
+        true
+    );
+    
+    // Execute swaps to reach target allocation
+    for i in 0..assets.len() {
+        if let (Some(asset), Some(current), Some(target)) = (
+            assets.get(i),
+            current_balances.get(i),
+            target_amounts.get(i)
+        ) {
+            let diff = target - current;
+            
+            // Skip if difference is negligible
+            if diff.abs() < 100 {
+                continue;
+            }
+            
+            if diff > 0 {
+                // Need to buy more of this asset
+                env.events().publish(
+                    (symbol_short!("need_buy"),),
+                    (asset.clone(), diff)
+                );
+                
+                // Find an asset we have excess of to sell
+                for j in 0..assets.len() {
+                    if i == j {
+                        continue;
+                    }
+                    
+                    if let (Some(source_asset), Some(source_current), Some(source_target)) = (
+                        assets.get(j),
+                        current_balances.get(j),
+                        target_amounts.get(j)
+                    ) {
+                        if source_current > source_target {
+                            // This asset has excess, use it as source
+                            let excess = source_current - source_target;
+                            
+                            // Get the factory address to find the pool
+                            let factory_address = crate::swap_router::get_soroswap_factory_address_internal(env);
+                            
+                            // Get the pool for this token pair
+                            let pool_address = match crate::pool_client::get_pool_for_pair(
+                                env,
+                                &factory_address,
+                                &source_asset,
+                                &asset,
+                            ) {
+                                Ok(addr) => addr,
+                                Err(e) => {
+                                    env.events().publish(
+                                        (symbol_short!("pool_err"),),
+                                        symbol_short!("notfound")
+                                    );
+                                    return Err(e);
+                                }
+                            };
+                            
+                            // Calculate how much source asset we need to sell to get 'diff' of target asset
+                            let amount_to_swap = match crate::pool_client::calculate_swap_input(
+                                env,
+                                &pool_address,
+                                &source_asset,
+                                &asset,
+                                diff, // How much we want to receive
+                            ) {
+                                Ok(amt) => amt,
+                                Err(e) => {
+                                    env.events().publish(
+                                        (symbol_short!("calc_err"),),
+                                        symbol_short!("failed")
+                                    );
+                                    return Err(e);
+                                }
+                            };
+                            
+                            // Make sure we don't swap more than our excess
+                            let amount_to_swap = if amount_to_swap > excess { excess } else { amount_to_swap };
+                            
+                            env.events().publish(
+                                (symbol_short!("calc_swap"),),
+                                (excess, amount_to_swap)
+                            );
+                            
+                            // Skip if amount is negligible
+                            if amount_to_swap < 100 {
+                                env.events().publish(
+                                    (symbol_short!("skip_amt"),),
+                                    amount_to_swap
+                                );
+                                continue;
+                            }
+                            
+                            // Calculate expected output
+                            let expected_output = match crate::pool_client::calculate_swap_output(
+                                env,
+                                &pool_address,
+                                &source_asset,
+                                &asset,
+                                amount_to_swap,
+                            ) {
+                                Ok(amt) => amt,
+                                Err(e) => {
+                                    env.events().publish(
+                                        (symbol_short!("out_err"),),
+                                        symbol_short!("failed")
+                                    );
+                                    return Err(e);
+                                }
+                            };
+                            
+                            // Calculate minimum output with 5% slippage tolerance
+                            let min_amount_out = (expected_output * 95) / 100;
+                            
+                            env.events().publish(
+                                (symbol_short!("swap_try"),),
+                                (source_asset.clone(), asset.clone(), amount_to_swap)
+                            );
+                            
+                            // Approve router to spend our tokens
+                            crate::token_client::approve_router(
+                                env,
+                                &source_asset,
+                                &router_address,
+                                amount_to_swap,
+                            )?;
+                            
+                            env.events().publish(
+                                (symbol_short!("approved"),),
+                                amount_to_swap
+                            );
+                            
+                            // Execute swap through router
+                            let amount_out = match crate::swap_router::swap_via_router(
+                                env,
+                                &router_address,
+                                &source_asset,
+                                &asset,
+                                amount_to_swap,
+                                min_amount_out,
+                            ) {
+                                Ok(amt) => {
+                                    env.events().publish(
+                                        (symbol_short!("swapped"),),
+                                        amt
+                                    );
+                                    amt
+                                },
+                                Err(e) => {
+                                    env.events().publish(
+                                        (symbol_short!("swap_err"),),
+                                        symbol_short!("failed")
+                                    );
+                                    return Err(e);
+                                }
+                            };
+                            
+                            // Update balances after swap
+                            current_balances.set(j, source_current - amount_to_swap);
+                            current_balances.set(i, current + amount_out);
+                            
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
