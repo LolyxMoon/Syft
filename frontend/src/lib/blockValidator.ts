@@ -278,10 +278,10 @@ export class BlockValidator {
 
     nodes.forEach((node) => {
       if (!connectedNodeIds.has(node.id) && nodes.length > 1) {
-        warnings.push({
+        errors.push({
           blockId: node.id,
           message: 'Block is not connected to any other blocks',
-          suggestion: 'Connect this block to create a rule chain',
+          field: 'connections',
         });
       }
     });
@@ -302,10 +302,9 @@ export class BlockValidator {
     });
 
     if (actionBlocks.length > 0 && actionNodesWithPaths.length === 0) {
-      warnings.push({
+      errors.push({
         blockId: 'canvas',
-        message: 'No complete rule chains found',
-        suggestion: 'Create chains following: Asset → Condition → Action',
+        message: 'No complete rule chains found. Create chains following: Asset → Condition → Action',
       });
     }
 
