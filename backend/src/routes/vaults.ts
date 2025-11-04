@@ -70,11 +70,14 @@ async function initializeVaultContract(
       targetAllocation = new Array((config.assets || []).length).fill(0);
     }
     
+    // Convert frontend action names to contract names
+    const contractAction = rule.action === 'provide_liquidity' ? 'liquidity' : rule.action;
+    
     // Build RebalanceRule struct (fields must be alphabetically ordered!)
     return StellarSdk.xdr.ScVal.scvMap([
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('action')),
-        val: StellarSdk.nativeToScVal(rule.action, { type: 'string' }),
+        val: StellarSdk.nativeToScVal(contractAction, { type: 'string' }),
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('condition_type')),
@@ -833,11 +836,14 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
         targetAllocation = new Array((config.assets || []).length).fill(0);
       }
       
+      // Convert frontend action names to contract names
+      const contractAction = rule.action === 'provide_liquidity' ? 'liquidity' : rule.action;
+      
       // Build RebalanceRule struct (fields must be alphabetically ordered!)
       return StellarSdk.xdr.ScVal.scvMap([
         new StellarSdk.xdr.ScMapEntry({
           key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('action')),
-          val: StellarSdk.nativeToScVal(rule.action, { type: 'string' }),
+          val: StellarSdk.nativeToScVal(contractAction, { type: 'string' }),
         }),
         new StellarSdk.xdr.ScMapEntry({
           key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('condition_type')),
