@@ -10,7 +10,7 @@ import type {
   QuestClaimResponse,
   QuestStatsResponse,
   ApiResponse,
-} from '../../../shared/types/index.js';
+} from '@shared/types/index.js';
 
 const router = Router();
 
