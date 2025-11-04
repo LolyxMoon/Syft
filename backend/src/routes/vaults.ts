@@ -61,12 +61,13 @@ async function initializeVaultContract(
     // Fix target_allocation to match number of assets
     let targetAllocation = rule.target_allocation || [];
     
-    // For liquidity/stake actions, if target_allocation doesn't match assets length, fix it
+    // For liquidity/stake actions, target_allocation must match number of assets (contract validation requirement)
+    // For liquidity, the actual percentage is in the threshold field, target_allocation is just a placeholder
     if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
         targetAllocation.length !== (config.assets || []).length) {
       console.log(`[initializeVaultContract] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
-      // Use 50% of vault value for liquidity/stake (represented as 50_0000 in basis points)
-      targetAllocation = [50_0000];
+      // Create array of zeros matching asset count (placeholder values, actual amount is in threshold)
+      targetAllocation = new Array((config.assets || []).length).fill(0);
     }
     
     // Build RebalanceRule struct (fields must be alphabetically ordered!)
@@ -823,12 +824,13 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       // Fix target_allocation to match number of assets
       let targetAllocation = rule.target_allocation || [];
       
-      // For liquidity/stake actions, if target_allocation doesn't match assets length, fix it
+      // For liquidity/stake actions, target_allocation must match number of assets (contract validation requirement)
+      // For liquidity, the actual percentage is in the threshold field, target_allocation is just a placeholder
       if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
           targetAllocation.length !== (config.assets || []).length) {
         console.log(`[Build Initialize] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
-        // Use 50% of vault value for liquidity/stake (represented as 50_0000 in basis points)
-        targetAllocation = [50_0000];
+        // Create array of zeros matching asset count (placeholder values, actual amount is in threshold)
+        targetAllocation = new Array((config.assets || []).length).fill(0);
       }
       
       // Build RebalanceRule struct (fields must be alphabetically ordered!)
