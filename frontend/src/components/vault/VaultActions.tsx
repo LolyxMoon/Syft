@@ -217,35 +217,16 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       console.log(`[VaultActions] ✅ Deposit successful! TX: ${submitData.data.transactionHash}`);
 
-      // For multi-asset vaults, automatically trigger rebalance after deposit
+      // Check if rebalance is needed (backend now returns this info)
       let rebalanceSuccess = false;
-      try {
-        console.log(`[VaultActions] 🔄 Optimizing asset allocation across protocols...`);
-        
-        // Build rebalance transaction
-        const rebalanceResponse = await fetch(
-          `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/build-rebalance`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userAddress: address,
-              network: normalizedNetwork,
-            }),
-          }
-        );
-
-        const rebalanceData = await rebalanceResponse.json();
-        console.log(`[VaultActions] Rebalance build response:`, rebalanceData);
-
-        if (rebalanceResponse.ok && rebalanceData.success) {
-          console.log(`[VaultActions] Rebalance transaction built, requesting signature...`);
+      if (submitData.data.needsRebalance && submitData.data.rebalanceXDR) {
+        try {
+          console.log(`[VaultActions] 🔄 Rebalance needed - optimizing asset allocation across protocols...`);
+          console.log(`[VaultActions] Requesting signature for rebalance transaction...`);
           
-          // Sign rebalance transaction
+          // Sign rebalance transaction (XDR already built by backend)
           const { wallet } = await import('../../util/wallet');
-          const { signedTxXdr: rebalanceSignedXdr } = await wallet.signTransaction(rebalanceData.data.xdr, {
+          const { signedTxXdr: rebalanceSignedXdr } = await wallet.signTransaction(submitData.data.rebalanceXDR, {
             networkPassphrase: networkPassphrase || 'Test SDF Network ; September 2015',
           });
 
@@ -275,12 +256,12 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
           } else {
             console.error(`[VaultActions] ❌ Rebalance submit failed:`, submitRebalanceData.error);
           }
-        } else {
-          console.error(`[VaultActions] ❌ Rebalance build failed:`, rebalanceData.error);
+        } catch (rebalanceError) {
+          console.error(`[VaultActions] ❌ Auto-rebalance exception:`, rebalanceError);
+          // Don't fail the deposit if rebalance fails
         }
-      } catch (rebalanceError) {
-        console.error(`[VaultActions] ❌ Auto-rebalance exception:`, rebalanceError);
-        // Don't fail the deposit if rebalance fails
+      } else {
+        console.log(`[VaultActions] No rebalance needed for this vault`);
       }
 
       setMessage({

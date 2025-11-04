@@ -1188,6 +1188,15 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
       }
     } catch (submitError: any) {
       console.error(`[Submit Deposit] Error submitting transaction:`, submitError);
+      
+      // Log detailed error information
+      if (submitError?.response?.data) {
+        console.error(`[Submit Deposit] Error details:`, JSON.stringify(submitError.response.data, null, 2));
+        if (submitError.response.data.extras?.result_codes) {
+          console.error(`[Submit Deposit] Result codes:`, JSON.stringify(submitError.response.data.extras.result_codes, null, 2));
+        }
+      }
+      
       return res.status(500).json({
         success: false,
         error: 'Failed to submit deposit transaction',
@@ -1229,15 +1238,13 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
 
     await syncVaultState(vaultId);
 
-    // IMPORTANT: Automatically trigger rebalance after successful deposit
-    // This is done in a SEPARATE transaction because Soroban requires explicit user authorization
-    // The deposit transaction transfers tokens, the rebalance transaction swaps to target allocation
-    let rebalanceTxHash: string | undefined;
+    // Check if auto-rebalance is needed and return unsigned rebalance XDR
+    // The user must sign this in a separate transaction
+    let rebalanceXDR: string | undefined;
+    let needsRebalance = false;
+    
     try {
-      console.log(`[Submit Deposit] Triggering auto-rebalance after deposit...`);
-      
-      // Import the rebalance helper
-      const { buildRebalanceTransaction } = await import('../services/vaultActionService.js');
+      console.log(`[Submit Deposit] Checking if auto-rebalance is needed...`);
       
       // Get vault info to check if it has rules requiring rebalance
       const { data: vault } = await supabase
@@ -1253,36 +1260,31 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
       const hasRebalanceRules = vault?.config?.rules && vault.config.rules.length > 0;
       
       if (hasRebalanceRules && hasMultipleAssets) {
+        console.log(`[Submit Deposit] Building rebalance transaction for user to sign...`);
+        
+        // Import the rebalance helper
+        const { buildRebalanceTransaction } = await import('../services/vaultActionService.js');
+        
         // Build rebalance transaction (force_rebalance, not trigger_rebalance)
-        const { xdr: rebalanceXDR } = await buildRebalanceTransaction(
+        const result = await buildRebalanceTransaction(
           vaultId,
           userAddress,
           network,
           true // force = true to skip rule checks
         );
         
-        // Parse transaction
-        const rebalanceTx = StellarSdk.TransactionBuilder.fromXDR(
-          rebalanceXDR,
-          servers.networkPassphrase
-        );
+        rebalanceXDR = result.xdr;
+        needsRebalance = true;
         
-        // Submit rebalance transaction
-        const rebalanceResult = await servers.horizonServer.submitTransaction(rebalanceTx);
-        rebalanceTxHash = rebalanceResult.hash;
-        
-        console.log(`[Submit Deposit] ✅ Auto-rebalance completed: ${rebalanceTxHash}`);
-        
-        // Sync vault state again after rebalance
-        await syncVaultState(vaultId);
+        console.log(`[Submit Deposit] ✅ Rebalance transaction built, ready for user signature`);
       } else if (!hasMultipleAssets) {
         console.log(`[Submit Deposit] Single-asset vault, skipping auto-rebalance`);
       } else {
         console.log(`[Submit Deposit] No rebalance rules configured, skipping auto-rebalance`);
       }
     } catch (rebalanceError) {
-      console.error('[Submit Deposit] Auto-rebalance failed (non-critical):', rebalanceError);
-      // Don't fail the deposit if rebalance fails - just log it
+      console.error('[Submit Deposit] Failed to build rebalance transaction (non-critical):', rebalanceError);
+      // Don't fail the deposit if rebalance build fails - just log it
       // The user can manually trigger rebalance later
     }
 
@@ -1290,8 +1292,8 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
       success: true,
       data: {
         transactionHash: txHash,
-        rebalanceTransactionHash: rebalanceTxHash,
-        autoRebalanced: !!rebalanceTxHash,
+        needsRebalance,
+        rebalanceXDR, // Return unsigned XDR for user to sign
       },
     });
   } catch (error) {
@@ -1395,9 +1397,24 @@ router.post('/:vaultId/submit-rebalance', async (req: Request, res: Response) =>
     const servers = getNetworkServers(network);
     const transaction = StellarSdk.TransactionBuilder.fromXDR(signedXDR, servers.networkPassphrase);
     
-    const txResponse = await servers.horizonServer.submitTransaction(transaction);
+    let txResponse;
+    try {
+      txResponse = await servers.horizonServer.submitTransaction(transaction);
+    } catch (submitError: any) {
+      console.error(`[Submit Rebalance] Transaction submission failed:`, submitError);
+      
+      // Log detailed error information
+      if (submitError?.response?.data) {
+        console.error(`[Submit Rebalance] Error details:`, JSON.stringify(submitError.response.data, null, 2));
+        if (submitError.response.data.extras?.result_codes) {
+          console.error(`[Submit Rebalance] Result codes:`, JSON.stringify(submitError.response.data.extras.result_codes, null, 2));
+        }
+      }
+      
+      throw submitError;
+    }
+    
     const txHash = txResponse.hash;
-
     console.log(`[Submit Rebalance] ✅ Transaction submitted successfully: ${txHash}`);
 
     // Invalidate cache and sync state
