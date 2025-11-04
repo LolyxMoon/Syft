@@ -587,15 +587,12 @@ fn execute_liquidity_action(
         return Err(VaultError::InsufficientBalance);
     }
     
-    // Get router and factory addresses from config
+    // Get pool address from config (mock liquidity pool)
     let config: crate::types::VaultConfig = env.storage().instance()
         .get(&CONFIG)
         .ok_or(VaultError::NotInitialized)?;
     
-    let router_address = config.router_address
-        .ok_or(VaultError::InvalidConfiguration)?;
-    
-    let factory_address = config.factory_address
+    let pool_address = config.router_address
         .ok_or(VaultError::InvalidConfiguration)?;
     
     // Use first two assets as liquidity pair
@@ -606,64 +603,20 @@ fn execute_liquidity_action(
     let balance_a = crate::token_client::get_vault_balance(env, &token_a);
     let balance_b = crate::token_client::get_vault_balance(env, &token_b);
     
-    // Find the liquidity pool for this pair
-    let pool_address = crate::pool_client::get_pool_for_pair(
-        env,
-        &factory_address,
-        &token_a,
-        &token_b,
-    )?;
-    
-    // Get pool reserves to calculate optimal amounts
-    use crate::pool_client::LiquidityPoolClient;
-    let pool_client = LiquidityPoolClient::new(env, &pool_address);
-    let (reserve_a, reserve_b) = pool_client.get_reserves();
-    
-    // Determine if token_a is token0 or token1 in the pool
-    let pool_token0 = pool_client.token_0();
-    let (reserve_a_correct, reserve_b_correct) = if &pool_token0 == &token_a {
-        (reserve_a, reserve_b)
-    } else {
-        (reserve_b, reserve_a)
-    };
-    
-    // Calculate amounts to provide based on pool ratio
-    // Start with half of liquidity_amount for each token
-    let mut amount_a = liquidity_amount / 2;
-    let mut amount_b = liquidity_amount / 2;
-    
-    // If pool has reserves, adjust to maintain ratio
-    if reserve_a_correct > 0 && reserve_b_correct > 0 {
-        // Calculate optimal amount_b for our amount_a
-        let optimal_b = crate::liquidity_router::get_optimal_liquidity_amounts(
-            env,
-            &router_address,
-            amount_a,
-            reserve_a_correct,
-            reserve_b_correct,
-        )?;
-        
-        if optimal_b <= balance_b {
-            amount_b = optimal_b;
-        } else {
-            // If we don't have enough of token_b, calculate based on available token_b
-            amount_b = balance_b.min(liquidity_amount / 2);
-            amount_a = amount_b
-                .checked_mul(reserve_a_correct)
-                .and_then(|v| v.checked_div(reserve_b_correct))
-                .unwrap_or(amount_a);
-        }
-    }
+    // Calculate amounts to provide
+    // Split liquidity amount equally between both tokens
+    let amount_a = liquidity_amount / 2;
+    let amount_b = liquidity_amount / 2;
     
     // Verify we have sufficient balance
     if amount_a > balance_a || amount_b > balance_b {
         return Err(VaultError::InsufficientBalance);
     }
     
-    // Add liquidity through router with 5% slippage tolerance
+    // Add liquidity through mock pool with 5% slippage tolerance
     let (lp_tokens, actual_a, actual_b) = crate::liquidity_router::add_liquidity_to_pool(
         env,
-        &router_address,
+        &pool_address,
         &token_a,
         &token_b,
         amount_a,
