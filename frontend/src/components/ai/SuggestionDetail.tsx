@@ -77,11 +77,19 @@ export function SuggestionDetail({ suggestion, onClose, onApply }: SuggestionDet
           </section>
 
           {/* Expected Impact */}
-          {suggestion.expectedImpact && Object.keys(suggestion.expectedImpact).length > 0 && (
+          {suggestion.expectedImpact && (
+            (suggestion.expectedImpact.returnIncrease !== null && 
+             suggestion.expectedImpact.returnIncrease !== undefined) ||
+            (suggestion.expectedImpact.riskReduction !== null && 
+             suggestion.expectedImpact.riskReduction !== undefined) ||
+            (suggestion.expectedImpact.efficiencyGain !== null && 
+             suggestion.expectedImpact.efficiencyGain !== undefined)
+          ) && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Expected Impact</h3>
               <div className={styles.impactGrid}>
-                {suggestion.expectedImpact.returnIncrease && (
+                {(suggestion.expectedImpact.returnIncrease !== null && 
+                  suggestion.expectedImpact.returnIncrease !== undefined) && (
                   <div className={styles.impactCard}>
                     <div className={styles.impactIcon}>📈</div>
                     <div className={styles.impactLabel}>Return Increase</div>
@@ -90,7 +98,8 @@ export function SuggestionDetail({ suggestion, onClose, onApply }: SuggestionDet
                     </div>
                   </div>
                 )}
-                {suggestion.expectedImpact.riskReduction && (
+                {(suggestion.expectedImpact.riskReduction !== null && 
+                  suggestion.expectedImpact.riskReduction !== undefined) && (
                   <div className={styles.impactCard}>
                     <div className={styles.impactIcon}>🛡️</div>
                     <div className={styles.impactLabel}>Risk Reduction</div>
@@ -99,7 +108,8 @@ export function SuggestionDetail({ suggestion, onClose, onApply }: SuggestionDet
                     </div>
                   </div>
                 )}
-                {suggestion.expectedImpact.efficiencyGain && (
+                {(suggestion.expectedImpact.efficiencyGain !== null && 
+                  suggestion.expectedImpact.efficiencyGain !== undefined) && (
                   <div className={styles.impactCard}>
                     <div className={styles.impactIcon}>⚡</div>
                     <div className={styles.impactLabel}>Efficiency Gain</div>

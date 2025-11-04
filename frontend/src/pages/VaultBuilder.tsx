@@ -472,8 +472,18 @@ const VaultBuilder = () => {
             threshold: threshold,
             action: rule.action.type,
             target_allocation: targetAllocation,
-            // Preserve asset information for visual builder (not sent to contract)
+            // Preserve ALL condition parameters for visual builder reconstruction
             monitored_asset: rule.condition.parameters.asset,
+            operator: rule.condition.parameters.operator,
+            percentage: rule.condition.parameters.percentage,
+            interval: rule.condition.parameters.interval,
+            unit: rule.condition.parameters.unit,
+            description: rule.condition.parameters.description,
+            // Preserve ALL action parameters for visual builder reconstruction
+            targetAsset: rule.action.parameters.targetAsset,
+            protocol: rule.action.parameters.protocol,
+            targetAllocation: rule.action.parameters.targetAllocation,
+            parameters: rule.action.parameters.parameters,
           };
         }),
       };

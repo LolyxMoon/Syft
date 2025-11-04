@@ -711,9 +711,15 @@ const Suggestions = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {suggestions.map((suggestion, index) => {
-                      const hasImpact = suggestion.expectedImpact?.returnIncrease || 
-                                       suggestion.expectedImpact?.riskReduction || 
-                                       suggestion.expectedImpact?.efficiencyGain;
+                      // Check if any impact value is actually defined and not null
+                      const hasImpact = (
+                        (suggestion.expectedImpact?.returnIncrease !== null && 
+                         suggestion.expectedImpact?.returnIncrease !== undefined) ||
+                        (suggestion.expectedImpact?.riskReduction !== null && 
+                         suggestion.expectedImpact?.riskReduction !== undefined) ||
+                        (suggestion.expectedImpact?.efficiencyGain !== null && 
+                         suggestion.expectedImpact?.efficiencyGain !== undefined)
+                      );
                       
                       return (
                         <motion.div
@@ -743,19 +749,22 @@ const Suggestions = () => {
                               <div className="mb-3 p-2 bg-neutral-950 rounded-md">
                                 <div className="text-xs font-semibold text-neutral-400 mb-1">Expected Impact:</div>
                                 <div className="space-y-1 text-xs">
-                                  {suggestion.expectedImpact.returnIncrease && (
+                                  {(suggestion.expectedImpact.returnIncrease !== null && 
+                                    suggestion.expectedImpact.returnIncrease !== undefined) && (
                                     <div className="flex justify-between">
                                       <span className="text-neutral-500">Return:</span>
                                       <span className="text-success-400">+{suggestion.expectedImpact.returnIncrease}%</span>
                                     </div>
                                   )}
-                                  {suggestion.expectedImpact.riskReduction && (
+                                  {(suggestion.expectedImpact.riskReduction !== null && 
+                                    suggestion.expectedImpact.riskReduction !== undefined) && (
                                     <div className="flex justify-between">
                                       <span className="text-neutral-500">Risk:</span>
                                       <span className="text-success-400">-{suggestion.expectedImpact.riskReduction}%</span>
                                     </div>
                                   )}
-                                  {suggestion.expectedImpact.efficiencyGain && (
+                                  {(suggestion.expectedImpact.efficiencyGain !== null && 
+                                    suggestion.expectedImpact.efficiencyGain !== undefined) && (
                                     <div className="flex justify-between">
                                       <span className="text-neutral-500">Efficiency:</span>
                                       <span className="text-success-400">+{suggestion.expectedImpact.efficiencyGain}%</span>
@@ -903,13 +912,17 @@ const Suggestions = () => {
                 )}
 
                 {/* Expected Impact */}
-                {(selectedSuggestion.expectedImpact?.returnIncrease || 
-                  selectedSuggestion.expectedImpact?.riskReduction || 
-                  selectedSuggestion.expectedImpact?.efficiencyGain) && (
+                {((selectedSuggestion.expectedImpact?.returnIncrease !== null && 
+                   selectedSuggestion.expectedImpact?.returnIncrease !== undefined) || 
+                  (selectedSuggestion.expectedImpact?.riskReduction !== null && 
+                   selectedSuggestion.expectedImpact?.riskReduction !== undefined) || 
+                  (selectedSuggestion.expectedImpact?.efficiencyGain !== null && 
+                   selectedSuggestion.expectedImpact?.efficiencyGain !== undefined)) && (
                   <div>
                     <h4 className="text-sm font-semibold text-neutral-400 mb-3">Expected Impact</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {selectedSuggestion.expectedImpact.returnIncrease && (
+                      {(selectedSuggestion.expectedImpact.returnIncrease !== null && 
+                        selectedSuggestion.expectedImpact.returnIncrease !== undefined) && (
                         <div className="bg-success-400/10 border border-success-400/30 rounded-lg p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <TrendingUp className="w-4 h-4 text-success-400" />
@@ -918,7 +931,8 @@ const Suggestions = () => {
                           <p className="text-2xl font-bold text-success-400">+{selectedSuggestion.expectedImpact.returnIncrease}%</p>
                         </div>
                       )}
-                      {selectedSuggestion.expectedImpact.riskReduction && (
+                      {(selectedSuggestion.expectedImpact.riskReduction !== null && 
+                        selectedSuggestion.expectedImpact.riskReduction !== undefined) && (
                         <div className="bg-success-400/10 border border-success-400/30 rounded-lg p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <Shield className="w-4 h-4 text-success-400" />
@@ -927,7 +941,8 @@ const Suggestions = () => {
                           <p className="text-2xl font-bold text-success-400">-{selectedSuggestion.expectedImpact.riskReduction}%</p>
                         </div>
                       )}
-                      {selectedSuggestion.expectedImpact.efficiencyGain && (
+                      {(selectedSuggestion.expectedImpact.efficiencyGain !== null && 
+                        selectedSuggestion.expectedImpact.efficiencyGain !== undefined) && (
                         <div className="bg-success-400/10 border border-success-400/30 rounded-lg p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-4 h-4 text-success-400" />

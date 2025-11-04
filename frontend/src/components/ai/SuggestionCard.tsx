@@ -82,20 +82,30 @@ export function SuggestionCard({ suggestion, onApply }: SuggestionCardProps) {
       <p className={styles.description}>{suggestion.description}</p>
 
       {suggestion.expectedImpact && (
+        (suggestion.expectedImpact.returnIncrease !== null && 
+         suggestion.expectedImpact.returnIncrease !== undefined) ||
+        (suggestion.expectedImpact.riskReduction !== null && 
+         suggestion.expectedImpact.riskReduction !== undefined) ||
+        (suggestion.expectedImpact.efficiencyGain !== null && 
+         suggestion.expectedImpact.efficiencyGain !== undefined)
+      ) && (
         <div className={styles.impact}>
-          {suggestion.expectedImpact.returnIncrease && (
+          {(suggestion.expectedImpact.returnIncrease !== null && 
+            suggestion.expectedImpact.returnIncrease !== undefined) && (
             <div className={styles.impactItem}>
               <span className={styles.impactIcon}>📈</span>
               <span>+{suggestion.expectedImpact.returnIncrease}% Return</span>
             </div>
           )}
-          {suggestion.expectedImpact.riskReduction && (
+          {(suggestion.expectedImpact.riskReduction !== null && 
+            suggestion.expectedImpact.riskReduction !== undefined) && (
             <div className={styles.impactItem}>
               <span className={styles.impactIcon}>🛡️</span>
               <span>-{suggestion.expectedImpact.riskReduction}% Risk</span>
             </div>
           )}
-          {suggestion.expectedImpact.efficiencyGain && (
+          {(suggestion.expectedImpact.efficiencyGain !== null && 
+            suggestion.expectedImpact.efficiencyGain !== undefined) && (
             <div className={styles.impactItem}>
               <span className={styles.impactIcon}>⚡</span>
               <span>+{suggestion.expectedImpact.efficiencyGain}% Efficiency</span>

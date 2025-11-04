@@ -325,19 +325,73 @@ export class ConfigSerializer {
           console.warn('[ConfigSerializer] No monitored_asset found, inferring:', assetForCondition);
         }
         
+        // Build condition parameters - restore all saved fields
+        const conditionParameters: Record<string, unknown> = {
+          asset: assetForCondition,
+          threshold: rule.threshold || 0,
+        };
+        
+        // Restore operator if saved
+        if (rule.operator) {
+          conditionParameters.operator = rule.operator;
+        } else {
+          conditionParameters.operator = 'gt'; // default fallback
+        }
+        
+        // Restore percentage/value if saved (for price_change conditions)
+        if (rule.percentage !== undefined) {
+          conditionParameters.percentage = rule.percentage;
+        }
+        
+        // Restore time interval fields if saved (for time_based conditions)
+        if (rule.interval !== undefined) {
+          conditionParameters.interval = rule.interval;
+        }
+        if (rule.unit !== undefined) {
+          conditionParameters.unit = rule.unit;
+        }
+        
+        // Restore description if saved
+        if (rule.description) {
+          conditionParameters.description = rule.description;
+        }
+        
         condition = {
           type: rule.condition_type,
-          parameters: {
-            asset: assetForCondition,
-            operator: 'gt',
-            threshold: rule.threshold || 0
-          }
+          parameters: conditionParameters,
         };
+        
+        // Build action parameters - restore all saved fields
+        const actionParameters: Record<string, unknown> = {};
+        
+        // Restore target_allocation if present
+        if (rule.target_allocation !== undefined) {
+          actionParameters.targetAllocation = rule.target_allocation;
+        }
+        
+        // Restore targetAsset if saved (for swap/rebalance actions)
+        if (rule.targetAsset) {
+          actionParameters.targetAsset = rule.targetAsset;
+        }
+        
+        // Restore protocol if saved (for stake/liquidity actions)
+        if (rule.protocol) {
+          actionParameters.protocol = rule.protocol;
+        }
+        
+        // Restore targetAllocation if saved separately
+        if (rule.targetAllocation !== undefined) {
+          actionParameters.targetAllocation = rule.targetAllocation;
+        }
+        
+        // Restore custom parameters if saved
+        if (rule.parameters) {
+          actionParameters.parameters = rule.parameters;
+        }
+        
         action = {
           type: rule.action,
-          parameters: {
-            targetAllocation: rule.target_allocation
-          }
+          parameters: actionParameters,
         };
       } else {
         // New nested format
@@ -367,15 +421,21 @@ export class ConfigSerializer {
         actionId = `action-${nodeIdCounter++}`;
         actionMap.set(actionSignature, actionId);
         
+        const actionData: Record<string, unknown> = {
+          actionType: action?.type || 'custom',
+          label: action?.type || 'custom',
+        };
+        
+        // Spread all parameters
+        if (action?.parameters) {
+          Object.assign(actionData, action.parameters);
+        }
+        
         nodes.push({
           id: actionId,
           type: 'action',
           position: { x: 700, y: 100 + actionMap.size * 200 },
-          data: {
-            actionType: action?.type || 'custom',
-            ...(action?.parameters || {}),
-            label: action?.type || 'custom',
-          },
+          data: actionData,
         });
         
         console.log('[ConfigSerializer] Created new action node:', actionId, action.type);
@@ -390,16 +450,56 @@ export class ConfigSerializer {
         return assetIdentifier === condition?.parameters?.asset;
       });
 
-      // Create condition block
+      // Create condition block with all restored parameters
+      const conditionData: Record<string, unknown> = {
+        conditionType: condition?.type || 'custom',
+        label: condition?.type || 'custom',
+      };
+      
+      // Spread all parameters
+      if (condition?.parameters) {
+        Object.assign(conditionData, condition.parameters);
+      }
+      
+      // For time_based conditions, ensure we have both interval/unit AND threshold
+      if (condition?.type === 'time_based') {
+        // If we have interval and unit, use them; otherwise derive from threshold
+        if (!conditionData.interval || !conditionData.unit) {
+          const threshold = (conditionData.threshold || 0) as number;
+          // Try to convert seconds back to a reasonable unit
+          if (threshold >= 604800) {
+            conditionData.interval = Math.round(threshold / 604800);
+            conditionData.unit = 'weeks';
+          } else if (threshold >= 86400) {
+            conditionData.interval = Math.round(threshold / 86400);
+            conditionData.unit = 'days';
+          } else if (threshold >= 3600) {
+            conditionData.interval = Math.round(threshold / 3600);
+            conditionData.unit = 'hours';
+          } else if (threshold >= 60) {
+            conditionData.interval = Math.round(threshold / 60);
+            conditionData.unit = 'minutes';
+          } else {
+            conditionData.interval = threshold;
+            conditionData.unit = 'minutes';
+          }
+        }
+        
+        // Store as timeValue and timeUnit for the condition block
+        conditionData.timeValue = conditionData.interval;
+        conditionData.timeUnit = conditionData.unit;
+      }
+      
+      // For price_change conditions, map percentage to value
+      if (condition?.type === 'price_change' && conditionData.percentage !== undefined) {
+        conditionData.value = conditionData.percentage;
+      }
+      
       nodes.push({
         id: conditionId,
         type: 'condition',
         position: { x: 400, y: 100 + index * 150 },
-        data: {
-          conditionType: condition?.type || 'custom',
-          ...(condition?.parameters || {}),
-          label: condition?.type || 'custom',
-        },
+        data: conditionData,
       });
 
       // Create edges
