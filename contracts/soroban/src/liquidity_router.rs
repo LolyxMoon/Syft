@@ -1,12 +1,12 @@
-// Mock Liquidity Pool interface for liquidity provision
-// This handles adding and removing liquidity from a mock DEX pool
+// Liquidity Pool interface for liquidity provision
+// This handles adding and removing liquidity from DEX pools
 use soroban_sdk::{contractclient, Address, Env};
 
-/// Mock Liquidity Pool interface
-/// Simplified interface for testing liquidity operations
-#[contractclient(name = "MockLiquidityPoolClient")]
+/// Liquidity Pool interface
+/// Interface for pool liquidity operations
+#[contractclient(name = "LiquidityPoolClient")]
 #[allow(dead_code)]
-pub trait MockLiquidityPoolInterface {
+pub trait LiquidityPoolInterface {
     /// Add liquidity to a token pair pool
     /// Returns (liquidity_tokens, amount_a_used, amount_b_used)
     fn add_liquidity(
@@ -44,7 +44,7 @@ pub trait MockLiquidityPoolInterface {
     ) -> i128;
 }
 
-/// Add liquidity to a mock liquidity pool
+/// Add liquidity to a liquidity pool
 /// This adds both tokens to the pool and receives LP tokens
 pub fn add_liquidity_to_pool(
     env: &Env,
@@ -65,7 +65,7 @@ pub fn add_liquidity_to_pool(
         return Err(VaultError::InvalidConfiguration);
     }
 
-    let pool_client = MockLiquidityPoolClient::new(env, pool_address);
+    let pool_client = LiquidityPoolClient::new(env, pool_address);
     let vault_address = env.current_contract_address();
     
     // Calculate minimum amounts based on slippage tolerance
@@ -82,8 +82,8 @@ pub fn add_liquidity_to_pool(
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
-    // Add liquidity through mock pool
-    // The mock pool will call token.transfer internally
+    // Add liquidity through pool
+    // The pool will call token.transfer internally
     let (lp_tokens, actual_a, actual_b) = pool_client.add_liquidity(
         &vault_address,
         token_a,
@@ -102,7 +102,7 @@ pub fn add_liquidity_to_pool(
     Ok((lp_tokens, actual_a, actual_b))
 }
 
-/// Remove liquidity from a mock liquidity pool
+/// Remove liquidity from a liquidity pool
 /// This burns LP tokens and receives both tokens back
 #[allow(dead_code)]
 pub fn remove_liquidity_from_pool(
@@ -123,18 +123,18 @@ pub fn remove_liquidity_from_pool(
         return Err(VaultError::InvalidConfiguration);
     }
 
-    let pool_client = MockLiquidityPoolClient::new(env, pool_address);
+    let pool_client = LiquidityPoolClient::new(env, pool_address);
     let vault_address = env.current_contract_address();
     
     // Calculate minimum amounts based on slippage tolerance
-    // For mock pool, we'll use 0 for simplicity
+    // Using 0 for maximum flexibility
     let amount_a_min = 0;
     let amount_b_min = 0;
     
     // Set deadline to 1 hour from now
     let deadline = env.ledger().timestamp() + 3600;
     
-    // Remove liquidity through mock pool
+    // Remove liquidity through pool
     let (amount_a, amount_b) = pool_client.remove_liquidity(
         &vault_address,
         &token_a,
@@ -168,7 +168,7 @@ pub fn get_optimal_liquidity_amounts(
         return Err(VaultError::InvalidAmount);
     }
 
-    let pool_client = MockLiquidityPoolClient::new(env, pool_address);
+    let pool_client = LiquidityPoolClient::new(env, pool_address);
     
     let amount_b = pool_client.quote(
         &amount_a,

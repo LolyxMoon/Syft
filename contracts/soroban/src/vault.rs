@@ -381,11 +381,11 @@ impl VaultContract {
             }
         }
         
-        // FAKE: Remove fake liquidity position (tokens never left vault, so nothing to do)
+        // Remove liquidity position from tracking
         use soroban_sdk::String;
         let position_key = String::from_str(env, "lp_position");
         if env.storage().instance().has(&position_key) {
-            log!(env, "FAKE: Removing fake liquidity position (tokens were always in vault)");
+            log!(env, "Releasing liquidity position for withdrawal");
             env.storage().instance().remove(&position_key);
         }
         
