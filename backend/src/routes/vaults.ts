@@ -123,6 +123,18 @@ async function initializeVaultContract(
       })(),
     }),
     new StellarSdk.xdr.ScMapEntry({
+      key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('liquidity_pool_address')),
+      val: (() => {
+        // liquidity_pool_address is used ONLY for ADD/REMOVE LIQUIDITY (Mock Pool)
+        const hasLiquidityRules = config.rules?.some((r: any) => r.action === 'liquidity' || r.action === 'provide_liquidity');
+        if (hasLiquidityRules && network === 'testnet') {
+          const liquidityPoolAddress = process.env.MOCK_LIQUIDITY_POOL || 'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G';
+          return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(liquidityPoolAddress), {type: 'address'}); // Option::Some(Address)
+        }
+        return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
+      })(),
+    }),
+    new StellarSdk.xdr.ScMapEntry({
       key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('name')),
       val: StellarSdk.nativeToScVal(config.name, { type: 'string' }),
     }),
@@ -138,18 +150,6 @@ async function initializeVaultContract(
         if (network === 'testnet') {
           const routerAddress = process.env.SOROSWAP_ROUTER_ADDRESS || 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
           return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(routerAddress), {type: 'address'}); // Option::Some(Address)
-        }
-        return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
-      })(),
-    }),
-    new StellarSdk.xdr.ScMapEntry({
-      key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('liquidity_pool_address')),
-      val: (() => {
-        // liquidity_pool_address is used ONLY for ADD/REMOVE LIQUIDITY (Mock Pool)
-        const hasLiquidityRules = config.rules?.some((r: any) => r.action === 'liquidity' || r.action === 'provide_liquidity');
-        if (hasLiquidityRules && network === 'testnet') {
-          const liquidityPoolAddress = process.env.MOCK_LIQUIDITY_POOL || 'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G';
-          return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(liquidityPoolAddress), {type: 'address'}); // Option::Some(Address)
         }
         return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
       })(),
@@ -892,6 +892,18 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
         })(),
       }),
       new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('liquidity_pool_address')),
+        val: (() => {
+          // liquidity_pool_address is used ONLY for ADD/REMOVE LIQUIDITY (Mock Pool)
+          const hasLiquidityRules = config.rules?.some((r: any) => r.action === 'liquidity' || r.action === 'provide_liquidity');
+          if (hasLiquidityRules && network === 'testnet') {
+            const liquidityPoolAddress = process.env.MOCK_LIQUIDITY_POOL || 'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G';
+            return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(liquidityPoolAddress), {type: 'address'}); // Option::Some(Address)
+          }
+          return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
+        })(),
+      }),
+      new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('name')),
         val: StellarSdk.nativeToScVal(config.name, { type: 'string' }),
       }),
@@ -907,18 +919,6 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
           if (network === 'testnet') {
             const routerAddress = process.env.SOROSWAP_ROUTER_ADDRESS || 'CCMAPXWVZD4USEKDWRYS7DA4Y3D7E2SDMGBFJUCEXTC7VN6CUBGWPFUS';
             return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(routerAddress), {type: 'address'}); // Option::Some(Address)
-          }
-          return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
-        })(),
-      }),
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('liquidity_pool_address')),
-        val: (() => {
-          // liquidity_pool_address is used ONLY for ADD/REMOVE LIQUIDITY (Mock Pool)
-          const hasLiquidityRules = config.rules?.some((r: any) => r.action === 'liquidity' || r.action === 'provide_liquidity');
-          if (hasLiquidityRules && network === 'testnet') {
-            const liquidityPoolAddress = process.env.MOCK_LIQUIDITY_POOL || 'CARVGHKA2KNCBEZ4NGXM3TXAVAHCJWYGXLZPPBPE5GLMHO7Z3GJHCH3G';
-            return StellarSdk.nativeToScVal(StellarSdk.Address.fromString(liquidityPoolAddress), {type: 'address'}); // Option::Some(Address)
           }
           return StellarSdk.nativeToScVal(null, {type: 'address'}); // Option::None
         })(),
