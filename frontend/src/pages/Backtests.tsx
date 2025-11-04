@@ -77,6 +77,7 @@ interface BacktestMetrics {
   numRebalances: number;
   finalValue: number;
   buyAndHoldReturn: number;
+  totalFees?: number;
   usingMockData?: boolean;
   dataSourceWarning?: string;
 }
@@ -1162,13 +1163,53 @@ const Backtests = () => {
                         variant="outline"
                         size="md"
                         onClick={() => {
-                          const dataStr = JSON.stringify(selectedResult, null, 2);
-                          const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-                          const exportFileDefaultName = `backtest-${selectedResult.backtestId}.json`;
+                          // Create CSV content
+                          const metrics = selectedResult.results.metrics;
+                          const portfolioHistory = selectedResult.results.portfolioValueHistory || [];
+                          
+                          // Summary section
+                          let csv = 'BACKTEST SUMMARY\n';
+                          csv += `Backtest ID,${selectedResult.backtestId}\n`;
+                          csv += `Vault ID,${selectedResult.vaultId}\n`;
+                          csv += `Start Date,${new Date(selectedResult.timeframe.start).toLocaleDateString()}\n`;
+                          csv += `End Date,${new Date(selectedResult.timeframe.end).toLocaleDateString()}\n`;
+                          csv += `Initial Capital,$${selectedResult.initialCapital.toFixed(2)}\n`;
+                          csv += '\n';
+                          
+                          // Performance metrics
+                          csv += 'PERFORMANCE METRICS\n';
+                          csv += `Metric,Value\n`;
+                          csv += `Total Return,${(metrics.totalReturn * 100).toFixed(2)}%\n`;
+                          csv += `Total Return Amount,$${metrics.totalReturnAmount.toFixed(2)}\n`;
+                          csv += `Annualized Return,${(metrics.annualizedReturn * 100).toFixed(2)}%\n`;
+                          csv += `Buy & Hold Return,${(metrics.buyAndHoldReturn * 100).toFixed(2)}%\n`;
+                          csv += `Alpha vs Buy & Hold,${((metrics.totalReturn - metrics.buyAndHoldReturn) * 100).toFixed(2)}%\n`;
+                          csv += `Sharpe Ratio,${metrics.sharpeRatio.toFixed(2)}\n`;
+                          csv += `Max Drawdown,${(metrics.maxDrawdown * 100).toFixed(2)}%\n`;
+                          csv += `Volatility,${(metrics.volatility * 100).toFixed(2)}%\n`;
+                          csv += `Win Rate,${(metrics.winRate * 100).toFixed(2)}%\n`;
+                          csv += `Number of Rebalances,${metrics.numRebalances}\n`;
+                          if (metrics.totalFees !== undefined) {
+                            csv += `Total Fees,$${metrics.totalFees.toFixed(2)}\n`;
+                          }
+                          csv += '\n';
+                          
+                          // Portfolio value history
+                          csv += 'PORTFOLIO VALUE HISTORY\n';
+                          csv += 'Date,Portfolio Value\n';
+                          portfolioHistory.forEach(p => {
+                            csv += `${new Date(p.timestamp).toLocaleDateString()},${p.value.toFixed(2)}\n`;
+                          });
+                          
+                          // Create download
+                          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const exportFileDefaultName = `backtest-${selectedResult.backtestId}.csv`;
                           const linkElement = document.createElement('a');
-                          linkElement.setAttribute('href', dataUri);
+                          linkElement.setAttribute('href', url);
                           linkElement.setAttribute('download', exportFileDefaultName);
                           linkElement.click();
+                          URL.revokeObjectURL(url);
                         }}
                         className="flex items-center gap-2"
                       >
