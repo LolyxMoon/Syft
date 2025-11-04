@@ -380,40 +380,94 @@ const Backtests = () => {
               operator: 'gte',
               value: intervalMs,
             });
-          } else if (rule.condition_type === 'price_based') {
+          } else if (rule.condition_type === 'price_based' || rule.condition_type === 'price') {
             conditions.push({
               type: 'price',
               operator: rule.operator || 'gte',
               value: rule.threshold || 0,
-              assetId: rule.assetId,
+              assetId: rule.monitored_asset || rule.assetId,
             });
-          } else if (rule.condition_type === 'allocation_based') {
-            conditions.push({
-              type: 'allocation',
-              operator: rule.operator || 'gte',
-              value: rule.threshold || 0,
-              assetId: rule.assetId,
-            });
+          } else if (rule.condition_type === 'allocation_based' || rule.condition_type === 'allocation') {
+            // Handle allocation-based rebalancing
+            // Interpret threshold sensibly based on its value:
+            // - If threshold is small (< 20%), treat as deviation threshold (e.g., "rebalance when deviates by 5%")
+            // - If threshold is large (>= 20%), treat as absolute allocation level (e.g., "rebalance when reaches 80%")
+            const thresholdValue = rule.threshold || 5;
+            const isAbsoluteThreshold = thresholdValue >= 20;
+            
+            if (isAbsoluteThreshold) {
+              // Threshold represents absolute allocation level (e.g., 80% means "when asset reaches 80%")
+              // Calculate reasonable deviation from target
+              // If target is 70% and threshold is 80%, deviation is 10%
+              const targetAllocation = rule.target_allocation && Array.isArray(rule.target_allocation) 
+                ? (rule.target_allocation[0] / 10000) // First asset percentage from basis points
+                : 50; // Default 50-50 split
+              
+              const deviation = Math.abs(thresholdValue - targetAllocation);
+              
+              conditions.push({
+                type: 'allocation',
+                operator: 'gte',
+                value: Math.max(deviation, 5), // At least 5% deviation to avoid too frequent rebalancing
+                assetId: rule.monitored_asset || rule.assetId,
+              });
+            } else {
+              // Threshold represents deviation from target (e.g., 5% means "when deviates by 5%")
+              conditions.push({
+                type: 'allocation',
+                operator: 'gte',
+                value: thresholdValue,
+                assetId: rule.monitored_asset || rule.assetId,
+              });
+            }
           }
 
           // Transform action
           const actions = [];
-          if (rule.action === 'rebalance' && rule.target_allocation) {
+          if (rule.action === 'rebalance') {
+            // Handle different target_allocation formats
+            let targetAllocations = [];
+            
+            if (Array.isArray(rule.target_allocation)) {
+              // Check if it's array of objects or array of numbers
+              if (rule.target_allocation.length > 0 && typeof rule.target_allocation[0] === 'object') {
+                // Array of objects: [{assetCode: "XLM", percentage: 50}, ...]
+                targetAllocations = rule.target_allocation.map((alloc: any) => ({
+                  assetId: alloc.assetId || `asset_${alloc.assetCode?.toLowerCase() || 'unknown'}`,
+                  assetCode: alloc.assetCode || alloc.code || alloc.asset || 'UNKNOWN',
+                  assetIssuer: alloc.assetIssuer,
+                  percentage: alloc.percentage || alloc.allocation || 0,
+                }));
+              } else if (rule.target_allocation.length > 0 && typeof rule.target_allocation[0] === 'number') {
+                // Array of numbers: [700000, 300000] representing basis points
+                // Map to vault assets in order
+                targetAllocations = assets.map((asset, idx) => ({
+                  assetId: asset.assetId,
+                  assetCode: asset.assetCode,
+                  assetIssuer: asset.assetIssuer,
+                  percentage: rule.target_allocation[idx] ? rule.target_allocation[idx] / 10000 : 0,
+                }));
+              }
+            } else {
+              // Fallback: use vault's default asset allocations
+              targetAllocations = assets.map(asset => ({
+                assetId: asset.assetId,
+                assetCode: asset.assetCode,
+                assetIssuer: asset.assetIssuer,
+                percentage: asset.percentage,
+              }));
+            }
+            
             actions.push({
               type: 'rebalance',
-              targetAllocations: rule.target_allocation.map((alloc: any) => ({
-                assetId: alloc.assetId || `asset_${alloc.assetCode?.toLowerCase() || 'unknown'}`,
-                assetCode: alloc.assetCode || alloc.asset || 'UNKNOWN',
-                assetIssuer: alloc.assetIssuer,
-                percentage: alloc.percentage || alloc.allocation || 0,
-              })),
+              targetAllocations,
             });
           }
 
           return {
             id: rule.id || `rule_${index}`,
-            name: rule.name || `Rule ${index + 1}`,
-            description: rule.description,
+            name: rule.name || `Rebalance when ${rule.monitored_asset || 'asset'} deviates by ${rule.threshold}%`,
+            description: rule.description || `Monitor ${rule.monitored_asset} allocation and rebalance if deviation exceeds ${rule.threshold}%`,
             conditions,
             actions,
             enabled: rule.enabled !== false, // Default to enabled

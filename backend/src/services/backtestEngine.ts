@@ -132,8 +132,12 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestRes
   // Fetch historical price data for all assets
   const { priceData, usedMockData } = await fetchAllAssetPrices(vaultConfig.assets, startTime, endTime, resolution);
 
-  // Initialize portfolio with target allocations
-  let portfolio = initializePortfolio(initialCapital, vaultConfig.assets);
+  // Get starting prices
+  const startTime_ms = new Date(startTime).getTime();
+  const startingPrices = getCurrentPrices(priceData, startTime_ms);
+  
+  // Initialize portfolio with target allocations using real starting prices
+  let portfolio = initializePortfolio(initialCapital, vaultConfig.assets, startingPrices);
   let previousValue = initialCapital;
   let maxValue = initialCapital;
   let maxDrawdown = 0;
@@ -156,6 +160,10 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestRes
   
   // Track last rebalance time for each rule (for time-based conditions)
   const lastRebalanceTime = new Map<string, number>();
+  
+  // Minimum cooldown between rebalances (24 hours) to prevent over-trading
+  const MIN_REBALANCE_COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
+  let lastGlobalRebalance = 0;
 
   while (currentTime <= end) {
     const timestamp = new Date(currentTime).toISOString();
@@ -165,39 +173,57 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestRes
 
     // Update portfolio value based on current prices
     portfolio = updatePortfolioValue(portfolio, currentPrices);
+    
+    // Apply daily management fee (amortized from annual rate)
+    // Management fee is deducted continuously, not on rebalance
+    if (vaultConfig.managementFee && vaultConfig.managementFee > 0) {
+      const daysInPeriod = resolution / (24 * 60 * 60 * 1000);
+      const dailyFeeRate = (vaultConfig.managementFee / 100) / 365; // Convert annual to daily
+      const periodFee = portfolio.totalValue * dailyFeeRate * daysInPeriod;
+      
+      if (periodFee > 0) {
+        portfolio.totalValue -= periodFee;
+        totalFees += periodFee;
+      }
+    }
 
-    // Check if any rules trigger
-    const triggeredRules = checkRuleTriggers(
-      vaultConfig.rules,
-      portfolio,
-      currentPrices,
-      timestamp,
-      lastRebalanceTime
-    );
-
-    // Execute triggered rules
-    for (const rule of triggeredRules) {
-      const rebalanceFee = executeRebalance(
+    // Check if any rules trigger (only if cooldown has passed)
+    const timeSinceLastRebalance = currentTime - lastGlobalRebalance;
+    const canRebalance = timeSinceLastRebalance >= MIN_REBALANCE_COOLDOWN;
+    
+    if (canRebalance) {
+      const triggeredRules = checkRuleTriggers(
+        vaultConfig.rules,
         portfolio,
-        rule,
         currentPrices,
-        vaultConfig.managementFee || 0
+        timestamp,
+        lastRebalanceTime
       );
 
-      totalFees += rebalanceFee;
-      numRebalances++;
+      // Execute triggered rules
+      for (const rule of triggeredRules) {
+        const rebalanceFee = executeRebalance(
+          portfolio,
+          rule,
+          currentPrices
+        );
 
-      // Update last rebalance time for this rule
-      lastRebalanceTime.set(rule.id, currentTime);
+        totalFees += rebalanceFee;
+        numRebalances++;
 
-      timeline.push({
-        timestamp,
-        type: 'rebalance',
-        description: `Rebalanced: ${rule.name}`,
-        portfolioValue: portfolio.totalValue,
-        allocations: [...portfolio.allocations],
-        triggeredRule: rule.id,
-      });
+        // Update last rebalance time for this rule
+        lastRebalanceTime.set(rule.id, currentTime);
+        lastGlobalRebalance = currentTime;
+
+        timeline.push({
+          timestamp,
+          type: 'rebalance',
+          description: `Rebalanced: ${rule.name}`,
+          portfolioValue: portfolio.totalValue,
+          allocations: [...portfolio.allocations],
+          triggeredRule: rule.id,
+        });
+      }
     }
 
     // Track metrics
@@ -513,19 +539,26 @@ function generateMockPriceData(
  */
 function initializePortfolio(
   capital: number,
-  targetAllocations: AssetAllocation[]
+  targetAllocations: AssetAllocation[],
+  startingPrices: AssetPrice
 ): PortfolioState {
   const holdings = new Map<string, number>();
+  let actualTotalValue = 0;
 
   for (const allocation of targetAllocations) {
     const allocationAmount = (capital * allocation.percentage) / 100;
-    // Assume initial price of 1 for simplicity (will be updated with real prices)
-    holdings.set(allocation.assetCode, allocationAmount);
+    // Use real starting prices to calculate initial holdings
+    const price = startingPrices[allocation.assetCode] || 1;
+    const quantity = allocationAmount / price;
+    holdings.set(allocation.assetCode, quantity);
+    actualTotalValue += quantity * price;
   }
+
+  console.log(`[Backtest] Initialized portfolio: target=$${capital}, actual=$${actualTotalValue.toFixed(2)}`);
 
   return {
     holdings,
-    totalValue: capital,
+    totalValue: actualTotalValue, // Use actual calculated value, not target
     allocations: targetAllocations.map((a) => ({ ...a })),
   };
 }
@@ -620,12 +653,27 @@ function checkRuleTriggers(
           break;
         }
       } else if (condition.type === 'allocation' && condition.assetId) {
+        // Check if allocation has deviated from target by more than threshold
         const currentAllocation = portfolio.allocations.find(
           (a) => a.assetCode === condition.assetId
         );
         const currentPct = currentAllocation?.percentage || 0;
-
-        const met = evaluateCondition(currentPct, condition.operator, condition.value);
+        
+        // Find target allocation for this asset
+        // Look in the first action's targetAllocations
+        const targetAllocation = rule.actions[0]?.targetAllocations?.find(
+          (a) => a.assetCode === condition.assetId
+        );
+        const targetPct = targetAllocation?.percentage || 0;
+        
+        // Calculate absolute deviation
+        const deviation = Math.abs(currentPct - targetPct);
+        
+        // condition.value is the threshold (e.g., 5 means 5% deviation)
+        const met = deviation >= condition.value;
+        
+        console.log(`[Backtest] Allocation check for ${condition.assetId}: current=${currentPct.toFixed(2)}%, target=${targetPct.toFixed(2)}%, deviation=${deviation.toFixed(2)}%, threshold=${condition.value}%, met=${met}`);
+        
         if (!met) {
           allConditionsMet = false;
           break;
@@ -676,8 +724,7 @@ function evaluateCondition(actual: number, operator: string, expected: number): 
 function executeRebalance(
   portfolio: PortfolioState,
   rule: RebalanceRule,
-  prices: AssetPrice,
-  managementFee: number
+  prices: AssetPrice
 ): number {
   // Get target allocations from rule
   const action = rule.actions[0];
@@ -685,22 +732,30 @@ function executeRebalance(
 
   const targetAllocations = action.targetAllocations;
 
-  // Calculate new holdings based on target allocations
+  // Calculate rebalancing fee (per-rebalance, not annual)
+  // Typical rebalancing fee is ~0.1-0.3% per rebalance, not the full annual management fee
+  // Management fee should be amortized over time, not charged per rebalance
+  const rebalanceFeeRate = 0.001; // 0.1% per rebalance (reasonable for DEX swaps + gas)
+  const fee = portfolio.totalValue * rebalanceFeeRate;
+  
+  // Deduct fee FIRST, then rebalance remaining value
+  const valueAfterFee = portfolio.totalValue - fee;
+
+  // Calculate new holdings based on target allocations using value after fee
   const newHoldings = new Map<string, number>();
 
   for (const target of targetAllocations) {
-    const targetValue = (portfolio.totalValue * target.percentage) / 100;
+    const targetValue = (valueAfterFee * target.percentage) / 100;
     const price = prices[target.assetCode] || 1;
     const amount = targetValue / price;
     newHoldings.set(target.assetCode, amount);
   }
 
-  // Calculate fee (0.1% of rebalanced amount for example)
-  const fee = portfolio.totalValue * (managementFee / 100);
-
   portfolio.holdings = newHoldings;
   portfolio.allocations = targetAllocations.map((a) => ({ ...a }));
-  portfolio.totalValue -= fee;
+  portfolio.totalValue = valueAfterFee;
+
+  console.log(`[Backtest] Rebalanced: fee=$${fee.toFixed(2)}, new value=$${valueAfterFee.toFixed(2)}`);
 
   return fee;
 }
