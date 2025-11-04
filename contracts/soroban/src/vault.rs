@@ -856,16 +856,11 @@ impl VaultContract {
     }
 
     /// Trigger liquidity provision based on configured rules (only liquidity actions)
-    /// Can be called by anyone, but only executes if liquidity rules are met
+    /// Can be called by anyone (no condition checking - backend already verified)
     pub fn trigger_liquidity(env: Env) -> Result<(), VaultError> {
         // Check vault is initialized
         if !env.storage().instance().has(&CONFIG) {
             return Err(VaultError::NotInitialized);
-        }
-
-        // Check if liquidity provision should occur based on rules
-        if !crate::engine::should_provide_liquidity(&env) {
-            return Ok(()); // No liquidity provision needed
         }
 
         let _config: VaultConfig = env.storage().instance().get(&CONFIG)
@@ -874,7 +869,7 @@ impl VaultContract {
         let mut state: VaultState = env.storage().instance().get(&STATE)
             .ok_or(VaultError::NotInitialized)?;
 
-        // Execute only liquidity actions
+        // Execute only liquidity actions (no condition checking - backend already verified)
         crate::rebalance::execute_liquidity_only(&env)?;
 
         // Update last rebalance timestamp
