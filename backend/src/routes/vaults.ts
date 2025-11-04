@@ -818,6 +818,49 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       return StellarSdk.Address.fromString(address).toScVal();
     });
 
+    // Convert rules to Soroban ScVal format (same logic as initializeVaultContract)
+    const rulesScVal = (config.rules || []).map((rule: any) => {
+      // Fix target_allocation to match number of assets
+      let targetAllocation = rule.target_allocation || [];
+      
+      // For liquidity/stake actions, if target_allocation doesn't match assets length, fix it
+      if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
+          targetAllocation.length !== (config.assets || []).length) {
+        console.log(`[Build Initialize] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
+        // Use 50% of vault value for liquidity/stake (represented as 50_0000 in basis points)
+        targetAllocation = [50_0000];
+      }
+      
+      // Build RebalanceRule struct (fields must be alphabetically ordered!)
+      return StellarSdk.xdr.ScVal.scvMap([
+        new StellarSdk.xdr.ScMapEntry({
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('action')),
+          val: StellarSdk.nativeToScVal(rule.action, { type: 'string' }),
+        }),
+        new StellarSdk.xdr.ScMapEntry({
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('condition_type')),
+          val: StellarSdk.nativeToScVal(rule.condition_type, { type: 'string' }),
+        }),
+        new StellarSdk.xdr.ScMapEntry({
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('target_allocation')),
+          val: StellarSdk.xdr.ScVal.scvVec(
+            targetAllocation.map((alloc: number) => StellarSdk.nativeToScVal(alloc, { type: 'i128' }))
+          ),
+        }),
+        new StellarSdk.xdr.ScMapEntry({
+          key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('threshold')),
+          val: StellarSdk.nativeToScVal(rule.threshold, { type: 'i128' }),
+        }),
+      ]);
+    });
+
+    console.log(`[Build Initialize] Converting ${config.rules?.length || 0} rules to ScVal format`);
+    if (config.rules && config.rules.length > 0) {
+      console.log(`[Build Initialize] Rules:`, config.rules.map((r: any, i: number) => 
+        `Rule ${i}: ${r.action} with allocation ${r.target_allocation?.join(', ')}`
+      ).join('; '));
+    }
+
     // Build VaultConfig struct (must be sorted alphabetically by key!)
     const vaultConfigStruct = StellarSdk.xdr.ScVal.scvMap([
       new StellarSdk.xdr.ScMapEntry({
@@ -860,11 +903,21 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('rules')),
-        val: StellarSdk.xdr.ScVal.scvVec([]),
+        val: StellarSdk.xdr.ScVal.scvVec(rulesScVal), // Pass the actual rules!
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('staking_pool_address')),
-        val: StellarSdk.xdr.ScVal.scvVoid(), // Option::None
+        val: (() => {
+          // Set staking pool address for testnet if any stake rules exist
+          const hasStakeRules = config.rules?.some((r: any) => r.action === 'stake');
+          if (hasStakeRules && network === 'testnet') {
+            const stakingPoolAddress = 'CDLZVYS4GWBUKQAJYX5DFXUH4N2NVPW6QQZNSG6GJUMU4LQYPVCQLKFK';
+            return StellarSdk.xdr.ScVal.scvVec([
+              StellarSdk.Address.fromString(stakingPoolAddress).toScVal()
+            ]); // Option::Some(Address)
+          }
+          return StellarSdk.xdr.ScVal.scvVoid(); // Option::None
+        })(),
       }),
     ]);
 
