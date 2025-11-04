@@ -58,6 +58,17 @@ async function initializeVaultContract(
   
   // Convert rules to Soroban ScVal format
   const rulesScVal = (config.rules || []).map((rule: any) => {
+    // Fix target_allocation to match number of assets
+    let targetAllocation = rule.target_allocation || [];
+    
+    // For liquidity/stake actions, if target_allocation doesn't match assets length, fix it
+    if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
+        targetAllocation.length !== (config.assets || []).length) {
+      console.log(`[initializeVaultContract] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
+      // Use 50% of vault value for liquidity/stake (represented as 50_0000 in basis points)
+      targetAllocation = [50_0000];
+    }
+    
     // Build RebalanceRule struct (fields must be alphabetically ordered!)
     return StellarSdk.xdr.ScVal.scvMap([
       new StellarSdk.xdr.ScMapEntry({
@@ -71,7 +82,7 @@ async function initializeVaultContract(
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.xdr.ScVal.scvSymbol(Buffer.from('target_allocation')),
         val: StellarSdk.xdr.ScVal.scvVec(
-          rule.target_allocation.map((alloc: number) => StellarSdk.nativeToScVal(alloc, { type: 'i128' }))
+          targetAllocation.map((alloc: number) => StellarSdk.nativeToScVal(alloc, { type: 'i128' }))
         ),
       }),
       new StellarSdk.xdr.ScMapEntry({
