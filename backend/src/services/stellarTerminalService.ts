@@ -15,6 +15,7 @@ import {
 import * as StellarSdk from '@stellar/stellar-sdk';
 import axios from 'axios';
 import { withRetry, pollUntil } from '../utils/retryLogic.js';
+import { supabase } from '../lib/supabase.js';
 
 // Stellar Testnet Configuration
 const HORIZON_URL = 'https://horizon-testnet.stellar.org';
@@ -1233,16 +1234,145 @@ export class StellarTerminalService {
 
   async listNFTs(address: string, collectionId?: string): Promise<any> {
     try {
+      const allNFTs: any[] = [];
+
+      // 1. Query on-chain NFTs from the deployed NFT contract
+      const NFT_CONTRACT_ADDRESS = process.env.NFT_CONTRACT_ADDRESS;
+      
+      if (NFT_CONTRACT_ADDRESS) {
+        try {
+          console.log(`[List NFTs] Querying on-chain NFTs for ${address} from contract ${NFT_CONTRACT_ADDRESS}`);
+          
+          // Query the contract for NFTs - we need to check the total count first
+          // then iterate through them to find ones owned by this address
+          const contract = new Contract(NFT_CONTRACT_ADDRESS);
+          const sourceAccount = await horizonServer.loadAccount(address).catch(() => null);
+          
+          if (sourceAccount) {
+            // Try to get total NFT count from contract
+            // Note: This is a simplified approach - in production, you might want to use events or indexing
+            try {
+              // Try to query up to 100 NFT IDs to find ones owned by this address
+              // This is not efficient but works for small collections
+              const maxNFTsToCheck = 100;
+              
+              for (let nftId = 1; nftId <= maxNFTsToCheck; nftId++) {
+                try {
+                  const nftTx = new TransactionBuilder(sourceAccount, {
+                    fee: BASE_FEE,
+                    networkPassphrase: Networks.TESTNET,
+                  })
+                    .addOperation(contract.call('get_nft', nativeToScVal(nftId, { type: 'u64' })))
+                    .setTimeout(30)
+                    .build();
+                  
+                  const nftResult = await sorobanServer.simulateTransaction(nftTx);
+                  
+                  if (StellarSdk.rpc.Api.isSimulationSuccess(nftResult) && nftResult.result?.retval) {
+                    const nftData = scValToNative(nftResult.result.retval);
+                    
+                    // Check if this NFT is owned by the queried address
+                    if (nftData.holder === address) {
+                      allNFTs.push({
+                        tokenId: `NFT_${nftId}`,
+                        name: `Vault NFT #${nftId}`,
+                        description: `Vault ownership NFT representing ${(nftData.ownership_percentage / 100).toFixed(2)}% ownership`,
+                        image: 'https://syft-stellar.vercel.app/vault-nft.png',
+                        ownership_percentage: nftData.ownership_percentage,
+                        vault_address: nftData.vault_address,
+                        source: 'on-chain',
+                      });
+                    }
+                  } else {
+                    // NFT ID doesn't exist, we've reached the end
+                    break;
+                  }
+                } catch (nftError) {
+                  // NFT might not exist or error reading, likely reached the end
+                  break;
+                }
+              }
+              
+              console.log(`[List NFTs] Found ${allNFTs.filter(n => n.source === 'on-chain').length} on-chain NFTs`);
+            } catch (onChainQueryError) {
+              console.log(`[List NFTs] Error querying on-chain NFTs:`, onChainQueryError);
+            }
+          }
+        } catch (onChainError: any) {
+          console.log(`[List NFTs] On-chain NFT query failed (non-fatal):`, onChainError.message);
+          // Don't fail the whole operation, just log and continue
+        }
+      }
+
+      // 2. Get Quest NFTs from database (these have richer metadata)
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', address)
+        .single();
+
+      if (user && !userError) {
+        // Get user's claimed quest NFTs
+        const { data: userQuests, error: questsError } = await supabase
+          .from('user_quests')
+          .select(`
+            nft_token_id,
+            nft_transaction_hash,
+            claimed_at,
+            quests (
+              id,
+              title,
+              description,
+              reward_nft_name,
+              reward_nft_description,
+              reward_nft_image,
+              category
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('status', 'claimed')
+          .not('nft_token_id', 'is', null)
+          .order('claimed_at', { ascending: false });
+
+        if (!questsError && userQuests) {
+          // Add Quest NFTs with enhanced metadata
+          userQuests.forEach((uq: any) => {
+            const quest = uq.quests;
+            allNFTs.push({
+              tokenId: uq.nft_token_id,
+              name: quest.reward_nft_name || quest.title,
+              description: quest.reward_nft_description || quest.description,
+              image: quest.reward_nft_image || 'https://syft-stellar.vercel.app/wallet-pioneer.png',
+              claimedAt: uq.claimed_at,
+              transactionHash: uq.nft_transaction_hash,
+              category: quest.category,
+              source: 'quest',
+            });
+          });
+        }
+      }
+
+      // 3. Return combined results
+      const filteredNFTs = collectionId 
+        ? allNFTs.filter(nft => nft.source === collectionId || nft.category === collectionId)
+        : allNFTs;
+
       return {
         success: true,
         owner: address,
         collection: collectionId || 'All Collections',
-        nfts: [
-          { tokenId: '123', name: 'Cool NFT #123', image: 'ipfs://...' },
-          { tokenId: '456', name: 'Rare NFT #456', image: 'ipfs://...' },
-        ],
+        nfts: filteredNFTs,
+        breakdown: {
+          onChain: allNFTs.filter(n => n.source === 'on-chain').length,
+          quest: allNFTs.filter(n => n.source === 'quest').length,
+          total: filteredNFTs.length,
+        },
+        message: filteredNFTs.length > 0 
+          ? `You own ${filteredNFTs.length} NFT${filteredNFTs.length !== 1 ? 's' : ''} (${allNFTs.filter(n => n.source === 'quest').length} Quest NFT${allNFTs.filter(n => n.source === 'quest').length !== 1 ? 's' : ''}, ${allNFTs.filter(n => n.source === 'on-chain').length} on-chain NFT${allNFTs.filter(n => n.source === 'on-chain').length !== 1 ? 's' : ''})`
+          : 'No NFTs found. Complete quests to earn NFT rewards or mint NFTs from the platform!',
       };
     } catch (error: any) {
+      console.error('[List NFTs] Error:', error);
       return {
         success: false,
         error: error.message,
