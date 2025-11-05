@@ -437,6 +437,33 @@ const VaultBuilder = () => {
             const percentage = rule.action.parameters.targetAllocation || 0;
             targetAllocation = [Math.round((percentage as number) * 10000)];
             console.log(`[VaultBuilder] Stake percentage: ${percentage}% -> ${targetAllocation[0]} basis points`);
+          } else if (rule.action.type === 'swap' && rule.action.parameters.targetAsset) {
+            // For swap actions, create allocation array where target asset gets the percentage
+            const targetAsset = rule.action.parameters.targetAsset as string;
+            const swapPercentage = Number(rule.action.parameters.targetAllocation) || 100;
+            
+            // Find or add the target asset to the config
+            let targetAssetIndex = config.assets.findIndex(a => 
+              a.code === targetAsset || a.issuer === targetAsset
+            );
+            
+            // If target asset doesn't exist in vault, add it with 0 initial allocation
+            if (targetAssetIndex === -1) {
+              config.assets.push({
+                code: targetAsset,
+                allocation: 0,
+                issuer: undefined // Will be resolved by backend
+              });
+              targetAssetIndex = config.assets.length - 1;
+              console.log(`[VaultBuilder] Added ${targetAsset} to assets for swap action`);
+            }
+            
+            // Create allocation array: all assets get 0 except target asset
+            targetAllocation = config.assets.map((_asset, idx) => 
+              idx === targetAssetIndex ? Math.round(swapPercentage * 1000) : 0
+            );
+            
+            console.log(`[VaultBuilder] Swap to ${targetAsset}: ${swapPercentage}% -> allocation array:`, targetAllocation);
           } else if (rule.action.parameters.targetAllocation) {
             // For other actions, use the provided target allocation
             targetAllocation = [rule.action.parameters.targetAllocation as number];

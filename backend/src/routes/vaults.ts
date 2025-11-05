@@ -61,13 +61,33 @@ async function initializeVaultContract(
     // Fix target_allocation to match number of assets
     let targetAllocation = rule.target_allocation || [];
     
-    // For liquidity/stake actions, target_allocation must match number of assets (contract validation requirement)
-    // Use the vault's asset allocations (in 6-decimal format: 50% = 50_0000)
-    if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
+    // For ALL actions, target_allocation must match number of assets (contract validation requirement)
+    // Use the vault's asset allocations (in 6-decimal format: 50% = 50_0000, 100% = 100_0000)
+    if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake' || 
+         rule.action === 'swap' || rule.action === 'rebalance') && 
         targetAllocation.length !== (config.assets || []).length) {
       console.log(`[initializeVaultContract] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
-      // Use asset allocations from config (convert from percentage to 6-decimal format)
-      targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
+      
+      // For swap/rebalance actions, use targetAllocation from the rule if provided
+      if ((rule.action === 'swap' || rule.action === 'rebalance') && rule.targetAllocation !== undefined) {
+        // Convert single percentage to allocation array based on target asset
+        const targetAssetIndex = (config.assets || []).findIndex((a: any) => 
+          a.code === rule.targetAsset || a === rule.targetAsset
+        );
+        
+        if (targetAssetIndex >= 0) {
+          // Create allocation array: target asset gets the allocation, rest gets 0
+          targetAllocation = (config.assets || []).map((_: any, idx: number) => 
+            idx === targetAssetIndex ? rule.targetAllocation * 1000 : 0 // Convert % to basis points
+          );
+        } else {
+          // Fallback: use asset allocations from config
+          targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+        }
+      } else {
+        // For other actions, use asset allocations from config
+        targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+      }
     }
     
     // Convert frontend action names to contract names
@@ -850,13 +870,33 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
       // Fix target_allocation to match number of assets
       let targetAllocation = rule.target_allocation || [];
       
-      // For liquidity/stake actions, target_allocation must match number of assets (contract validation requirement)
-      // Use the vault's asset allocations (in 6-decimal format: 50% = 50_0000)
-      if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake') && 
+      // For ALL actions, target_allocation must match number of assets (contract validation requirement)
+      // Use the vault's asset allocations (in 6-decimal format: 50% = 50_0000, 100% = 100_0000)
+      if ((rule.action === 'liquidity' || rule.action === 'provide_liquidity' || rule.action === 'stake' || 
+           rule.action === 'swap' || rule.action === 'rebalance') && 
           targetAllocation.length !== (config.assets || []).length) {
         console.log(`[Build Initialize] Fixing target_allocation for ${rule.action}: was ${targetAllocation.length} elements, need ${(config.assets || []).length}`);
-        // Use asset allocations from config (convert from percentage to 6-decimal format)
-        targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
+        
+        // For swap/rebalance actions, use targetAllocation from the rule if provided
+        if ((rule.action === 'swap' || rule.action === 'rebalance') && rule.targetAllocation !== undefined) {
+          // Convert single percentage to allocation array based on target asset
+          const targetAssetIndex = (config.assets || []).findIndex((a: any) => 
+            a.code === rule.targetAsset || a === rule.targetAsset
+          );
+          
+          if (targetAssetIndex >= 0) {
+            // Create allocation array: target asset gets the allocation, rest gets 0
+            targetAllocation = (config.assets || []).map((_: any, idx: number) => 
+              idx === targetAssetIndex ? rule.targetAllocation * 1000 : 0 // Convert % to basis points
+            );
+          } else {
+            // Fallback: use asset allocations from config
+            targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+          }
+        } else {
+          // For other actions, use asset allocations from config
+          targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+        }
       }
       
       // Convert frontend action names to contract names
