@@ -265,6 +265,35 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
+                Target Allocation (%)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={localTargetAllocation || 100}
+                  onChange={(e) => handleTargetAllocationChange(parseFloat(e.target.value) || 100)}
+                  className="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="flex items-center text-sm text-gray-600 dark:text-gray-400">%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={localTargetAllocation || 100}
+                onChange={(e) => handleTargetAllocationChange(parseFloat(e.target.value))}
+                className="w-full mt-1"
+                style={{
+                  background: `linear-gradient(to right, #f97316 0%, #f97316 ${localTargetAllocation || 100}%, #e5e7eb ${localTargetAllocation || 100}%, #e5e7eb 100%)`
+                }}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
                 DEX Protocol (Optional)
               </label>
               {availableProtocols.length > 0 ? (
@@ -319,9 +348,12 @@ const ActionBlock = ({ id, data, selected }: ActionBlockProps) => {
           ? `Add liquidity to ${localProtocol}`
           : 'Add liquidity to pool';
       case 'swap':
-        return localTargetAsset
-          ? `Swap to ${localTargetAsset}${localProtocol ? ` via ${localProtocol}` : ''}`
-          : 'Swap assets';
+        if (localTargetAsset && localTargetAllocation > 0) {
+          return `Swap ${localTargetAllocation}% to ${localTargetAsset}${localProtocol ? ` via ${localProtocol}` : ''}`;
+        } else if (localTargetAsset) {
+          return `Swap to ${localTargetAsset}${localProtocol ? ` via ${localProtocol}` : ''}`;
+        }
+        return 'Swap assets';
       default:
         return 'Execute action';
     }

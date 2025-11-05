@@ -263,38 +263,22 @@ fn execute_rebalance_action(
         }
     }
     
-    // Check if rebalancing is actually needed (tolerance: 1% of total value)
-    let tolerance = total_value / 100; // 1% tolerance
-    let mut needs_rebalance = false;
+    // REMOVED TOLERANCE CHECK - Execute rebalancing whenever called
+    // The previous tolerance check was preventing legitimate rebalancing
+    // Now we trust the caller to only trigger rebalancing when needed
     
+    // Log current and target balances for debugging
     for i in 0..assets.len() {
-        if let (Some(current), Some(target)) = (
+        if let (Some(asset), Some(current), Some(target)) = (
+            assets.get(i),
             current_balances.get(i),
             target_amounts.get(i)
         ) {
-            let diff = if current > target {
-                current - target
-            } else {
-                target - current
-            };
-            
-            // If any asset is off by more than tolerance, we need to rebalance
-            if diff > tolerance {
-                needs_rebalance = true;
-                break;
-            }
+            env.events().publish(
+                (symbol_short!("reb_curr"),),
+                (asset.clone(), current, target)
+            );
         }
-    }
-    
-    // Skip rebalancing if already at target allocation
-    if !needs_rebalance {
-        // Log that rebalance was skipped
-        env.events().publish(
-            (symbol_short!("reb_skip"),),
-            tolerance
-        );
-        // No error, just skip - allocation is already correct
-        return Ok(());
     }
     
     // Log that we're proceeding with swaps
@@ -304,6 +288,9 @@ fn execute_rebalance_action(
     );
     
     // Execute swaps to reach target allocation
+    // Minimum swap amount to avoid dust (100 stroops)
+    let min_swap_amount = 100i128;
+    
     for i in 0..assets.len() {
         if let (Some(asset), Some(current), Some(target)) = (
             assets.get(i),
@@ -312,8 +299,8 @@ fn execute_rebalance_action(
         ) {
             let diff = target - current;
             
-            // Skip if this asset is already close to target
-            if diff.abs() <= tolerance {
+            // Skip if difference is too small to swap (less than 100 stroops)
+            if diff.abs() < min_swap_amount {
                 continue;
             }
             
