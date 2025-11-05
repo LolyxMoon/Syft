@@ -766,6 +766,13 @@ Format transaction hashes and addresses nicely for readability.`,
         let iteration = 0;
         let primaryFunctionName = firstFunctionName; // Track the primary operation
         let primaryFunctionResult = lastFunctionResult;
+        
+        // Track executed function calls to prevent infinite loops
+        const executedCalls = new Set<string>();
+        assistantMessage.tool_calls.forEach(tc => {
+          const callKey = `${tc.function.name}:${tc.function.arguments}`;
+          executedCalls.add(callKey);
+        });
 
         while (continueChain && iteration < maxIterations) {
           iteration++;
@@ -783,15 +790,47 @@ Format transaction hashes and addresses nicely for readability.`,
 
           // Check if AI wants to call more functions
           if (nextMessage.tool_calls && nextMessage.tool_calls.length > 0) {
+            // Detect duplicate function calls (infinite loop prevention)
+            const duplicateCalls = nextMessage.tool_calls.filter(tc => {
+              const callKey = `${tc.function.name}:${tc.function.arguments}`;
+              return executedCalls.has(callKey);
+            });
+            
+            if (duplicateCalls.length === nextMessage.tool_calls.length) {
+              // ALL calls are duplicates - AI is stuck in a loop
+              console.log(`[Terminal AI] ⚠️  Detected infinite loop - AI trying to re-execute same functions. Stopping chain.`);
+              continueChain = false;
+              
+              // Add a system message explaining the loop was detected
+              history.push({
+                role: 'assistant',
+                content: nextMessage.content || `I've completed the requested operations. ${duplicateCalls.length} function(s) were executed successfully.`
+              });
+              break;
+            }
+            
             console.log(`[Terminal AI] Chain iteration ${iteration}: AI calling more functions`);
             
             history.push(nextMessage);
 
-            // Execute the new tool calls
+            // Execute the new tool calls (skip duplicates)
             for (const toolCall of nextMessage.tool_calls) {
               const functionName = toolCall.function.name;
               const functionArgs = JSON.parse(toolCall.function.arguments);
-
+              const callKey = `${functionName}:${functionArgs}`;
+              
+              if (executedCalls.has(callKey)) {
+                console.log(`[Terminal AI] ⏭️  Skipping duplicate: ${functionName}`, functionArgs);
+                // Still add to history but with cached result
+                history.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: JSON.stringify({ success: true, cached: true, message: 'Already executed' }),
+                });
+                continue;
+              }
+              
+              executedCalls.add(callKey);
               console.log(`[Terminal AI] Chain executing: ${functionName}`, functionArgs);
 
               const functionResult = await this.executeFunction(
