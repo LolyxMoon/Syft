@@ -1161,6 +1161,8 @@ Format transaction hashes and addresses nicely for readability.`,
       const service = stellarTerminalService;
       const result = await service.swapAssets(sessionId, fromAsset, toAsset, amount, slippage);
 
+      console.log('[Terminal AI] Swap result:', JSON.stringify(result, null, 2));
+
       // Add the swap execution to conversation history
       if (history) {
         history.push({
@@ -1194,7 +1196,22 @@ Format transaction hashes and addresses nicely for readability.`,
         };
       }
 
-      const responseMessage = result.message || (result.success ? 'Swap completed successfully' : 'Swap failed');
+      // Check if the result indicates failure
+      if (!result.success) {
+        const errorMsg = result.error || 'Swap failed';
+        console.error('[Terminal AI] Swap failed:', errorMsg);
+        
+        return {
+          success: false,
+          error: errorMsg,
+          message: errorMsg,
+          functionCalled: 'swap_assets',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      const responseMessage = result.message || 'Swap completed successfully';
       
       if (history) {
         history.push({
@@ -1204,7 +1221,7 @@ Format transaction hashes and addresses nicely for readability.`,
       }
 
       return {
-        success: result.success,
+        success: true,
         message: responseMessage,
         functionCalled: 'swap_assets',
         functionResult: result,
@@ -1226,6 +1243,9 @@ Format transaction hashes and addresses nicely for readability.`,
         success: false,
         error: error.message,
         message: `Failed to execute swap: ${error.message}`,
+        functionCalled: 'swap_assets',
+        functionResult: { success: false, error: error.message },
+        type: 'function_call',
       };
     }
   }

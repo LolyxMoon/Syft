@@ -559,11 +559,18 @@ Let's build on Stellar! 🌟`,
 
                             const swapResult = await pollJobStatus(startResponse.data.jobId);
 
+                            console.log('[Terminal] Auto-swap result:', swapResult);
+
                             if (swapResult.success) {
+                              // Check if the result contains an action (transaction to sign)
+                              const hasAction = swapResult.functionResult?.action;
+                              
                               const swapResponseMessage: Message = {
                                 id: (Date.now() + 2).toString(),
                                 role: 'assistant',
-                                content: swapResult.message,
+                                content: hasAction 
+                                  ? swapResult.message 
+                                  : swapResult.message || '✅ Swap completed successfully!',
                                 timestamp: new Date(),
                                 functionCalled: swapResult.functionCalled,
                                 functionResult: swapResult.functionResult,
@@ -572,7 +579,9 @@ Let's build on Stellar! 🌟`,
                               };
                               setMessages((prev) => [...prev, swapResponseMessage]);
                             } else {
-                              throw new Error(swapResult.error || 'Swap failed');
+                              // Log the full error for debugging
+                              console.error('[Terminal] Auto-swap failed:', swapResult);
+                              throw new Error(swapResult.error || swapResult.message || 'Swap failed');
                             }
                           } catch (error: any) {
                             const errorMessage: Message = {
