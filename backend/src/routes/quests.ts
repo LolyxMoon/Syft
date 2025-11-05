@@ -416,7 +416,8 @@ router.post('/claim', async (req: Request, res: Response) => {
     const network = 'testnet'; // TODO: Get from user preferences or request
 
     // Build NFT minting transaction
-    const imageUrl = getQuestNFTImageUrl(questId, questData.category);
+    // Use reward_nft_image from database, fallback to category-based image
+    const imageUrl = questData.reward_nft_image || getQuestNFTImageUrl(questId, questData.category);
     const mintResult = await buildMintNFTTransaction({
       toAddress: walletAddress,
       metadata: {
