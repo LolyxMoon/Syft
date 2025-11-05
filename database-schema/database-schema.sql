@@ -135,6 +135,16 @@ CREATE TABLE public.user_onboarding (
   CONSTRAINT user_onboarding_pkey PRIMARY KEY (id),
   CONSTRAINT user_onboarding_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.user_page_visits (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  page_path text NOT NULL,
+  visit_count integer DEFAULT 1,
+  first_visited_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_visited_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_page_visits_pkey PRIMARY KEY (id),
+  CONSTRAINT user_page_visits_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.user_quests (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,

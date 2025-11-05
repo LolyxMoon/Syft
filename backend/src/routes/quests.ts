@@ -66,18 +66,12 @@ router.get('/', async (req: Request, res: Response) => {
       throw userQuestsError;
     }
 
-    // Combine quests with user progress and determine locked status
-    const questsWithProgress: QuestWithProgress[] = (quests || []).map((quest: any, index: number) => {
+    // Combine quests with user progress (no sequential locking)
+    const questsWithProgress: QuestWithProgress[] = (quests || []).map((quest: any) => {
       const userQuest = (userQuests || []).find((uq: any) => uq.quest_id === quest.id);
       
-      // Check if previous quest is completed
-      let isLocked = false;
-      if (index > 0) {
-        const previousQuest = quests[index - 1];
-        const previousUserQuest = (userQuests || []).find((uq: any) => uq.quest_id === previousQuest.id);
-        // Lock this quest if previous quest is not completed or claimed
-        isLocked = !previousUserQuest || (previousUserQuest.status !== 'completed' && previousUserQuest.status !== 'claimed');
-      }
+      // No longer locking quests - users can complete them in any order
+      const isLocked = false;
       
       return {
         id: quest.id,
@@ -252,33 +246,7 @@ router.post('/progress', async (req: Request, res: Response) => {
 
     const questId = quest.id;
 
-    // Check if quest is locked (previous quest not completed)
-    if (quest.order_index > 1) {
-      // Get the previous quest
-      const { data: previousQuest, error: prevQuestError } = await supabase
-        .from('quests')
-        .select('id')
-        .eq('order_index', quest.order_index - 1)
-        .single();
-
-      if (!prevQuestError && previousQuest) {
-        // Check if previous quest is completed
-        const { data: previousUserQuest } = await supabase
-          .from('user_quests')
-          .select('status')
-          .eq('user_id', userId)
-          .eq('quest_id', previousQuest.id)
-          .single();
-
-        if (!previousUserQuest || (previousUserQuest.status !== 'completed' && previousUserQuest.status !== 'claimed')) {
-          return res.status(403).json({
-            success: false,
-            error: { message: 'Previous quest must be completed first', code: 'QUEST_LOCKED' },
-            timestamp: new Date().toISOString(),
-          } as ApiResponse);
-        }
-      }
-    }
+    // No sequential validation - users can complete quests in any order
     const now = new Date().toISOString();
     const status = completed ? 'completed' : 'in_progress';
 
@@ -396,47 +364,7 @@ router.post('/claim', async (req: Request, res: Response) => {
 
     const userId = user.id;
 
-    // Get quest details to check order
-    const { data: questDetails, error: questDetailsError } = await supabase
-      .from('quests')
-      .select('order_index')
-      .eq('id', questId)
-      .single();
-
-    if (questDetailsError || !questDetails) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Quest not found', code: 'QUEST_NOT_FOUND' },
-        timestamp: new Date().toISOString(),
-      } as ApiResponse);
-    }
-
-    // Check if quest is locked (previous quest not completed)
-    if (questDetails.order_index > 1) {
-      const { data: previousQuest } = await supabase
-        .from('quests')
-        .select('id')
-        .eq('order_index', questDetails.order_index - 1)
-        .single();
-
-      if (previousQuest) {
-        const { data: previousUserQuest } = await supabase
-          .from('user_quests')
-          .select('status')
-          .eq('user_id', userId)
-          .eq('quest_id', previousQuest.id)
-          .single();
-
-        if (!previousUserQuest || (previousUserQuest.status !== 'completed' && previousUserQuest.status !== 'claimed')) {
-          return res.status(403).json({
-            success: false,
-            error: { message: 'Previous quest must be completed first', code: 'QUEST_LOCKED' },
-            timestamp: new Date().toISOString(),
-          } as ApiResponse);
-        }
-      }
-    }
-
+    // No sequential validation - users can claim quests in any order
     // Check quest completion
     const { data: userQuest, error: questError } = await supabase
       .from('user_quests')
@@ -642,6 +570,88 @@ router.post('/claim/submit', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'Failed to submit signed transaction', code: 'SUBMIT_ERROR' },
+      timestamp: new Date().toISOString(),
+    } as ApiResponse);
+  }
+});
+
+// Get user's claimed NFTs
+router.get('/nfts', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.query;
+
+    if (!walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Wallet address is required', code: 'MISSING_WALLET' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    // Get user
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('wallet_address', walletAddress)
+      .single();
+
+    if (userError || !user) {
+      return res.json({
+        success: true,
+        data: [],
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    // Get user's claimed quests with NFT data
+    const { data: userQuests, error: questsError } = await supabase
+      .from('user_quests')
+      .select(`
+        nft_token_id,
+        nft_transaction_hash,
+        claimed_at,
+        quests (
+          id,
+          title,
+          description,
+          reward_nft_name,
+          reward_nft_description,
+          category
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('status', 'claimed')
+      .not('nft_token_id', 'is', null)
+      .order('claimed_at', { ascending: false });
+
+    if (questsError) throw questsError;
+
+    // Format NFT data
+    const nfts = (userQuests || []).map((uq: any) => {
+      const quest = uq.quests;
+      const imageUrl = getQuestNFTImageUrl(quest.id, quest.category);
+      
+      return {
+        nft_id: uq.nft_token_id,
+        name: quest.reward_nft_name || quest.title,
+        description: quest.reward_nft_description || quest.description,
+        image_url: imageUrl,
+        ownership_percentage: 10000, // Quest NFTs have 100% ownership
+        claimed_at: uq.claimed_at,
+        transaction_hash: uq.nft_transaction_hash,
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: nfts,
+      timestamp: new Date().toISOString(),
+    } as ApiResponse);
+  } catch (error) {
+    console.error('Error fetching user NFTs:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'Failed to fetch user NFTs', code: 'FETCH_ERROR' },
       timestamp: new Date().toISOString(),
     } as ApiResponse);
   }

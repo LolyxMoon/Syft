@@ -36,6 +36,16 @@ const difficultyColors: Record<string, string> = {
   advanced: 'bg-red-500/10 text-red-500',
 };
 
+interface UserNFT {
+  nft_id: string;
+  name: string;
+  description: string;
+  image_url: string;
+  ownership_percentage: number;
+  claimed_at: string;
+  transaction_hash: string;
+}
+
 export default function Quests() {
   const { address: publicKey } = useWallet();
   const [quests, setQuests] = useState<QuestWithProgress[]>([]);
@@ -43,12 +53,34 @@ export default function Quests() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [claimingQuest, setClaimingQuest] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'quests' | 'nfts'>('quests');
+  const [userNFTs, setUserNFTs] = useState<UserNFT[]>([]);
+  const [nftsLoading, setNftsLoading] = useState(false);
 
   useEffect(() => {
     if (publicKey) {
       fetchQuests();
       fetchStats();
+      if (activeTab === 'nfts') {
+        fetchUserNFTs();
+      }
     }
+  }, [publicKey, activeTab]);
+
+  // Refetch quests when page becomes visible (user comes back from another page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && publicKey) {
+        console.log('Page visible again, refetching quests...');
+        fetchQuests();
+        fetchStats();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [publicKey]);
 
   const fetchQuests = async () => {
@@ -77,6 +109,22 @@ export default function Quests() {
       }
     } catch (error) {
       console.error('Error fetching quest stats:', error);
+    }
+  };
+
+  const fetchUserNFTs = async () => {
+    try {
+      setNftsLoading(true);
+      const response = await fetch(`${API_URL}/quests/nfts?walletAddress=${publicKey}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setUserNFTs(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching user NFTs:', error);
+    } finally {
+      setNftsLoading(false);
     }
   };
 
@@ -350,24 +398,63 @@ export default function Quests() {
         </div>
       )}
 
-      {/* Category Filter */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {categories.map((category) => (
-          <button
-            key={category.key}
-            onClick={() => setSelectedCategory(category.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-              selectedCategory === category.key
-                ? 'bg-primary-500 text-black'
-                : 'bg-secondary border border-default text-neutral-400 hover:text-neutral-50'
-            }`}
-          >
-            {category.label}
-          </button>
-        ))}
+      {/* Tabs */}
+      <div className="flex gap-4 mb-6 border-b border-default">
+        <button
+          onClick={() => setActiveTab('quests')}
+          className={`px-4 py-3 font-medium transition-all relative ${
+            activeTab === 'quests'
+              ? 'text-primary-500'
+              : 'text-neutral-400 hover:text-neutral-50'
+          }`}
+        >
+          Quests
+          {activeTab === 'quests' && (
+            <motion.div
+              layoutId="activeTab"
+              className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"
+            />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('nfts')}
+          className={`px-4 py-3 font-medium transition-all relative ${
+            activeTab === 'nfts'
+              ? 'text-primary-500'
+              : 'text-neutral-400 hover:text-neutral-50'
+          }`}
+        >
+          My NFTs
+          {activeTab === 'nfts' && (
+            <motion.div
+              layoutId="activeTab"
+              className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"
+            />
+          )}
+        </button>
       </div>
 
-      {/* Quests Grid */}
+      {/* Quests Tab Content */}
+      {activeTab === 'quests' && (
+        <>
+          {/* Category Filter */}
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            {categories.map((category) => (
+              <button
+                key={category.key}
+                onClick={() => setSelectedCategory(category.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                  selectedCategory === category.key
+                    ? 'bg-primary-500 text-black'
+                    : 'bg-secondary border border-default text-neutral-400 hover:text-neutral-50'
+                }`}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Quests Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredQuests.map((quest, index) => {
           const CategoryIcon = categoryIcons[quest.category];
@@ -491,6 +578,107 @@ export default function Quests() {
         <div className="text-center py-12">
           <Trophy className="w-16 h-16 text-neutral-600 mx-auto mb-4" />
           <p className="text-neutral-400">No quests found in this category.</p>
+        </div>
+      )}
+        </>
+      )}
+
+      {/* NFT Gallery Tab Content */}
+      {activeTab === 'nfts' && (
+        <div className="space-y-6">
+          {nftsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-secondary border border-default rounded-lg p-6 animate-pulse">
+                  <div className="aspect-square bg-neutral-800 rounded-lg mb-4"></div>
+                  <div className="h-6 bg-neutral-800 rounded mb-2"></div>
+                  <div className="h-4 bg-neutral-800 rounded w-3/4"></div>
+                </div>
+              ))}
+            </div>
+          ) : userNFTs.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-neutral-50">Your Quest NFTs</h2>
+                <span className="text-sm text-neutral-400">{userNFTs.length} NFT{userNFTs.length !== 1 ? 's' : ''}</span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {userNFTs.map((nft, index) => (
+                  <motion.div
+                    key={nft.nft_id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="bg-secondary border border-default rounded-lg overflow-hidden hover:border-primary-500/50 transition-all group"
+                  >
+                    {/* NFT Image */}
+                    <div className="aspect-square bg-gradient-to-br from-primary-500/20 to-purple-500/20 relative overflow-hidden">
+                      <img
+                        src={nft.image_url}
+                        alt={nft.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.classList.add('flex', 'items-center', 'justify-center');
+                          e.currentTarget.parentElement!.innerHTML = '<div class="text-4xl">🏆</div>';
+                        }}
+                      />
+                    </div>
+
+                    {/* NFT Details */}
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-neutral-50 mb-1">{nft.name}</h3>
+                        <p className="text-sm text-neutral-400 line-clamp-2">{nft.description}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs">
+                        <div>
+                          <p className="text-neutral-500">Ownership</p>
+                          <p className="text-primary-500 font-medium">{(nft.ownership_percentage / 100).toFixed(2)}%</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-neutral-500">Claimed</p>
+                          <p className="text-neutral-400 font-medium">
+                            {new Date(nft.claimed_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* View on Explorer */}
+                      {nft.transaction_hash && nft.transaction_hash !== 'pending' && (
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/tx/${nft.transaction_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full text-center px-3 py-2 bg-app border border-default hover:border-primary-500/50 text-primary-500 rounded-lg text-sm font-medium transition-all"
+                        >
+                          View on Explorer →
+                        </a>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16">
+              <div className="bg-secondary border border-default rounded-lg p-12 max-w-md mx-auto">
+                <Gift className="w-16 h-16 text-neutral-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-neutral-50 mb-2">No NFTs Yet</h3>
+                <p className="text-neutral-400 mb-6">
+                  Complete quests and claim NFT rewards to build your collection!
+                </p>
+                <button
+                  onClick={() => setActiveTab('quests')}
+                  className="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-all"
+                >
+                  Browse Quests
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

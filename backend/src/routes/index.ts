@@ -15,6 +15,7 @@ import chatRoutes from './chatRoutes.js';
 import protocolRoutes from './protocols.js';
 import naturalLanguageRoutes from './naturalLanguage.js';
 import questRoutes from './quests.js';
+import activityRoutes from './activity.js';
 
 const router = Router();
 
@@ -50,6 +51,7 @@ router.get('/', (_req, res) => {
       protocols: '/api/protocols',
       naturalLanguage: '/api/nl',
       quests: '/api/quests',
+      activity: '/api/activity',
     },
   });
 });
@@ -59,6 +61,7 @@ router.use('/users', userRoutes);
 router.use('/wallet', walletRoutes);
 router.use('/vaults', vaultRoutes);
 router.use('/quests', questRoutes);
+router.use('/activity', activityRoutes);
 // Note: suggestions routes are nested under vaults (e.g., /api/vaults/:vaultId/suggestions)
 // So they should be mounted on the vaults router, not here separately
 router.use('/backtests', backtestRoutes);
