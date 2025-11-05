@@ -3,6 +3,9 @@ import { Send, Terminal as TerminalIcon, Sparkles, Trash2, Loader2 } from 'lucid
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
+// Backend API URL configuration
+const API_BASE_URL = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -63,7 +66,7 @@ Let's build on Stellar! 🌟`,
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await axios.get(`/api/terminal/jobs/${jobId}`);
+        const response = await axios.get(`${API_BASE_URL}/api/terminal/jobs/${jobId}`);
 
         if (response.data.status === 'completed') {
           return response.data.data;
@@ -101,7 +104,7 @@ Let's build on Stellar! 🌟`,
 
     try {
       // Start the background job
-      const startResponse = await axios.post('/api/terminal/chat', {
+      const startResponse = await axios.post(`${API_BASE_URL}/api/terminal/chat`, {
         message: input,
         sessionId,
       });
@@ -148,7 +151,7 @@ Let's build on Stellar! 🌟`,
 
   const clearChat = async () => {
     try {
-      await axios.post('/api/terminal/clear', { sessionId });
+      await axios.post(`${API_BASE_URL}/api/terminal/clear`, { sessionId });
       setMessages([
         {
           id: '0',
