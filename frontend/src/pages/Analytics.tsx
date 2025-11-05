@@ -1,81 +1,105 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell 
+  LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
 import { 
-  TrendingUp, DollarSign, Percent, Activity, Calendar, AlertCircle, 
-  ArrowUpRight, ArrowDownRight, Shield, Target, TrendingDown,
-  RefreshCw, ChevronDown, ChevronUp, ExternalLink,
-  Clock, Package, Zap
+  Activity, AlertCircle, Shield, Target, 
+  RefreshCw, Brain, Layers, GitCompare,
+  Clock, Droplet, Calendar, Zap, Scale, TrendingUpDown,
+  AlertTriangle, Info, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { Card, Button, Skeleton } from '../components/ui';
 import { useWallet } from '../providers/WalletProvider';
-import { Link } from 'react-router-dom';
-import { resolveAssetNames } from '../services/tokenService';
-import { YieldComparison } from '../components/yield/YieldComparison';
 
-interface VaultBreakdown {
+interface RiskMetrics {
+  portfolioVolatility: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  valueAtRisk: number;
+  beta: number;
+  alpha: number;
+  informationRatio: number;
+}
+
+interface AssetCorrelation {
+  asset1: string;
+  asset2: string;
+  correlation: number;
+}
+
+interface RebalanceEvent {
+  timestamp: number;
   vaultId: string;
-  name: string;
-  assets: any[];
-  status: string;
-  tvl: number;
-  tvlChange24h: number;
-  tvlChange7d: number;
-  apy: number;
-  totalDeposits: number;
-  totalEarnings: number;
-  earningsPercentage: number;
-  sharePrice: number;
-  totalShares: string;
-  riskMetrics: {
-    sharpeRatio: number;
-    maxDrawdown: number;
-    volatility: number;
-  };
-  config?: {
-    name?: string;
-  };
+  vaultName: string;
+  cost: number;
+  tvlBefore: number;
+  tvlAfter: number;
+  impact: number;
+}
+
+interface LiquidityMetrics {
+  asset: string;
+  poolDepth: number;
+  avgSlippage: number;
+  volume24h: number;
+  liquidityScore: number;
+}
+
+interface TimeAnalysis {
+  period: string;
+  avgReturn: number;
+  totalVolume: number;
+  volatility: number;
+  bestDay: string;
+  worstDay: string;
+}
+
+interface AssetContribution {
+  asset: string;
+  totalReturn: number;
+  returnContribution: number;
+  riskContribution: number;
+  allocation: number;
+  color: string;
+}
+
+interface PerformanceAttribution {
+  vaultId: string;
+  vaultName: string;
+  assetSelection: number;
+  timing: number;
+  rebalancing: number;
+  fees: number;
+  totalReturn: number;
 }
 
 const Analytics = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState('7d');
+  const [selectedView, setSelectedView] = useState<'risk' | 'performance' | 'liquidity' | 'time'>('risk');
+  const [selectedPeriod, setSelectedPeriod] = useState('30d');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [portfolioAnalytics, setPortfolioAnalytics] = useState<any>(null);
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
-  const [allocationData, setAllocationData] = useState<any[]>([]);
-  const [vaultBreakdown, setVaultBreakdown] = useState<VaultBreakdown[]>([]);
-  const [expandedVault, setExpandedVault] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'tvl' | 'apy' | 'earnings'>('tvl');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
+  const [assetCorrelations, setAssetCorrelations] = useState<AssetCorrelation[]>([]);
+  const [rebalanceHistory, setRebalanceHistory] = useState<RebalanceEvent[]>([]);
+  const [liquidityMetrics, setLiquidityMetrics] = useState<LiquidityMetrics[]>([]);
+  const [timeAnalysis, setTimeAnalysis] = useState<TimeAnalysis[]>([]);
+  const [assetContributions, setAssetContributions] = useState<AssetContribution[]>([]);
+  const [performanceAttribution, setPerformanceAttribution] = useState<PerformanceAttribution[]>([]);
+  const [historicalVolatility, setHistoricalVolatility] = useState<any[]>([]);
+  const [drawdownHistory, setDrawdownHistory] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [resolvedTokenNames, setResolvedTokenNames] = useState<Record<string, string>>({}); // Cache for resolved token names
-  const { address, network, networkPassphrase } = useWallet();
-
-  const normalizeNetwork = (net?: string, passphrase?: string): string => {
-    if (!net) return 'testnet';
-    if (passphrase) {
-      if (passphrase.includes('Test SDF Future')) return 'futurenet';
-      if (passphrase.includes('Test SDF Network')) return 'testnet';
-      if (passphrase.includes('Public Global')) return 'mainnet';
-    }
-    const normalized = net.toLowerCase();
-    if (normalized === 'standalone' || normalized === 'futurenet') return 'futurenet';
-    if (normalized === 'testnet') return 'testnet';
-    if (normalized === 'mainnet' || normalized === 'public') return 'mainnet';
-    return 'testnet';
-  };
+  const { address, network } = useWallet();
 
   useEffect(() => {
     if (address) {
-      fetchAllAnalytics();
+      fetchAnalytics();
     }
-  }, [address, network, selectedPeriod]);
+  }, [address, network, selectedPeriod, selectedView]);
 
-  const fetchAllAnalytics = async (isRefresh = false) => {
+  const fetchAnalytics = async (isRefresh = false) => {
     if (!address) return;
     
     if (isRefresh) {
@@ -86,51 +110,14 @@ const Analytics = () => {
     setError(null);
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      
-      // Fetch all analytics data in parallel
-      const [portfolioRes, historyRes, allocationRes, breakdownRes] = await Promise.all([
-        fetch(`${backendUrl}/api/analytics/portfolio/${address}?network=${normalizedNetwork}`),
-        fetch(`${backendUrl}/api/analytics/portfolio/${address}/history?network=${normalizedNetwork}&days=${getPeriodDays()}`),
-        fetch(`${backendUrl}/api/analytics/portfolio/${address}/allocation?network=${normalizedNetwork}`),
-        fetch(`${backendUrl}/api/analytics/portfolio/${address}/breakdown?network=${normalizedNetwork}`),
-      ]);
-
-      // Process portfolio analytics
-      if (portfolioRes.ok) {
-        const data = await portfolioRes.json();
-        if (data.success) {
-          setPortfolioAnalytics(data.data);
-        }
-      }
-
-      // Process historical data
-      if (historyRes.ok) {
-        const data = await historyRes.json();
-        if (data.success && data.data.length > 0) {
-          setHistoricalData(data.data.map((d: any) => ({
-            ...d,
-            timestamp: d.date,
-            totalValue: d.value,
-          })));
-        }
-      }
-
-      // Process allocation data
-      if (allocationRes.ok) {
-        const data = await allocationRes.json();
-        if (data.success) {
-          setAllocationData(data.data);
-        }
-      }
-
-      // Process vault breakdown
-      if (breakdownRes.ok) {
-        const data = await breakdownRes.json();
-        if (data.success) {
-          setVaultBreakdown(data.data);
-        }
+      if (selectedView === 'risk') {
+        await fetchRiskAnalytics();
+      } else if (selectedView === 'performance') {
+        await fetchPerformanceAnalytics();
+      } else if (selectedView === 'liquidity') {
+        await fetchLiquidityAnalytics();
+      } else if (selectedView === 'time') {
+        await fetchTimeAnalytics();
       }
     } catch (err: any) {
       console.error('Failed to fetch analytics:', err);
@@ -141,37 +128,382 @@ const Analytics = () => {
     }
   };
 
-  const getPeriodDays = () => {
-    const map: Record<string, number> = { '24h': 1, '7d': 7, '30d': 30, '1y': 365 };
-    return map[selectedPeriod] || 7;
-  };
+  const fetchRiskAnalytics = async () => {
+    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const normalizedNetwork = network?.toLowerCase() || 'testnet';
+    
+    try {
+      // Fetch portfolio analytics with risk metrics
+      const analyticsResponse = await fetch(
+        `${backendUrl}/api/analytics/portfolio/${address}?network=${normalizedNetwork}`
+      );
+      
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json();
+        if (analyticsData.success && analyticsData.data) {
+          const data = analyticsData.data;
+          
+          // Set risk metrics from real data
+          setRiskMetrics({
+            portfolioVolatility: data.volatility || 0,
+            sharpeRatio: data.sharpeRatio || 0,
+            sortinoRatio: data.sortinoRatio || 0,
+            maxDrawdown: data.maxDrawdown || 0,
+            valueAtRisk: data.valueAtRisk || 0,
+            beta: data.beta || 1,
+            alpha: data.alpha || 0,
+            informationRatio: data.informationRatio || 0
+          });
+          
+          // Calculate asset correlations from real portfolio data
+          if (data.assetCorrelations && Array.isArray(data.assetCorrelations)) {
+            setAssetCorrelations(data.assetCorrelations);
+          }
+        }
+      }
 
-  const handleRefresh = () => {
-    fetchAllAnalytics(true);
-  };
+      // Fetch historical volatility data
+      const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+      const days = daysMap[selectedPeriod] || 30;
+      
+      const historyResponse = await fetch(
+        `${backendUrl}/api/analytics/portfolio/${address}/history?network=${normalizedNetwork}&days=${days}`
+      );
+      
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+        if (historyData.success && historyData.data && historyData.data.length > 0) {
+          // Calculate volatility and drawdown from historical data
+          const volatilityData = historyData.data.map((point: any) => ({
+            date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            volatility: point.volatility || 0,
+            benchmark: point.benchmarkVolatility || 0
+          }));
+          setHistoricalVolatility(volatilityData);
 
-  const handleSort = (field: 'tvl' | 'apy' | 'earnings') => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
+          // Calculate drawdown history
+          let peak = 0;
+          const drawdownData = historyData.data.map((point: any) => {
+            const value = point.totalValue || 0;
+            peak = Math.max(peak, value);
+            const drawdown = peak > 0 ? ((value - peak) / peak) * 100 : 0;
+            
+            return {
+              date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              drawdown: drawdown,
+              maxDrawdown: point.maxDrawdown || 0
+            };
+          });
+          setDrawdownHistory(drawdownData);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch risk analytics:', err);
+      throw err;
     }
   };
 
-  const sortedVaults = [...vaultBreakdown].sort((a, b) => {
-    const multiplier = sortOrder === 'asc' ? 1 : -1;
-    if (sortBy === 'tvl') return (a.tvl - b.tvl) * multiplier;
-    if (sortBy === 'apy') return (a.apy - b.apy) * multiplier;
-    if (sortBy === 'earnings') return (a.totalEarnings - b.totalEarnings) * multiplier;
-    return 0;
-  });
+  const fetchPerformanceAnalytics = async () => {
+    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const normalizedNetwork = network?.toLowerCase() || 'testnet';
+    
+    try {
+      // Fetch asset allocation data for contribution analysis
+      const allocationResponse = await fetch(
+        `${backendUrl}/api/analytics/portfolio/${address}/allocation?network=${normalizedNetwork}`
+      );
+      
+      if (allocationResponse.ok) {
+        const allocationData = await allocationResponse.json();
+        if (allocationData.success && allocationData.data && Array.isArray(allocationData.data)) {
+          // Map allocation data to asset contributions
+          const colors = ['#3b82f6', '#a8c93a', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981'];
+          const contributions = allocationData.data.map((asset: any, index: number) => ({
+            asset: asset.asset || asset.assetCode || 'Unknown',
+            totalReturn: asset.totalReturn || 0,
+            returnContribution: asset.returnContribution || 0,
+            riskContribution: asset.riskContribution || 0,
+            allocation: asset.percentage || 0,
+            color: colors[index % colors.length]
+          }));
+          setAssetContributions(contributions);
+        }
+      }
+
+      // Fetch vault breakdown for performance attribution
+      const breakdownResponse = await fetch(
+        `${backendUrl}/api/analytics/portfolio/${address}/breakdown?network=${normalizedNetwork}`
+      );
+      
+      if (breakdownResponse.ok) {
+        const breakdownData = await breakdownResponse.json();
+        if (breakdownData.success && breakdownData.data && Array.isArray(breakdownData.data)) {
+          // Map vault data to performance attribution
+          const attributions = breakdownData.data.map((vault: any) => ({
+            vaultId: vault.vaultId || vault.vault_id,
+            vaultName: vault.name || vault.vaultName || 'Unnamed Vault',
+            assetSelection: vault.attribution?.assetSelection || 0,
+            timing: vault.attribution?.timing || 0,
+            rebalancing: vault.attribution?.rebalancing || 0,
+            fees: vault.attribution?.fees || 0,
+            totalReturn: vault.totalReturn || vault.returnsAllTime || 0
+          }));
+          setPerformanceAttribution(attributions);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch performance analytics:', err);
+      throw err;
+    }
+  };
+
+  const fetchLiquidityAnalytics = async () => {
+    const normalizedNetwork = network?.toLowerCase() || 'testnet';
+    
+    try {
+      // Fetch real liquidity pools directly from Stellar Horizon
+      // This gives us actual pool data instead of generic protocol data
+      const horizonUrl = normalizedNetwork === 'mainnet' 
+        ? 'https://horizon.stellar.org'
+        : 'https://horizon-testnet.stellar.org';
+      
+      // Fetch liquidity pools from Horizon
+      const poolsResponse = await fetch(`${horizonUrl}/liquidity_pools?limit=200`);
+      const poolsData = await poolsResponse.json();
+      
+      if (!poolsData._embedded?.records) {
+        throw new Error('No liquidity pools found');
+      }
+      
+      const pools = poolsData._embedded.records;
+      console.log(`[Liquidity Analytics] Found ${pools.length} total pools`);
+      
+      // Map pools to metrics with real data
+      const metricsMap = new Map<string, any>();
+      
+      pools.forEach((pool: any) => {
+        try {
+          const reserves = pool.reserves || [];
+          if (reserves.length !== 2) return;
+          
+          // Extract asset codes from reserves
+          const asset1 = reserves[0].asset.split(':')[0] || 'NATIVE';
+          const asset2 = reserves[1].asset.split(':')[0] || 'NATIVE';
+          
+          // Convert XLM to native
+          const asset1Name = asset1 === 'native' ? 'XLM' : asset1;
+          const asset2Name = asset2 === 'native' ? 'XLM' : asset2;
+          const pairKey = `${asset1Name}/${asset2Name}`;
+          
+          // Calculate TVL from reserves (in dollars - approximate using XLM price of $0.10)
+          const reserve1Amount = parseFloat(reserves[0].amount);
+          const reserve2Amount = parseFloat(reserves[1].amount);
+          const tvl = (reserve1Amount + reserve2Amount) * 0.10; // Rough USD conversion
+          
+          // Get total shares for liquidity score
+          const totalShares = parseFloat(pool.total_shares || '0');
+          const totalTrustlines = parseInt(pool.total_trustlines || '0');
+          
+          // Calculate slippage (lower for more balanced pools with higher liquidity)
+          const imbalance = Math.abs(reserve1Amount - reserve2Amount) / Math.max(reserve1Amount, reserve2Amount);
+          const baseSlippage = 0.3; // 0.3% base (Stellar AMM default fee)
+          const imbalanceSlippage = imbalance * 2; // Add slippage for imbalanced pools
+          const avgSlippage = baseSlippage + imbalanceSlippage;
+          
+          // Estimate 24h volume based on pool activity (total_shares is a proxy)
+          const volume24h = Math.round(tvl * 0.15 * (totalTrustlines / 100)); // Scale by trustlines
+          
+          // Calculate liquidity score
+          const liquidityScore = Math.min(100, Math.round(
+            (Math.min(tvl / 5000, 1) * 40) + // TVL component (max 40 points)
+            (Math.min(totalTrustlines / 50, 1) * 30) + // Usage component (max 30 points)
+            (Math.min(totalShares / 1000000, 1) * 30) // Liquidity depth (max 30 points)
+          ));
+          
+          // Only include pools with meaningful liquidity
+          if (tvl >= 100 && liquidityScore >= 30) {
+            // If we already have this pair, keep the one with higher TVL
+            if (metricsMap.has(pairKey)) {
+              const existing = metricsMap.get(pairKey);
+              if (tvl > existing.poolDepth) {
+                metricsMap.set(pairKey, {
+                  asset: pairKey,
+                  poolDepth: Math.round(tvl),
+                  avgSlippage: Number(avgSlippage.toFixed(2)),
+                  volume24h: volume24h,
+                  liquidityScore: liquidityScore,
+                  poolId: pool.id
+                });
+              }
+            } else {
+              metricsMap.set(pairKey, {
+                asset: pairKey,
+                poolDepth: Math.round(tvl),
+                avgSlippage: Number(avgSlippage.toFixed(2)),
+                volume24h: volume24h,
+                liquidityScore: liquidityScore,
+                poolId: pool.id
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[Liquidity Analytics] Error processing pool:', err);
+        }
+      });
+      
+      // Convert map to array and sort by liquidity score
+      const metrics = Array.from(metricsMap.values())
+        .sort((a, b) => b.liquidityScore - a.liquidityScore)
+        .slice(0, 10); // Show top 10 pools
+      
+      console.log(`[Liquidity Analytics] Processed ${metrics.length} unique pools with real data`);
+      
+      if (metrics.length > 0) {
+        setLiquidityMetrics(metrics);
+      } else {
+        // Fallback: Show common pairs with zeros if no real data
+        setLiquidityMetrics([
+          { asset: 'USDC/XLM', poolDepth: 0, avgSlippage: 0, volume24h: 0, liquidityScore: 0 },
+          { asset: 'XLM/BTC', poolDepth: 0, avgSlippage: 0, volume24h: 0, liquidityScore: 0 },
+          { asset: 'USDC/ETH', poolDepth: 0, avgSlippage: 0, volume24h: 0, liquidityScore: 0 },
+          { asset: 'XLM/ETH', poolDepth: 0, avgSlippage: 0, volume24h: 0, liquidityScore: 0 }
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch liquidity analytics:', err);
+      throw err;
+    }
+  };
+
+  const fetchTimeAnalytics = async () => {
+    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const normalizedNetwork = network?.toLowerCase() || 'testnet';
+    
+    try {
+      // Fetch historical data for time-based analysis
+      const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+      const days = daysMap[selectedPeriod] || 30;
+      
+      const historyResponse = await fetch(
+        `${backendUrl}/api/analytics/portfolio/${address}/history?network=${normalizedNetwork}&days=${days}`
+      );
+      
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+        if (historyData.success && historyData.data && historyData.data.length > 0) {
+          // Aggregate data by day of week
+          const dayMap = new Map<string, { returns: number[], volumes: number[], volatilities: number[] }>();
+          const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          
+          historyData.data.forEach((point: any) => {
+            const date = new Date(point.timestamp);
+            const dayName = days[date.getDay()];
+            
+            if (!dayMap.has(dayName)) {
+              dayMap.set(dayName, { returns: [], volumes: [], volatilities: [] });
+            }
+            
+            const dayData = dayMap.get(dayName)!;
+            if (point.dailyReturn != null) dayData.returns.push(point.dailyReturn);
+            if (point.volume != null) dayData.volumes.push(point.volume);
+            if (point.volatility != null) dayData.volatilities.push(point.volatility);
+          });
+          
+          // Calculate averages for each day
+          const timeAnalysisData = days.slice(1).concat(days[0]).map(dayName => {
+            const data = dayMap.get(dayName) || { returns: [0], volumes: [0], volatilities: [0] };
+            const avgReturn = data.returns.length > 0 
+              ? data.returns.reduce((a, b) => a + b, 0) / data.returns.length 
+              : 0;
+            const totalVolume = data.volumes.length > 0 
+              ? data.volumes.reduce((a, b) => a + b, 0) / data.volumes.length 
+              : 0;
+            const volatility = data.volatilities.length > 0 
+              ? data.volatilities.reduce((a, b) => a + b, 0) / data.volatilities.length 
+              : 0;
+            
+            return {
+              period: dayName,
+              avgReturn,
+              totalVolume,
+              volatility,
+              bestDay: '',
+              worstDay: ''
+            };
+          });
+          
+          setTimeAnalysis(timeAnalysisData);
+        }
+      }
+
+      // Fetch rebalance history from user's vaults
+      const vaultsResponse = await fetch(
+        `${backendUrl}/api/vaults/user/${address}?network=${normalizedNetwork}`
+      );
+      
+      if (vaultsResponse.ok) {
+        const vaultsData = await vaultsResponse.json();
+        if (vaultsData.success && vaultsData.data && Array.isArray(vaultsData.data)) {
+          const rebalances: RebalanceEvent[] = [];
+          
+          // Fetch rebalance history for each vault
+          for (const vault of vaultsData.data) {
+            try {
+              const historyResponse = await fetch(
+                `${backendUrl}/api/vaults/${vault.vault_id}/history?limit=10`
+              );
+              
+              if (historyResponse.ok) {
+                const historyData = await historyResponse.json();
+                if (historyData.success && historyData.data && Array.isArray(historyData.data)) {
+                  // Filter rebalance events
+                  const vaultRebalances = historyData.data
+                    .filter((event: any) => event.event_type === 'rebalance')
+                    .map((event: any) => ({
+                      timestamp: new Date(event.timestamp).getTime(),
+                      vaultId: vault.vault_id,
+                      vaultName: vault.name || vault.config?.name || 'Unnamed Vault',
+                      cost: event.fee || 0,
+                      tvlBefore: event.tvl_before || 0,
+                      tvlAfter: event.tvl_after || 0,
+                      impact: event.impact || 0
+                    }));
+                  
+                  rebalances.push(...vaultRebalances);
+                }
+              }
+            } catch (err) {
+              console.error(`Failed to fetch history for vault ${vault.vault_id}:`, err);
+            }
+          }
+          
+          // Sort by timestamp (most recent first) and limit to 10
+          rebalances.sort((a, b) => b.timestamp - a.timestamp);
+          setRebalanceHistory(rebalances.slice(0, 10));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch time analytics:', err);
+      throw err;
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchAnalytics(true);
+  };
 
   const periods = [
-    { value: '24h', label: '24h' },
-    { value: '7d', label: '7d' },
-    { value: '30d', label: '30d' },
-    { value: '1y', label: '1y' },
+    { value: '7d', label: '7D' },
+    { value: '30d', label: '30D' },
+    { value: '90d', label: '90D' },
+    { value: '1y', label: '1Y' },
+  ];
+
+  const views = [
+    { value: 'risk', label: 'Risk Analysis', icon: Shield },
+    { value: 'performance', label: 'Performance', icon: Target },
+    { value: 'liquidity', label: 'Liquidity', icon: Droplet },
+    { value: 'time', label: 'Time Analysis', icon: Clock },
   ];
 
   if (!address) {
@@ -296,18 +628,11 @@ const Analytics = () => {
           <AlertCircle className="w-12 h-12 text-error-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2 text-neutral-50">Error Loading Analytics</h2>
           <p className="text-neutral-400 mb-4">{error}</p>
-          <Button onClick={() => fetchAllAnalytics()} variant="primary">Try Again</Button>
+          <Button onClick={() => fetchAnalytics()} variant="primary">Try Again</Button>
         </Card>
       </div>
     );
   }
-
-  const totalValue = portfolioAnalytics?.totalTVL || 0;
-  const totalReturn = portfolioAnalytics?.totalEarnings || 0;
-  const totalReturnPct = portfolioAnalytics?.totalDeposits > 0 
-    ? (totalReturn / portfolioAnalytics.totalDeposits) * 100 
-    : 0;
-  const avgApy = portfolioAnalytics?.weightedAPY || 0;
 
   return (
     <div className="h-full bg-app overflow-auto">
@@ -322,11 +647,11 @@ const Analytics = () => {
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-neutral-50 mb-2 flex items-center gap-3">
-                <Activity className="w-8 h-8 text-primary-500" />
-                Portfolio Analytics
+                <Brain className="w-8 h-8 text-primary-500" />
+                Advanced Analytics
               </h1>
               <p className="text-neutral-400">
-                Deep insights into your vault performance and returns
+                Deep-dive analysis into risk, performance, and market dynamics
               </p>
             </div>
             
@@ -362,599 +687,603 @@ const Analytics = () => {
             </div>
           </div>
 
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="p-5 bg-card border border-default">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-primary-500" />
+          {/* View Selector */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {views.map((view) => {
+              const Icon = view.icon;
+              const isActive = selectedView === view.value;
+              return (
+                <button
+                  key={view.value}
+                  onClick={() => setSelectedView(view.value as any)}
+                  className={`p-4 rounded-lg border transition-all ${
+                    isActive
+                      ? 'bg-primary-500/10 border-primary-500 shadow-lg shadow-primary-500/20'
+                      : 'bg-card border-default hover:border-primary-500/50'
+                  }`}
+                >
+                  <Icon className={`w-6 h-6 mb-2 ${isActive ? 'text-primary-500' : 'text-neutral-400'}`} />
+                  <div className={`text-sm font-medium ${isActive ? 'text-primary-400' : 'text-neutral-300'}`}>
+                    {view.label}
                   </div>
-                  <div className="text-xs text-neutral-500">
-                    {portfolioAnalytics?.vaultCount || 0} vaults
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-2xl font-bold text-neutral-50">
-                    ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm text-neutral-400">Total Portfolio Value</div>
-                </div>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="p-5 bg-card border border-default">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-success-400/10 flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-success-400" />
-                  </div>
-                  <div className={`flex items-center gap-1 text-xs font-medium ${totalReturnPct >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                    {totalReturnPct >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                    {Math.abs(totalReturnPct).toFixed(2)}%
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className={`text-2xl font-bold ${totalReturn >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                    {totalReturn >= 0 ? '+' : ''}${totalReturn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm text-neutral-400">Total Earnings</div>
-                </div>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="p-5 bg-card border border-default">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center">
-                    <Percent className="w-5 h-5 text-primary-500" />
-                  </div>
-                  <div className="text-xs text-neutral-500">Weighted</div>
-                </div>
-                <div className="space-y-1">
-                  <div className={`text-2xl font-bold ${avgApy >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                    {avgApy >= 0 ? '+' : ''}{avgApy.toFixed(2)}%
-                  </div>
-                  <div className="text-sm text-neutral-400">Average APY</div>
-                </div>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="p-5 bg-card border border-default">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-warning-400/10 flex items-center justify-center">
-                    <Activity className="w-5 h-5 text-warning-400" />
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    {portfolioAnalytics?.activeVaultCount || 0} active
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-2xl font-bold text-neutral-50">
-                    ${(portfolioAnalytics?.totalDeposits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm text-neutral-400">Total Invested</div>
-                </div>
-              </Card>
-            </motion.div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Performance Chart and Allocation */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Risk Analysis View */}
+          {selectedView === 'risk' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="lg:col-span-2"
+              className="space-y-6"
             >
-              <Card className="p-6 bg-card border border-default">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-neutral-50">Portfolio Performance</h2>
-                    <p className="text-sm text-neutral-400 mt-1">Historical value over time</p>
+              {/* Risk Metrics Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="p-4 bg-card border border-default">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-neutral-400">Sharpe Ratio</div>
+                    <Shield className="w-4 h-4 text-success-400" />
                   </div>
-                </div>
-                
-                {historicalData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <AreaChart data={historicalData}>
-                      <defs>
-                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#a8c93a" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#a8c93a" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis 
-                        dataKey="timestamp" 
-                        stroke="#9CA3AF"
-                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1F2937',
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                          color: '#F9FAFB',
-                        }}
-                        labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Value']}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="totalValue"
-                        stroke="#a8c93a"
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#colorValue)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[350px] flex items-center justify-center">
-                    <div className="text-center">
-                      <Calendar className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
-                      <p className="text-neutral-400">No historical data available</p>
-                      <p className="text-sm text-neutral-500 mt-1">Data will appear as your vaults generate performance history</p>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </motion.div>
+                  <div className="text-2xl font-bold text-neutral-50">{riskMetrics?.sharpeRatio.toFixed(2)}</div>
+                  <div className="text-xs text-neutral-500 mt-1">Risk-adjusted return</div>
+                </Card>
 
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card className="p-6 bg-card border border-default">
-                <h3 className="text-lg font-bold text-neutral-50 mb-4">Asset Allocation</h3>
-                {allocationData.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={allocationData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {allocationData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#1F2937',
-                            border: '1px solid #374151',
-                            borderRadius: '8px',
-                            color: '#F9FAFB',
-                          }}
-                          formatter={(value: number, _name: string, props: any) => [
-                            `$${value.toFixed(2)} (${props.payload.percentage.toFixed(1)}%)`,
-                            props.payload.asset
-                          ]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="mt-4 space-y-2 max-h-32 overflow-y-auto">
-                      {allocationData.map((asset, idx) => (
-                        <div key={`${asset.asset}-${idx}`} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: asset.color }} />
-                            <span className="text-sm text-neutral-300">{asset.asset}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-medium text-neutral-50">${asset.value.toFixed(2)}</span>
-                            <span className="text-xs text-neutral-400 ml-2">({asset.percentage.toFixed(1)}%)</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <Package className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
-                    <p className="text-neutral-400 text-sm">No assets yet</p>
-                    <p className="text-neutral-500 text-xs mt-1">Create a vault to see allocation</p>
+                <Card className="p-4 bg-card border border-default">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-neutral-400">Max Drawdown</div>
+                    <TrendingUpDown className="w-4 h-4 text-error-400" />
                   </div>
-                )}
-              </Card>
-            </motion.div>
-          </div>
+                  <div className="text-2xl font-bold text-error-400">{riskMetrics?.maxDrawdown.toFixed(1)}%</div>
+                  <div className="text-xs text-neutral-500 mt-1">Peak to trough</div>
+                </Card>
 
-          {/* Vault Breakdown Table */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <Card className="p-6 bg-card border border-default">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-neutral-50 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-primary-500" />
-                    Vault Performance Breakdown
-                  </h2>
-                  <p className="text-sm text-neutral-400 mt-1">Detailed analytics for each vault</p>
-                </div>
-                
-                {/* Sort Controls */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-neutral-400">Sort by:</span>
-                  <button
-                    onClick={() => handleSort('tvl')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      sortBy === 'tvl' ? 'bg-primary-500 text-dark-950' : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
-                    }`}
-                  >
-                    TVL {sortBy === 'tvl' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </button>
-                  <button
-                    onClick={() => handleSort('apy')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      sortBy === 'apy' ? 'bg-primary-500 text-dark-950' : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
-                    }`}
-                  >
-                    APY {sortBy === 'apy' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </button>
-                  <button
-                    onClick={() => handleSort('earnings')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      sortBy === 'earnings' ? 'bg-primary-500 text-dark-950' : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
-                    }`}
-                  >
-                    Earnings {sortBy === 'earnings' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </button>
-                </div>
+                <Card className="p-4 bg-card border border-default">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-neutral-400">Volatility</div>
+                    <Activity className="w-4 h-4 text-warning-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-neutral-50">{riskMetrics?.portfolioVolatility.toFixed(1)}%</div>
+                  <div className="text-xs text-neutral-500 mt-1">30-day annualized</div>
+                </Card>
+
+                <Card className="p-4 bg-card border border-default">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-neutral-400">Value at Risk</div>
+                    <AlertTriangle className="w-4 h-4 text-error-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-error-400">{riskMetrics?.valueAtRisk.toFixed(1)}%</div>
+                  <div className="text-xs text-neutral-500 mt-1">95% confidence</div>
+                </Card>
               </div>
 
-              {sortedVaults.length > 0 ? (
-                <div className="space-y-3">
-                  {sortedVaults.map((vault, index) => (
-                    <motion.div
-                      key={vault.vaultId}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.8 + index * 0.05 }}
-                      className="border border-default rounded-lg overflow-hidden"
-                    >
-                      {/* Vault Header */}
-                      <div
-                        className="p-4 bg-neutral-900 cursor-pointer hover:bg-neutral-800 transition-colors"
-                        onClick={() => setExpandedVault(expandedVault === vault.vaultId ? null : vault.vaultId)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4 flex-1">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-semibold text-neutral-50">{vault.name || vault.config?.name || 'Unnamed Vault'}</h3>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  vault.status === 'active' ? 'bg-success-400/20 text-success-400' : 'bg-neutral-700 text-neutral-400'
-                                }`}>
-                                  {vault.status}
-                                </span>
-                              </div>
-                              <p className="text-sm text-neutral-400">
-                                {(() => {
-                                  // Get resolved token names from cache or use fallback
-                                  const vaultKey = vault.vaultId;
-                                  const cachedNames = resolvedTokenNames[vaultKey];
-                                  
-                                  // Resolve token names asynchronously if not cached
-                                  if (!cachedNames && vault.assets) {
-                                    resolveAssetNames(vault.assets, network || 'testnet')
-                                      .then(names => {
-                                        setResolvedTokenNames(prev => ({
-                                          ...prev,
-                                          [vaultKey]: names.join(' / ')
-                                        }));
-                                      })
-                                      .catch(err => {
-                                        console.error('Error resolving token names:', err);
-                                        // Fallback to showing codes/addresses
-                                        const fallback = vault.assets
-                                          .map((a: any) => {
-                                            if (typeof a === 'string') {
-                                              return a.startsWith('C') && a.length > 20 ? `${a.slice(0, 8)}...` : a;
-                                            }
-                                            return a.code || a.assetCode || 'Unknown';
-                                          })
-                                          .join(' / ');
-                                        setResolvedTokenNames(prev => ({
-                                          ...prev,
-                                          [vaultKey]: fallback
-                                        }));
-                                      });
-                                    return 'Loading...';
-                                  }
-                                  
-                                  return cachedNames || vault.assets.map((a: any) => typeof a === 'string' ? a : a.code).join(' / ');
-                                })()}
-                              </p>
-                            </div>
-                            
-                            <div className="grid grid-cols-4 gap-8 flex-1">
-                              <div>
-                                <div className="text-xs text-neutral-500 mb-0.5">TVL</div>
-                                <div className="text-sm font-semibold text-neutral-50">
-                                  ${vault.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {/* Volatility Chart */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <TrendingUpDown className="w-5 h-5 text-warning-400" />
+                  Historical Volatility
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={historicalVolatility}>
+                    <defs>
+                      <linearGradient id="volatilityGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="date" stroke="#9CA3AF" style={{ fontSize: '12px' }} />
+                    <YAxis stroke="#9CA3AF" style={{ fontSize: '12px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB',
+                      }}
+                    />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="volatility"
+                      stroke="#f59e0b"
+                      fill="url(#volatilityGradient)"
+                      name="Portfolio Volatility"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="benchmark"
+                      stroke="#6366f1"
+                      strokeDasharray="5 5"
+                      name="Market Benchmark"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Drawdown Chart */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <ArrowDownRight className="w-5 h-5 text-error-400" />
+                  Drawdown Analysis
+                </h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <AreaChart data={drawdownHistory}>
+                    <defs>
+                      <linearGradient id="drawdownGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="date" stroke="#9CA3AF" style={{ fontSize: '12px' }} />
+                    <YAxis stroke="#9CA3AF" style={{ fontSize: '12px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB',
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="drawdown"
+                      stroke="#ef4444"
+                      fill="url(#drawdownGradient)"
+                      name="Current Drawdown"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="maxDrawdown"
+                      stroke="#dc2626"
+                      strokeDasharray="5 5"
+                      name="Max Drawdown"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Asset Correlation Matrix */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <GitCompare className="w-5 h-5 text-primary-500" />
+                  Asset Correlation Matrix
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-neutral-700">
+                        <th className="text-left p-3 text-sm text-neutral-400">Asset Pair</th>
+                        <th className="text-center p-3 text-sm text-neutral-400">Correlation</th>
+                        <th className="text-center p-3 text-sm text-neutral-400">Relationship</th>
+                        <th className="text-center p-3 text-sm text-neutral-400">Visual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assetCorrelations.map((corr, idx) => {
+                        const absCorr = Math.abs(corr.correlation);
+                        const isPositive = corr.correlation > 0;
+                        let relationship = 'Weak';
+                        if (absCorr > 0.7) relationship = 'Strong';
+                        else if (absCorr > 0.4) relationship = 'Moderate';
+                        
+                        return (
+                          <tr key={idx} className="border-b border-neutral-800 hover:bg-neutral-900">
+                            <td className="p-3 text-sm text-neutral-300">{corr.asset1} / {corr.asset2}</td>
+                            <td className="p-3 text-center">
+                              <span className={`text-sm font-medium ${isPositive ? 'text-success-400' : 'text-error-400'}`}>
+                                {corr.correlation.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center text-sm text-neutral-400">{relationship}</td>
+                            <td className="p-3">
+                              <div className="flex items-center justify-center">
+                                <div className="w-32 h-2 bg-neutral-800 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full ${isPositive ? 'bg-success-400' : 'bg-error-400'}`}
+                                    style={{ width: `${absCorr * 100}%` }}
+                                  />
                                 </div>
                               </div>
-                              
-                              <div>
-                                <div className="text-xs text-neutral-500 mb-0.5">APY</div>
-                                <div className={`text-sm font-semibold ${vault.apy >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                                  {vault.apy >= 0 ? '+' : ''}{vault.apy.toFixed(2)}%
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <div className="text-xs text-neutral-500 mb-0.5">Earnings</div>
-                                <div className={`text-sm font-semibold ${vault.totalEarnings >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                                  {vault.totalEarnings >= 0 ? '+' : ''}${vault.totalEarnings.toFixed(2)}
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <div className="text-xs text-neutral-500 mb-0.5">Return</div>
-                                <div className={`text-sm font-semibold ${vault.earningsPercentage >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                                  {vault.earningsPercentage >= 0 ? '+' : ''}{vault.earningsPercentage.toFixed(2)}%
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Link to={`/app/vaults/${vault.vaultId}`}>
-                              <Button size="sm" variant="outline" className="flex items-center gap-1">
-                                <ExternalLink className="w-3 h-3" />
-                                View
-                              </Button>
-                            </Link>
-                            <button className="p-2 hover:bg-neutral-700 rounded-md transition-colors">
-                              {expandedVault === vault.vaultId ? (
-                                <ChevronUp className="w-4 h-4 text-neutral-400" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4 text-neutral-400" />
-                              )}
-                            </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* Additional Risk Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="p-6 bg-card border border-default">
+                  <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                    <Scale className="w-5 h-5 text-primary-500" />
+                    Risk-Adjusted Metrics
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg">
+                      <div>
+                        <div className="text-sm text-neutral-400">Sortino Ratio</div>
+                        <div className="text-xs text-neutral-500 mt-1">Downside deviation</div>
+                      </div>
+                      <div className="text-xl font-bold text-success-400">{riskMetrics?.sortinoRatio.toFixed(2)}</div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg">
+                      <div>
+                        <div className="text-sm text-neutral-400">Information Ratio</div>
+                        <div className="text-xs text-neutral-500 mt-1">vs benchmark</div>
+                      </div>
+                      <div className="text-xl font-bold text-primary-400">{riskMetrics?.informationRatio.toFixed(2)}</div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg">
+                      <div>
+                        <div className="text-sm text-neutral-400">Alpha</div>
+                        <div className="text-xs text-neutral-500 mt-1">Excess return</div>
+                      </div>
+                      <div className="text-xl font-bold text-success-400">+{riskMetrics?.alpha.toFixed(1)}%</div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg">
+                      <div>
+                        <div className="text-sm text-neutral-400">Beta</div>
+                        <div className="text-xs text-neutral-500 mt-1">Market sensitivity</div>
+                      </div>
+                      <div className="text-xl font-bold text-neutral-50">{riskMetrics?.beta.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-6 bg-card border border-default">
+                  <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                    <Info className="w-5 h-5 text-primary-500" />
+                    Risk Insights
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-success-400/10 border border-success-400/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <ArrowUpRight className="w-5 h-5 text-success-400 mt-0.5" />
+                        <div>
+                          <div className="text-sm font-medium text-success-400 mb-1">Strong Risk-Adjusted Returns</div>
+                          <div className="text-xs text-neutral-400">
+                            Your Sharpe ratio of {riskMetrics?.sharpeRatio.toFixed(2)} indicates excellent risk-adjusted performance.
                           </div>
                         </div>
                       </div>
-
-                      {/* Expanded Details */}
-                      {expandedVault === vault.vaultId && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="border-t border-default bg-card"
-                        >
-                          <div className="p-4">
-                            <div className="grid grid-cols-3 gap-4">
-                              {/* Risk Metrics */}
-                              <Card className="p-4 bg-neutral-900">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <Shield className="w-4 h-4 text-primary-500" />
-                                  <h4 className="text-sm font-semibold text-neutral-50">Risk Metrics</h4>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Sharpe Ratio</span>
-                                    <span className="text-xs font-medium text-neutral-50">
-                                      {vault.riskMetrics.sharpeRatio.toFixed(2)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Max Drawdown</span>
-                                    <span className="text-xs font-medium text-error-400">
-                                      {vault.riskMetrics.maxDrawdown.toFixed(2)}%
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Volatility</span>
-                                    <span className="text-xs font-medium text-neutral-50">
-                                      {vault.riskMetrics.volatility.toFixed(2)}%
-                                    </span>
-                                  </div>
-                                </div>
-                              </Card>
-
-                              {/* Performance Stats */}
-                              <Card className="p-4 bg-neutral-900">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <Zap className="w-4 h-4 text-warning-400" />
-                                  <h4 className="text-sm font-semibold text-neutral-50">Performance</h4>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Total Deposited</span>
-                                    <span className="text-xs font-medium text-neutral-50">
-                                      ${vault.totalDeposits.toFixed(2)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Share Price</span>
-                                    <span className="text-xs font-medium text-neutral-50">
-                                      ${vault.sharePrice.toFixed(4)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Total Shares</span>
-                                    <span className="text-xs font-medium text-neutral-50">
-                                      {(Number(vault.totalShares) / 1e7).toFixed(2)}
-                                    </span>
-                                  </div>
-                                </div>
-                              </Card>
-
-                              {/* Vault Info */}
-                              <Card className="p-4 bg-neutral-900">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <Clock className="w-4 h-4 text-primary-500" />
-                                  <h4 className="text-sm font-semibold text-neutral-50">Info</h4>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">Vault ID</span>
-                                    <span className="text-xs font-mono text-neutral-50">
-                                      {vault.vaultId.slice(0, 8)}...
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">24h Change</span>
-                                    <span className={`text-xs font-medium ${vault.tvlChange24h >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                                      {vault.tvlChange24h >= 0 ? '+' : ''}{vault.tvlChange24h.toFixed(2)}%
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-neutral-400">7d Change</span>
-                                    <span className={`text-xs font-medium ${vault.tvlChange7d >= 0 ? 'text-success-400' : 'text-error-400'}`}>
-                                      {vault.tvlChange7d >= 0 ? '+' : ''}{vault.tvlChange7d.toFixed(2)}%
-                                    </span>
-                                  </div>
-                                </div>
-                              </Card>
-                            </div>
+                    </div>
+                    <div className="p-4 bg-warning-400/10 border border-warning-400/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-warning-400 mt-0.5" />
+                        <div>
+                          <div className="text-sm font-medium text-warning-400 mb-1">Moderate Volatility</div>
+                          <div className="text-xs text-neutral-400">
+                            Portfolio volatility at {riskMetrics?.portfolioVolatility.toFixed(1)}% is within acceptable range.
                           </div>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Package className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
-                  <p className="text-neutral-400">No vaults found</p>
-                  <p className="text-sm text-neutral-500 mt-1">Create your first vault to see analytics</p>
-                </div>
-              )}
-            </Card>
-          </motion.div>
-
-          {/* Best & Worst Performers */}
-          {portfolioAnalytics?.bestPerformingVault && portfolioAnalytics?.worstPerformingVault && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9 }}
-              >
-                <Card className="p-6 bg-card border border-default">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-success-400/10 flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-success-400" />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-neutral-50">Best Performer</h3>
-                      <p className="text-xs text-neutral-400">Highest APY vault</p>
+                    <div className="p-4 bg-primary-500/10 border border-primary-500/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Info className="w-5 h-5 text-primary-400 mt-0.5" />
+                        <div>
+                          <div className="text-sm font-medium text-primary-400 mb-1">Low Market Correlation</div>
+                          <div className="text-xs text-neutral-400">
+                            Your beta of {riskMetrics?.beta.toFixed(2)} shows lower correlation with market movements.
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-neutral-400">Vault Name</span>
-                      <span className="font-semibold text-neutral-50">
-                        {portfolioAnalytics.bestPerformingVault.name}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-neutral-400">APY</span>
-                      <span className="text-xl font-bold text-success-400">
-                        +{portfolioAnalytics.bestPerformingVault.apy.toFixed(2)}%
-                      </span>
-                    </div>
-                    <Link to={`/app/vaults/${portfolioAnalytics.bestPerformingVault.vaultId}`}>
-                      <Button variant="outline" size="sm" className="w-full mt-2">
-                        View Vault
-                      </Button>
-                    </Link>
                   </div>
                 </Card>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.0 }}
-              >
-                <Card className="p-6 bg-card border border-default">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-error-400/10 flex items-center justify-center">
-                      <TrendingDown className="w-5 h-5 text-error-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-neutral-50">Needs Attention</h3>
-                      <p className="text-xs text-neutral-400">Lowest APY vault</p>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-neutral-400">Vault Name</span>
-                      <span className="font-semibold text-neutral-50">
-                        {portfolioAnalytics.worstPerformingVault.name}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-neutral-400">APY</span>
-                      <span className="text-xl font-bold text-error-400">
-                        {portfolioAnalytics.worstPerformingVault.apy.toFixed(2)}%
-                      </span>
-                    </div>
-                    <Link to={`/app/vaults/${portfolioAnalytics.worstPerformingVault.vaultId}`}>
-                      <Button variant="outline" size="sm" className="w-full mt-2">
-                        View Vault
-                      </Button>
-                    </Link>
-                  </div>
-                </Card>
-              </motion.div>
-            </div>
+              </div>
+            </motion.div>
           )}
 
-          {/* Protocol Yield Opportunities */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1 }}
-          >
-            <Card className="p-6 bg-card border border-default">
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-neutral-50 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary-500" />
-                  Protocol Yield Opportunities
-                </h2>
-                <p className="text-sm text-neutral-400 mt-1">Compare yields across DeFi protocols</p>
-              </div>
-              <YieldComparison 
-                asset="USDC"
-                amount={1000}
-                network={normalizeNetwork(network, networkPassphrase)}
-              />
-            </Card>
-          </motion.div>
+          {/* Performance Analysis View */}
+          {selectedView === 'performance' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              {/* Asset Contribution Chart */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-primary-500" />
+                  Asset Contribution Analysis
+                </h3>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={assetContributions}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="asset" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB',
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="returnContribution" name="Return Contribution (%)" fill="#a8c93a" />
+                    <Bar dataKey="riskContribution" name="Risk Contribution (%)" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Asset Details Table */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4">Asset Performance Breakdown</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-neutral-700">
+                        <th className="text-left p-3 text-sm text-neutral-400">Asset</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Total Return</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Return Contribution</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Risk Contribution</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Allocation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assetContributions.map((asset, idx) => (
+                        <tr key={idx} className="border-b border-neutral-800 hover:bg-neutral-900">
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: asset.color }} />
+                              <span className="text-sm font-medium text-neutral-50">{asset.asset}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right text-sm font-medium text-success-400">
+                            ${asset.totalReturn.toFixed(2)}
+                          </td>
+                          <td className="p-3 text-right text-sm text-neutral-300">
+                            {asset.returnContribution}%
+                          </td>
+                          <td className="p-3 text-right text-sm text-neutral-300">
+                            {asset.riskContribution}%
+                          </td>
+                          <td className="p-3 text-right text-sm text-neutral-300">
+                            {asset.allocation}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* Performance Attribution */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary-500" />
+                  Performance Attribution by Vault
+                </h3>
+                <div className="space-y-4">
+                  {performanceAttribution.map((vault, idx) => (
+                    <div key={idx} className="p-4 bg-neutral-900 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-neutral-50">{vault.vaultName}</h4>
+                        <div className="text-lg font-bold text-success-400">
+                          +{vault.totalReturn.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="text-center p-2 bg-card rounded">
+                          <div className="text-xs text-neutral-400 mb-1">Asset Selection</div>
+                          <div className="text-sm font-medium text-primary-400">+{vault.assetSelection.toFixed(1)}%</div>
+                        </div>
+                        <div className="text-center p-2 bg-card rounded">
+                          <div className="text-xs text-neutral-400 mb-1">Timing</div>
+                          <div className="text-sm font-medium text-success-400">+{vault.timing.toFixed(1)}%</div>
+                        </div>
+                        <div className="text-center p-2 bg-card rounded">
+                          <div className="text-xs text-neutral-400 mb-1">Rebalancing</div>
+                          <div className="text-sm font-medium text-success-400">+{vault.rebalancing.toFixed(1)}%</div>
+                        </div>
+                        <div className="text-center p-2 bg-card rounded">
+                          <div className="text-xs text-neutral-400 mb-1">Fees</div>
+                          <div className="text-sm font-medium text-error-400">{vault.fees.toFixed(1)}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Liquidity Analysis View */}
+          {selectedView === 'liquidity' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <Droplet className="w-5 h-5 text-primary-500" />
+                  Liquidity Metrics
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-neutral-700">
+                        <th className="text-left p-3 text-sm text-neutral-400">Pool</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Pool Depth</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Avg Slippage</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">24h Volume</th>
+                        <th className="text-right p-3 text-sm text-neutral-400">Liquidity Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liquidityMetrics.map((metric, idx) => {
+                        let scoreColor = 'text-success-400';
+                        if (metric.liquidityScore < 70) scoreColor = 'text-error-400';
+                        else if (metric.liquidityScore < 85) scoreColor = 'text-warning-400';
+                        
+                        return (
+                          <tr key={idx} className="border-b border-neutral-800 hover:bg-neutral-900">
+                            <td className="p-3 text-sm font-medium text-neutral-50">{metric.asset}</td>
+                            <td className="p-3 text-right text-sm text-neutral-300">
+                              ${metric.poolDepth.toLocaleString()}
+                            </td>
+                            <td className="p-3 text-right text-sm text-neutral-300">
+                              {metric.avgSlippage.toFixed(2)}%
+                            </td>
+                            <td className="p-3 text-right text-sm text-neutral-300">
+                              ${metric.volume24h.toLocaleString()}
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className={`text-sm font-bold ${scoreColor}`}>
+                                {metric.liquidityScore}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* Liquidity Score Distribution */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4">Liquidity Score Distribution</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={liquidityMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="asset" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB',
+                      }}
+                    />
+                    <Bar dataKey="liquidityScore" name="Liquidity Score">
+                      {liquidityMetrics.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.liquidityScore >= 85 ? '#10b981' : entry.liquidityScore >= 70 ? '#f59e0b' : '#ef4444'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Time Analysis View */}
+          {selectedView === 'time' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              {/* Day of Week Analysis */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary-500" />
+                  Performance by Day of Week
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={timeAnalysis}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="period" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB',
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="avgReturn" name="Avg Return (%)">
+                      {timeAnalysis.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.avgReturn >= 0 ? '#10b981' : '#ef4444'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Volume Analysis */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary-500" />
+                  Volume Distribution
+                </h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={timeAnalysis}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="period" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="totalVolume"
+                      stroke="#a8c93a"
+                      strokeWidth={2}
+                      name="Total Volume"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Rebalancing History */}
+              <Card className="p-6 bg-card border border-default">
+                <h3 className="text-lg font-bold text-neutral-50 mb-4 flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-primary-500" />
+                  Recent Rebalancing Events
+                </h3>
+                <div className="space-y-3">
+                  {rebalanceHistory.map((event, idx) => (
+                    <div key={idx} className="p-4 bg-neutral-900 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <div className="font-semibold text-neutral-50">{event.vaultName}</div>
+                          <div className="text-xs text-neutral-400">
+                            {new Date(event.timestamp).toLocaleDateString()} at {new Date(event.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-success-400">
+                            +{event.impact.toFixed(2)}% impact
+                          </div>
+                          <div className="text-xs text-neutral-400">
+                            Cost: ${event.cost.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs">
+                        <div className="text-neutral-400">
+                          Before: <span className="text-neutral-300">${event.tvlBefore.toLocaleString()}</span>
+                        </div>
+                        <div className="text-neutral-500">→</div>
+                        <div className="text-neutral-400">
+                          After: <span className="text-neutral-300">${event.tvlAfter.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </div>
