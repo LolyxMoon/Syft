@@ -2,6 +2,8 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { buildMintNFTTransaction, submitSignedTransaction, getQuestNFTImageUrl } from '../services/nftMintingService.js';
+import { getNetworkServers } from '../lib/horizonClient.js';
+import * as StellarSdk from '@stellar/stellar-sdk';
 import type {
   UserQuest,
   QuestWithProgress,
@@ -589,67 +591,96 @@ router.get('/nfts', async (req: Request, res: Response) => {
       } as ApiResponse);
     }
 
-    // Get user
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('wallet_address', walletAddress)
-      .single();
+    console.log(`[Quest NFTs] Fetching NFTs for wallet: ${walletAddress}`);
 
-    if (userError || !user) {
+    // ARCHITECTURE: Query blockchain as source of truth for NFT ownership
+    // The blockchain contract stores the actual NFT data and ownership
+    // Database is NOT used here - it's only for quest progress tracking
+    const NFT_CONTRACT_ADDRESS = process.env.NFT_CONTRACT_ADDRESS;
+    
+    if (!NFT_CONTRACT_ADDRESS) {
+      return res.status(500).json({
+        success: false,
+        error: { message: 'NFT contract not configured', code: 'CONTRACT_NOT_CONFIGURED' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    const servers = getNetworkServers('testnet');
+    const contract = new StellarSdk.Contract(NFT_CONTRACT_ADDRESS);
+    const nfts: any[] = [];
+
+    try {
+      // Load the wallet account to use for simulation
+      const sourceAccount = await servers.horizonServer.loadAccount(walletAddress as string);
+
+      // Query NFTs from blockchain - check IDs 1-100
+      // Note: This is a simple approach. In production, use events/indexing
+      for (let nftId = 1; nftId <= 100; nftId++) {
+        try {
+          const nftTx = new StellarSdk.TransactionBuilder(sourceAccount, {
+            fee: StellarSdk.BASE_FEE,
+            networkPassphrase: StellarSdk.Networks.TESTNET,
+          })
+            .addOperation(contract.call('get_nft', StellarSdk.nativeToScVal(nftId, { type: 'u64' })))
+            .setTimeout(30)
+            .build();
+
+          const nftResult = await servers.sorobanServer.simulateTransaction(nftTx);
+
+          if (StellarSdk.rpc.Api.isSimulationSuccess(nftResult) && nftResult.result?.retval) {
+            const nftData = StellarSdk.scValToNative(nftResult.result.retval);
+
+            // Check if this NFT is owned by the queried wallet
+            if (nftData.holder === walletAddress) {
+              // Parse metadata from the NFT (it's stored as a string on-chain)
+              let metadata: any = {};
+              try {
+                // The metadata string might be JSON or just the name
+                metadata = typeof nftData.metadata === 'string' && nftData.metadata.startsWith('{')
+                  ? JSON.parse(nftData.metadata)
+                  : { name: nftData.metadata || `NFT #${nftId}` };
+              } catch {
+                metadata = { name: nftData.metadata || `NFT #${nftId}` };
+              }
+
+              nfts.push({
+                nft_id: `NFT_${nftId}`,
+                name: metadata.name || `Vault NFT #${nftId}`,
+                description: metadata.description || `Ownership NFT with ${(nftData.ownership_percentage / 100).toFixed(2)}% share`,
+                image_url: metadata.image_url || getQuestNFTImageUrl(nftId.toString(), 'basics'),
+                ownership_percentage: nftData.ownership_percentage,
+                vault_address: nftData.vault_address,
+                claimed_at: null, // On-chain NFTs don't have claim dates
+                transaction_hash: null, // We'd need to query events for this
+              });
+            }
+          } else {
+            // NFT ID doesn't exist, reached the end
+            break;
+          }
+        } catch (nftError) {
+          // NFT doesn't exist or error reading, likely reached the end
+          break;
+        }
+      }
+
+      console.log(`[Quest NFTs] Found ${nfts.length} NFTs on-chain for ${walletAddress}`);
+
+      return res.json({
+        success: true,
+        data: nfts,
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    } catch (error) {
+      console.error('[Quest NFTs] Error querying blockchain:', error);
+      // If blockchain query fails, return empty array rather than error
       return res.json({
         success: true,
         data: [],
         timestamp: new Date().toISOString(),
       } as ApiResponse);
     }
-
-    // Get user's claimed quests with NFT data
-    const { data: userQuests, error: questsError } = await supabase
-      .from('user_quests')
-      .select(`
-        nft_token_id,
-        nft_transaction_hash,
-        claimed_at,
-        quests (
-          id,
-          title,
-          description,
-          reward_nft_name,
-          reward_nft_description,
-          reward_nft_image,
-          category
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('status', 'claimed')
-      .not('nft_token_id', 'is', null)
-      .order('claimed_at', { ascending: false });
-
-    if (questsError) throw questsError;
-
-    // Format NFT data
-    const nfts = (userQuests || []).map((uq: any) => {
-      const quest = uq.quests;
-      // Use reward_nft_image from database, fallback to category-based image
-      const imageUrl = quest.reward_nft_image || getQuestNFTImageUrl(quest.id, quest.category);
-      
-      return {
-        nft_id: uq.nft_token_id,
-        name: quest.reward_nft_name || quest.title,
-        description: quest.reward_nft_description || quest.description,
-        image_url: imageUrl,
-        ownership_percentage: 10000, // Quest NFTs have 100% ownership
-        claimed_at: uq.claimed_at,
-        transaction_hash: uq.nft_transaction_hash,
-      };
-    });
-
-    return res.json({
-      success: true,
-      data: nfts,
-      timestamp: new Date().toISOString(),
-    } as ApiResponse);
   } catch (error) {
     console.error('Error fetching user NFTs:', error);
     return res.status(500).json({
