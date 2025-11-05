@@ -393,17 +393,20 @@ const VaultBuilder = () => {
     try {
       setDeploying(true);
       
-      // FIRST: Add target assets from swap actions to the assets list
+      // Create a deployment-specific assets list that includes target assets from swap actions
+      // This is separate from the original config.assets which will be saved to database
+      const deploymentAssets = [...config.assets];
+      
       config.rules.forEach(rule => {
         if (rule.action.type === 'swap' && rule.action.parameters.targetAsset) {
           const targetAsset = rule.action.parameters.targetAsset as string;
-          const assetExists = config.assets.some(a => 
+          const assetExists = deploymentAssets.some(a => 
             a.code === targetAsset || a.issuer === targetAsset
           );
           
           if (!assetExists) {
-            console.log(`[VaultBuilder] Pre-adding ${targetAsset} to assets for swap action`);
-            config.assets.push({
+            console.log(`[VaultBuilder] Adding ${targetAsset} to deployment assets for swap action`);
+            deploymentAssets.push({
               code: targetAsset,
               allocation: 0,
               issuer: undefined
@@ -412,7 +415,8 @@ const VaultBuilder = () => {
         }
       });
       
-      console.log('[VaultBuilder] Final assets list:', config.assets);
+      console.log('[VaultBuilder] Original assets (for DB):', config.assets);
+      console.log('[VaultBuilder] Deployment assets (for contract):', deploymentAssets);
       
       // Transform config to match backend expectations
       const backendConfig = {
@@ -420,13 +424,13 @@ const VaultBuilder = () => {
         name: vaultName,
         description: vaultDescription,
         isPublic,
-        // For deployment, send just the asset addresses/codes
-        assets: config.assets.map(asset => {
+        // For deployment, send the deployment assets (includes target assets)
+        assets: deploymentAssets.map(asset => {
           // If issuer exists (contract address or classic issuer), use it; otherwise use code
           // Backend accepts contract addresses (C...) or known symbols (XLM, USDC, etc.)
           return asset.issuer || asset.code;
         }),
-        // Keep full asset config with allocations for database storage
+        // Keep ORIGINAL asset config with allocations for database storage (not deployment assets)
         assetsWithAllocations: config.assets,
         rules: config.rules.map(rule => {
           // For rebalance actions, gather all asset allocations into target_allocation array
@@ -434,8 +438,8 @@ const VaultBuilder = () => {
           
           if (rule.action.type === 'rebalance') {
             // Convert asset allocations from percentages to basis points (100_0000 = 100%)
-            // The target_allocation array must match the order of assets
-            targetAllocation = config.assets.map(asset => {
+            // The target_allocation array must match the order of DEPLOYMENT assets
+            targetAllocation = deploymentAssets.map(asset => {
               const percentage = asset.allocation || 0;
               // Convert to contract format: 70% -> 700000 (representing 70.0000%)
               // Contract expects sum to equal 1000000 (100_0000) for 100%
@@ -443,13 +447,13 @@ const VaultBuilder = () => {
             });
             
             console.log('[VaultBuilder] Asset allocations:', 
-              config.assets.map(a => `${a.code}: ${a.allocation}%`).join(', ')
+              deploymentAssets.map(a => `${a.code}: ${a.allocation}%`).join(', ')
             );
             console.log('[VaultBuilder] Target allocation (basis points):', targetAllocation);
           } else if (rule.action.type === 'provide_liquidity') {
             // For liquidity actions, use vault's asset allocations (contract validation requires it)
             // The actual liquidity percentage is in threshold field, target_allocation is just for validation
-            targetAllocation = config.assets.map(asset => {
+            targetAllocation = deploymentAssets.map(asset => {
               const percentage = asset.allocation || 0;
               return Math.round(percentage * 10000);
             });
@@ -464,19 +468,19 @@ const VaultBuilder = () => {
             const targetAsset = rule.action.parameters.targetAsset as string;
             const swapPercentage = Number(rule.action.parameters.targetAllocation) || 100;
             
-            // Find the target asset (should already be in the list from pre-processing)
-            const targetAssetIndex = config.assets.findIndex(a => 
+            // Find the target asset in DEPLOYMENT assets (includes auto-added target)
+            const targetAssetIndex = deploymentAssets.findIndex(a => 
               a.code === targetAsset || a.issuer === targetAsset
             );
             
             if (targetAssetIndex === -1) {
-              console.error(`[VaultBuilder] Target asset ${targetAsset} not found in assets list!`);
+              console.error(`[VaultBuilder] Target asset ${targetAsset} not found in deployment assets!`);
               throw new Error(`Target asset ${targetAsset} not found`);
             }
             
             // Create allocation array: all assets get 0 except target asset
             // Contract expects 100% = 100_0000 = 1000000 (4 decimal places)
-            targetAllocation = config.assets.map((_asset, idx) => 
+            targetAllocation = deploymentAssets.map((_asset, idx) => 
               idx === targetAssetIndex ? Math.round(swapPercentage * 10000) : 0
             );
             
