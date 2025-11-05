@@ -216,8 +216,20 @@ fn execute_rebalance_action(
     assets: &Vec<Address>,
     total_value: i128
 ) -> Result<(), VaultError> {
+    use soroban_sdk::symbol_short;
+    
+    // Log entry into function
+    env.events().publish(
+        (symbol_short!("reb_fn"),),
+        (assets.len(), total_value)
+    );
+    
     // Validate target allocation matches number of assets
     if rule.target_allocation.len() != assets.len() {
+        env.events().publish(
+            (symbol_short!("err_len"),),
+            (rule.target_allocation.len(), assets.len())
+        );
         return Err(VaultError::InvalidConfiguration);
     }
     
@@ -230,8 +242,18 @@ fn execute_rebalance_action(
         }
     }
     
+    // Log total allocation for debugging
+    env.events().publish(
+        (symbol_short!("tot_alloc"),),
+        total_allocation
+    );
+    
     // Allow 100% allocation (100_0000 in our precision)
     if total_allocation != 100_0000 && total_allocation != 0 {
+        env.events().publish(
+            (symbol_short!("bad_sum"),),
+            total_allocation
+        );
         return Err(VaultError::InvalidConfiguration);
     }
 
@@ -247,6 +269,11 @@ fn execute_rebalance_action(
     let mut current_balances: Vec<i128> = Vec::new(env);
     let mut target_amounts: Vec<i128> = Vec::new(env);
     
+    env.events().publish(
+        (symbol_short!("calc_bal"),),
+        assets.len()
+    );
+    
     for i in 0..assets.len() {
         if let (Some(asset), Some(target_pct)) = (assets.get(i), rule.target_allocation.get(i)) {
             // Get current balance of this asset in vault
@@ -260,6 +287,12 @@ fn execute_rebalance_action(
                 .ok_or(VaultError::InvalidAmount)?;
             
             target_amounts.push_back(target_amount);
+            
+            // Log each asset's current and target
+            env.events().publish(
+                (symbol_short!("asset_bal"),),
+                (i as u32, current_balance, target_amount)
+            );
         }
     }
     

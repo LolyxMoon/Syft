@@ -388,9 +388,31 @@ const VaultBuilder = () => {
 
     const config = ConfigSerializer.serialize(nodes, edges);
     console.log('Deploying vault with config:', config);
+    console.log('Assets before transformation:', config.assets);
 
     try {
       setDeploying(true);
+      
+      // FIRST: Add target assets from swap actions to the assets list
+      config.rules.forEach(rule => {
+        if (rule.action.type === 'swap' && rule.action.parameters.targetAsset) {
+          const targetAsset = rule.action.parameters.targetAsset as string;
+          const assetExists = config.assets.some(a => 
+            a.code === targetAsset || a.issuer === targetAsset
+          );
+          
+          if (!assetExists) {
+            console.log(`[VaultBuilder] Pre-adding ${targetAsset} to assets for swap action`);
+            config.assets.push({
+              code: targetAsset,
+              allocation: 0,
+              issuer: undefined
+            });
+          }
+        }
+      });
+      
+      console.log('[VaultBuilder] Final assets list:', config.assets);
       
       // Transform config to match backend expectations
       const backendConfig = {
@@ -442,20 +464,14 @@ const VaultBuilder = () => {
             const targetAsset = rule.action.parameters.targetAsset as string;
             const swapPercentage = Number(rule.action.parameters.targetAllocation) || 100;
             
-            // Find or add the target asset to the config
-            let targetAssetIndex = config.assets.findIndex(a => 
+            // Find the target asset (should already be in the list from pre-processing)
+            const targetAssetIndex = config.assets.findIndex(a => 
               a.code === targetAsset || a.issuer === targetAsset
             );
             
-            // If target asset doesn't exist in vault, add it with 0 initial allocation
             if (targetAssetIndex === -1) {
-              config.assets.push({
-                code: targetAsset,
-                allocation: 0,
-                issuer: undefined // Will be resolved by backend
-              });
-              targetAssetIndex = config.assets.length - 1;
-              console.log(`[VaultBuilder] Added ${targetAsset} to assets for swap action`);
+              console.error(`[VaultBuilder] Target asset ${targetAsset} not found in assets list!`);
+              throw new Error(`Target asset ${targetAsset} not found`);
             }
             
             // Create allocation array: all assets get 0 except target asset
