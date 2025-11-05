@@ -83,6 +83,8 @@ export default function Quests() {
   const handleClaimReward = async (questId: string) => {
     try {
       setClaimingQuest(questId);
+      
+      // Step 1: Get unsigned transaction from backend
       const response = await fetch(`${API_URL}/quests/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,15 +96,79 @@ export default function Quests() {
 
       const data = await response.json();
       
-      if (data.success) {
-        // Refresh quests and stats
-        await fetchQuests();
-        await fetchStats();
+      if (!data.success || !data.data?.xdr) {
+        alert(`Failed to build claim transaction: ${data.error?.message || 'Unknown error'}`);
+        setClaimingQuest(null);
+        return;
+      }
+
+      // Step 2: Sign transaction with user's wallet
+      try {
+        // Import wallet utility
+        const { wallet } = await import('../util/wallet');
         
-        // Show success message
-        alert('NFT reward claimed successfully! 🎉');
-      } else {
-        alert(`Failed to claim reward: ${data.error?.message}`);
+        console.log('[Quest Claim] Requesting wallet signature...');
+        const signedXdr = await wallet.signTransaction(data.data.xdr);
+        
+        if (!signedXdr) {
+          alert('Transaction signing was cancelled');
+          setClaimingQuest(null);
+          return;
+        }
+
+        console.log('[Quest Claim] Transaction signed, submitting to network...');
+
+        // Step 3: Submit signed transaction to blockchain
+        const submitResponse = await fetch(`${API_URL}/quests/claim/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signedXdr,
+            network: 'testnet',
+          }),
+        });
+
+        const submitData = await submitResponse.json();
+        
+        if (!submitData.success) {
+          alert(`Failed to submit transaction: ${submitData.error?.message || 'Unknown error'}`);
+          setClaimingQuest(null);
+          return;
+        }
+
+        console.log('[Quest Claim] Transaction submitted:', submitData.data?.transactionHash);
+        
+        // Step 4: Confirm with backend database
+        const confirmResponse = await fetch(`${API_URL}/quests/claim/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: publicKey,
+            questId,
+            transactionHash: submitData.data?.transactionHash || 'unknown',
+            nftTokenId: submitData.data?.nftTokenId || `QUEST_${questId}_${Date.now()}`,
+          }),
+        });
+
+        const confirmData = await confirmResponse.json();
+        
+        if (confirmData.success) {
+          // Refresh quests and stats
+          await fetchQuests();
+          await fetchStats();
+          
+          // Show success message
+          alert('🎉 NFT minted successfully! Check your wallet for your new quest NFT.');
+        } else {
+          alert(`Failed to confirm NFT claim: ${confirmData.error?.message}`);
+        }
+      } catch (signError: any) {
+        console.error('Error signing transaction:', signError);
+        if (signError.message?.includes('User rejected')) {
+          alert('You rejected the transaction. NFT was not minted.');
+        } else {
+          alert(`Failed to sign transaction: ${signError.message || 'Please check your wallet and try again.'}`);
+        }
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
@@ -351,7 +417,19 @@ export default function Quests() {
               {/* Reward NFT Preview */}
               <div className="bg-app border border-default rounded-lg p-3 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  {quest.rewardNftImage ? (
+                    <img
+                      src={quest.rewardNftImage}
+                      alt={quest.rewardNftName}
+                      className="w-12 h-12 rounded-lg object-cover"
+                      onError={(e) => {
+                        // Fallback to gradient if image fails to load
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-12 h-12 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center ${quest.rewardNftImage ? 'hidden' : ''}`}>
                     <Gift className="w-6 h-6 text-white" />
                   </div>
                   <div>

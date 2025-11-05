@@ -51,7 +51,10 @@ impl VaultNFTContract {
         minter: Address,
         vault_address: Address,
         ownership_percentage: i128,
-        metadata: NFTMetadata,
+        name: String,
+        description: String,
+        image_url: String,
+        vault_performance: i128,
     ) -> Result<u64, VaultNFTError> {
         // Verify minter is authorized
         minter.require_auth();
@@ -68,6 +71,14 @@ impl VaultNFTContract {
             .unwrap_or(0);
         
         let next_id = nft_id + 1;
+        
+        // Create NFT metadata from individual fields
+        let metadata = NFTMetadata {
+            name: name.clone(),
+            description: description.clone(),
+            image_url: image_url.clone(),
+            vault_performance,
+        };
         
         // Create NFT
         let nft = VaultNFT {

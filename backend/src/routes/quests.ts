@@ -1,6 +1,7 @@
 // Quest routes - endpoints for the quest system
 import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase.js';
+import { buildMintNFTTransaction, submitSignedTransaction, getQuestNFTImageUrl } from '../services/nftMintingService.js';
 import type {
   UserQuest,
   QuestWithProgress,
@@ -365,7 +366,7 @@ router.post('/progress', async (req: Request, res: Response) => {
   }
 });
 
-// Claim NFT reward for completed quest
+// Build NFT minting transaction for completed quest
 router.post('/claim', async (req: Request, res: Response) => {
   try {
     const { walletAddress, questId } = req.body as { walletAddress: string } & QuestClaimRequest;
@@ -468,31 +469,50 @@ router.post('/claim', async (req: Request, res: Response) => {
       } as ApiResponse);
     }
 
-    // TODO: Implement actual NFT minting here
-    // For now, we'll use placeholder values
-    const mockNftTokenId = `QUEST_NFT_${questId}_${Date.now()}`;
-    const mockTransactionHash = `mock_tx_${Date.now()}`;
+    // Get quest details for NFT metadata
+    const { data: questData, error: questDataError } = await supabase
+      .from('quests')
+      .select('*')
+      .eq('id', questId)
+      .single();
 
-    // Update quest status to claimed
-    const { error: updateError } = await supabase
-      .from('user_quests')
-      .update({
-        status: 'claimed',
-        claimed_at: new Date().toISOString(),
-        nft_token_id: mockNftTokenId,
-        nft_transaction_hash: mockTransactionHash,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId)
-      .eq('quest_id', questId);
+    if (questDataError || !questData) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Quest not found', code: 'QUEST_NOT_FOUND' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
 
-    if (updateError) throw updateError;
+    // Get user's network preference (default to testnet)
+    const network = 'testnet'; // TODO: Get from user preferences or request
 
+    // Build NFT minting transaction
+    const imageUrl = getQuestNFTImageUrl(questId, questData.category);
+    const mintResult = await buildMintNFTTransaction({
+      toAddress: walletAddress,
+      metadata: {
+        name: questData.reward_nft_name || questData.title,
+        description: questData.reward_nft_description || questData.description,
+        image_url: imageUrl,
+        vault_performance: 0, // Quest NFTs don't have performance metrics
+      },
+      network,
+    });
+
+    if (!mintResult.success || !mintResult.xdr) {
+      return res.status(500).json({
+        success: false,
+        error: { message: mintResult.error || 'Failed to build NFT minting transaction', code: 'MINT_ERROR' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    // Return the unsigned transaction for the client to sign
     const response: QuestClaimResponse = {
       success: true,
-      nftTokenId: mockNftTokenId,
-      transactionHash: mockTransactionHash,
-      message: 'NFT reward claimed successfully!',
+      xdr: mintResult.xdr,
+      message: 'Please sign the transaction in your wallet to mint your NFT!',
     };
 
     return res.json({
@@ -505,6 +525,123 @@ router.post('/claim', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'Failed to claim quest reward', code: 'CLAIM_ERROR' },
+      timestamp: new Date().toISOString(),
+    } as ApiResponse);
+  }
+});
+
+// Confirm NFT minting after user signs the transaction
+router.post('/claim/confirm', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress, questId, transactionHash, nftTokenId } = req.body;
+
+    if (!walletAddress || !questId || !transactionHash) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Wallet address, quest ID, and transaction hash are required', code: 'MISSING_FIELDS' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    // Get user
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('wallet_address', walletAddress)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'User not found', code: 'USER_NOT_FOUND' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    const userId = user.id;
+
+    // Update quest status to claimed
+    const { error: updateError } = await supabase
+      .from('user_quests')
+      .update({
+        status: 'claimed',
+        claimed_at: new Date().toISOString(),
+        nft_token_id: nftTokenId || transactionHash,
+        nft_transaction_hash: transactionHash,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('quest_id', questId);
+
+    if (updateError) throw updateError;
+
+    const response: QuestClaimResponse = {
+      success: true,
+      nftTokenId: nftTokenId || transactionHash,
+      transactionHash,
+      message: 'NFT reward claimed successfully!',
+    };
+
+    return res.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString(),
+    } as ApiResponse<QuestClaimResponse>);
+  } catch (error) {
+    console.error('Error confirming quest NFT claim:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'Failed to confirm NFT claim', code: 'CONFIRM_ERROR' },
+      timestamp: new Date().toISOString(),
+    } as ApiResponse);
+  }
+});
+
+// Submit signed transaction to blockchain
+router.post('/claim/submit', async (req: Request, res: Response) => {
+  try {
+    let { signedXdr, network = 'testnet' } = req.body;
+
+    // Handle both string XDR and object with signedTxXdr property
+    if (typeof signedXdr === 'object' && signedXdr.signedTxXdr) {
+      signedXdr = signedXdr.signedTxXdr;
+    }
+
+    if (!signedXdr || typeof signedXdr !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Signed XDR is required', code: 'MISSING_XDR' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    console.log('[NFT Submit] Submitting signed transaction to network:', network);
+
+    const result = await submitSignedTransaction(signedXdr, network);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: { message: result.error || 'Failed to submit transaction', code: 'SUBMIT_ERROR' },
+        timestamp: new Date().toISOString(),
+      } as ApiResponse);
+    }
+
+    console.log('[NFT Submit] Transaction submitted successfully:', result.transactionHash);
+
+    return res.json({
+      success: true,
+      data: {
+        transactionHash: result.transactionHash,
+        nftTokenId: result.nftTokenId,
+      },
+      timestamp: new Date().toISOString(),
+    } as ApiResponse);
+  } catch (error) {
+    console.error('Error submitting signed transaction:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'Failed to submit signed transaction', code: 'SUBMIT_ERROR' },
       timestamp: new Date().toISOString(),
     } as ApiResponse);
   }

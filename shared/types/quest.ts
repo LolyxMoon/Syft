@@ -89,6 +89,7 @@ export interface QuestClaimResponse {
   success: boolean;
   nftTokenId?: string;
   transactionHash?: string;
+  xdr?: string; // Unsigned transaction XDR for client signing
   message?: string;
 }
 
