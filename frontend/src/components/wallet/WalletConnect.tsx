@@ -10,6 +10,7 @@ import { useWallet } from '../../hooks/useWallet';
 import { wallet } from '../../util/wallet';
 import storage from '../../util/storage';
 import { isValidNetwork, getNetworkDisplayName } from '../../util/networkValidation';
+import { showToast } from '../ui/Toast';
 
 export const WalletConnect = () => {
   const { address, network, isPending } = useWallet();
@@ -174,7 +175,7 @@ export const WalletConnect = () => {
   const handleSwitchNetwork = () => {
     // Since we can't programmatically switch networks, we guide users to do it manually
     // This will open their wallet extension
-    alert('Please open your wallet extension and switch to Testnet network.');
+    showToast.info('Please open your wallet extension and switch to Testnet network.');
     setIsNetworkModalOpen(false);
   };
 

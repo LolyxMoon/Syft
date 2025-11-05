@@ -6,6 +6,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, MessageSquare, Plus, Trash2, Calendar, Loader2, X } from 'lucide-react';
+import { ConfirmModal } from '../ui/ConfirmModal';
+import { showToast } from '../ui/Toast';
 
 interface ChatSession {
   sessionId: string;
@@ -37,6 +39,8 @@ export function ChatHistoryPanel({
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -82,16 +86,18 @@ export function ChatHistoryPanel({
     }
   };
 
-  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+  const handleDeleteSessionClick = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setDeleteSessionId(sessionId);
+  };
 
-    if (!confirm('Are you sure you want to delete this chat session?')) {
-      return;
-    }
+  const handleConfirmDelete = async () => {
+    if (!deleteSessionId) return;
 
+    setIsDeletingSession(true);
     try {
       const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const response = await fetch(`${backendUrl}/api/chat/sessions/${sessionId}`, {
+      const response = await fetch(`${backendUrl}/api/chat/sessions/${deleteSessionId}`, {
         method: 'DELETE',
       });
 
@@ -102,15 +108,20 @@ export function ChatHistoryPanel({
       }
 
       // Remove from list
-      setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
+      setSessions(prev => prev.filter(s => s.sessionId !== deleteSessionId));
 
       // If deleting current session, start new chat
-      if (sessionId === currentSessionId) {
+      if (deleteSessionId === currentSessionId) {
         onNewChat();
       }
+
+      showToast.success('Chat session deleted successfully');
+      setDeleteSessionId(null);
     } catch (err) {
       console.error('Error deleting session:', err);
-      alert(err instanceof Error ? err.message : 'Failed to delete session');
+      showToast.error(err instanceof Error ? err.message : 'Failed to delete session');
+    } finally {
+      setIsDeletingSession(false);
     }
   };
 
@@ -240,7 +251,7 @@ export function ChatHistoryPanel({
                         </div>
                       </div>
                       <button
-                        onClick={(e) => handleDeleteSession(session.sessionId, e)}
+                        onClick={(e) => handleDeleteSessionClick(session.sessionId, e)}
                         className="flex-shrink-0 w-7 h-7 hover:bg-error-500/20 text-neutral-500 hover:text-error-400 rounded flex items-center justify-center transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -253,6 +264,19 @@ export function ChatHistoryPanel({
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={!!deleteSessionId}
+        onClose={() => setDeleteSessionId(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Chat Session"
+        message="Are you sure you want to delete this chat session? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeletingSession}
+      />
     </AnimatePresence>
   );
 }

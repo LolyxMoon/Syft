@@ -13,6 +13,7 @@ import {
 import { motion } from 'framer-motion';
 import type { QuestWithProgress, QuestStatsResponse } from '../../../shared/types';
 import { questHints } from '../services/questHints';
+import { showToast } from '../components/ui/Toast';
 
 const API_URL = `${import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api`;
 
@@ -145,7 +146,7 @@ export default function Quests() {
       const data = await response.json();
       
       if (!data.success || !data.data?.xdr) {
-        alert(`Failed to build claim transaction: ${data.error?.message || 'Unknown error'}`);
+        showToast.error(`Failed to build claim transaction: ${data.error?.message || 'Unknown error'}`);
         setClaimingQuest(null);
         return;
       }
@@ -159,7 +160,7 @@ export default function Quests() {
         const signedXdr = await wallet.signTransaction(data.data.xdr);
         
         if (!signedXdr) {
-          alert('Transaction signing was cancelled');
+          showToast.warning('Transaction signing was cancelled');
           setClaimingQuest(null);
           return;
         }
@@ -179,7 +180,7 @@ export default function Quests() {
         const submitData = await submitResponse.json();
         
         if (!submitData.success) {
-          alert(`Failed to submit transaction: ${submitData.error?.message || 'Unknown error'}`);
+          showToast.error(`Failed to submit transaction: ${submitData.error?.message || 'Unknown error'}`);
           setClaimingQuest(null);
           return;
         }
@@ -206,21 +207,21 @@ export default function Quests() {
           await fetchStats();
           
           // Show success message
-          alert('🎉 NFT minted successfully! Check your wallet for your new quest NFT.');
+          showToast.success('🎉 NFT minted successfully! Check your wallet for your new quest NFT.');
         } else {
-          alert(`Failed to confirm NFT claim: ${confirmData.error?.message}`);
+          showToast.error(`Failed to confirm NFT claim: ${confirmData.error?.message}`);
         }
       } catch (signError: any) {
         console.error('Error signing transaction:', signError);
         if (signError.message?.includes('User rejected')) {
-          alert('You rejected the transaction. NFT was not minted.');
+          showToast.warning('You rejected the transaction. NFT was not minted.');
         } else {
-          alert(`Failed to sign transaction: ${signError.message || 'Please check your wallet and try again.'}`);
+          showToast.error(`Failed to sign transaction: ${signError.message || 'Please check your wallet and try again.'}`);
         }
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
-      alert('Failed to claim reward. Please try again.');
+      showToast.error('Failed to claim reward. Please try again.');
     } finally {
       setClaimingQuest(null);
     }

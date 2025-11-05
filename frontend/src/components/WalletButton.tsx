@@ -9,6 +9,7 @@ import storage from "../util/storage";
 import { Button } from "./ui";
 import { NetworkValidationModal } from "./wallet/NetworkValidationModal";
 import { isValidNetwork } from "../util/networkValidation";
+import { showToast } from "./ui/Toast";
 
 export const WalletButton = () => {
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
@@ -75,7 +76,7 @@ export const WalletButton = () => {
 
   const handleSwitchNetwork = () => {
     // Since we can't programmatically switch networks, we guide users to do it manually
-    alert('Please open your wallet extension and switch to Testnet network.');
+    showToast.info('Please open your wallet extension and switch to Testnet network.');
     setIsNetworkModalOpen(false);
   };
 
