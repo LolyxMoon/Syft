@@ -42,16 +42,16 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'get_balance',
-    description: 'Show all balances (XLM + custom assets) for an account including trustlines. Use ONLY when user explicitly asks to check/show balance. When user requests swap/transfer with relative amounts (half, 50%, etc.), use this to calculate then IMMEDIATELY proceed with the action.',
+    description: 'Show all balances (XLM + custom assets) for the connected wallet including trustlines. Use ONLY when user explicitly asks to check/show balance. When user requests swap/transfer with relative amounts (half, 50%, etc.), use this to calculate then IMMEDIATELY proceed with the action. DO NOT specify publicKey - it uses the connected wallet automatically.',
     parameters: {
       type: 'object',
       properties: {
         publicKey: {
           type: 'string',
-          description: 'The public key (address) to check',
+          description: 'INTERNAL USE ONLY - automatically populated with connected wallet. DO NOT provide this parameter.',
         },
       },
-      required: ['publicKey'],
+      required: [],
     },
   },
   {
@@ -423,7 +423,7 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'burn_nft',
-    description: 'Burn (destroy) an NFT permanently.',
+    description: 'Burn (destroy) an NFT permanently from the connected wallet.',
     parameters: {
       type: 'object',
       properties: {
@@ -437,20 +437,20 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'list_nfts',
-    description: 'List all NFTs owned by an address.',
+    description: 'List all NFTs owned by the connected wallet. DO NOT specify an address - it will automatically use the connected wallet.',
     parameters: {
       type: 'object',
       properties: {
         address: {
           type: 'string',
-          description: 'Owner address',
+          description: 'INTERNAL USE ONLY - automatically populated with connected wallet address. DO NOT provide this parameter.',
         },
         collectionId: {
           type: 'string',
           description: 'Optional: filter by collection',
         },
       },
-      required: ['address'],
+      required: [],
     },
   },
 
@@ -471,13 +471,13 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'get_transaction_history',
-    description: 'Get transaction history for an account.',
+    description: 'Get transaction history for the connected wallet. DO NOT specify an address - it uses the connected wallet automatically.',
     parameters: {
       type: 'object',
       properties: {
         address: {
           type: 'string',
-          description: 'Account address',
+          description: 'INTERNAL USE ONLY - automatically populated with connected wallet. DO NOT provide this parameter.',
         },
         days: {
           type: 'number',
@@ -485,7 +485,7 @@ const TERMINAL_FUNCTIONS = [
           default: 7,
         },
       },
-      required: ['address'],
+      required: [],
     },
   },
   {
@@ -642,7 +642,14 @@ Example response:
 CRITICAL: Do NOT show web search results in your response! Web search is a SILENT helper tool. Only show the final blockchain operation (swap, transfer, trustline) to the user. Your reasoning is internal - just present the final action.
 
 IMPORTANT - Wallet Integration:
-The user's wallet is already connected to the platform${walletAddress ? ` (${walletAddress})` : ''}. When they ask about "my wallet" or "my balance", use their connected wallet address.
+The user's wallet is already connected to the platform${walletAddress ? ` (${walletAddress})` : ''}. 
+
+CRITICAL WALLET RULES:
+- When they ask about "my wallet", "my balance", or "my NFTs", ALWAYS use their connected wallet address: ${walletAddress || 'the connected address'}
+- NEVER make up, guess, or hallucinate wallet addresses
+- NEVER call functions with random addresses
+- For operations on the user's wallet, the connected address is AUTOMATICALLY used
+- For list_nfts, get_balance, and similar functions: DO NOT provide an address parameter - the system will use the connected wallet automatically
 
 IMPORTANT - Transaction Execution:
 When a user clearly requests a blockchain operation (transfer, swap, deploy, etc.), IMMEDIATELY call the appropriate function. DO NOT ask for confirmation or secret keys first.
@@ -866,6 +873,69 @@ Format transaction hashes and addresses nicely for readability.`,
   ): Promise<any> {
     try {
       const service = stellarTerminalService;
+
+      // Get the connected wallet for this session
+      const session = (service as any).sessions?.get(sessionId);
+      const connectedWallet = session?.publicKey;
+
+      // List of functions that require a connected wallet
+      const walletRequiredFunctions = ['list_nfts', 'get_balance', 'get_transaction_history'];
+      
+      // If function requires wallet but none is connected, return error
+      if (walletRequiredFunctions.includes(functionName) && !connectedWallet) {
+        console.error(`[Terminal AI] ❌ ${functionName} called without connected wallet`);
+        return {
+          success: false,
+          error: 'No wallet connected',
+          message: 'Please connect your wallet first to perform this operation.',
+        };
+      }
+
+      // Auto-inject connected wallet address for user-wallet operations
+      // This prevents the AI from hallucinating random addresses
+      if (connectedWallet) {
+        // For list_nfts
+        if (functionName === 'list_nfts') {
+          if (args.address && args.address !== connectedWallet) {
+            console.warn(`[Terminal AI] ⚠️  AI tried to use wrong address for list_nfts. Expected: ${connectedWallet}, Got: ${args.address}`);
+            return {
+              success: false,
+              error: 'Cannot query NFTs for a different wallet. Please use the connected wallet.',
+              message: `I can only check NFTs for your connected wallet (${connectedWallet}). I cannot access other wallets.`,
+            };
+          }
+          args.address = connectedWallet;
+          console.log(`[Terminal AI] Auto-injecting connected wallet for list_nfts: ${connectedWallet}`);
+        }
+        
+        // For get_balance
+        if (functionName === 'get_balance') {
+          if (args.publicKey && args.publicKey !== connectedWallet) {
+            console.warn(`[Terminal AI] ⚠️  AI tried to use wrong address for get_balance. Expected: ${connectedWallet}, Got: ${args.publicKey}`);
+            return {
+              success: false,
+              error: 'Cannot check balance for a different wallet. Please use the connected wallet.',
+              message: `I can only check the balance for your connected wallet (${connectedWallet}). I cannot access other wallets.`,
+            };
+          }
+          args.publicKey = connectedWallet;
+          console.log(`[Terminal AI] Auto-injecting connected wallet for get_balance: ${connectedWallet}`);
+        }
+        
+        // For get_transaction_history
+        if (functionName === 'get_transaction_history') {
+          if (args.address && args.address !== connectedWallet) {
+            console.warn(`[Terminal AI] ⚠️  AI tried to use wrong address for get_transaction_history. Expected: ${connectedWallet}, Got: ${args.address}`);
+            return {
+              success: false,
+              error: 'Cannot check transaction history for a different wallet. Please use the connected wallet.',
+              message: `I can only check transaction history for your connected wallet (${connectedWallet}). I cannot access other wallets.`,
+            };
+          }
+          args.address = connectedWallet;
+          console.log(`[Terminal AI] Auto-injecting connected wallet for get_transaction_history: ${connectedWallet}`);
+        }
+      }
 
       // Route to appropriate service method
       switch (functionName) {
