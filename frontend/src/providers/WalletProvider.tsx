@@ -8,6 +8,7 @@ import {
 import { wallet } from "../util/wallet";
 import storage from "../util/storage";
 import { questValidation } from "../services/questValidation";
+import { WatchWalletChanges } from "@stellar/freighter-api";
 
 export interface WalletContextType {
   address?: string;
@@ -186,10 +187,64 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for wallet connection events from the same tab
     window.addEventListener('walletConnected', handleWalletConnected as EventListener);
 
+    // Set up wallet watcher to detect account changes in Freighter
+    const walletWatcher = new WatchWalletChanges(2000); // Poll every 2 seconds
+    
+    walletWatcher.watch((watcherResults) => {
+      console.log("[WalletProvider] Wallet change detected:", watcherResults);
+      
+      const storedAddress = storage.getItem("walletAddress");
+      const storedNetwork = storage.getItem("walletNetwork")?.toLowerCase();
+      const storedPassphrase = storage.getItem("networkPassphrase");
+      
+      // Only update if there's a stored wallet (user is connected)
+      if (storedAddress) {
+        // Check if address has changed
+        if (watcherResults.address && watcherResults.address !== storedAddress) {
+          console.log("[WalletProvider] Account changed from", storedAddress, "to", watcherResults.address);
+          
+          // Update storage with new address
+          storage.setItem("walletAddress", watcherResults.address);
+          
+          // Update state
+          updateState({
+            address: watcherResults.address,
+            network: watcherResults.network?.toLowerCase() || storedNetwork,
+            networkPassphrase: watcherResults.networkPassphrase || storedPassphrase || undefined,
+          });
+          
+          // Update network if it changed too
+          if (watcherResults.network) {
+            storage.setItem("walletNetwork", watcherResults.network);
+          }
+          if (watcherResults.networkPassphrase) {
+            storage.setItem("networkPassphrase", watcherResults.networkPassphrase);
+          }
+        }
+        // Check if network has changed
+        else if (watcherResults.network && watcherResults.network.toLowerCase() !== storedNetwork) {
+          console.log("[WalletProvider] Network changed from", storedNetwork, "to", watcherResults.network);
+          
+          // Update storage and state with new network
+          storage.setItem("walletNetwork", watcherResults.network);
+          if (watcherResults.networkPassphrase) {
+            storage.setItem("networkPassphrase", watcherResults.networkPassphrase);
+          }
+          
+          updateState({
+            address: storedAddress,
+            network: watcherResults.network.toLowerCase(),
+            networkPassphrase: watcherResults.networkPassphrase || storedPassphrase || undefined,
+          });
+        }
+      }
+    });
+
     // Cleanup
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('walletConnected', handleWalletConnected as EventListener);
+      walletWatcher.stop(); // Stop polling when component unmounts
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- it SHOULD only run once per component mount
 
