@@ -543,7 +543,7 @@ export default function Quests() {
                   <button
                     onClick={() => handleClaimReward(quest.id)}
                     disabled={claimingQuest === quest.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-black rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Gift className="w-4 h-4" />
                     <span>{claimingQuest === quest.id ? 'Claiming...' : 'Claim NFT'}</span>

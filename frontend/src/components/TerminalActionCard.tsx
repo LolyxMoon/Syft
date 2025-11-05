@@ -116,13 +116,23 @@ export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardPro
           // Skip image_preview in the details list (we show it above)
           if (key === 'image_preview') return null;
           
+          // Format the value appropriately
+          let displayValue: string;
+          if (typeof value === 'object' && value !== null) {
+            // For objects and arrays, use JSON.stringify
+            displayValue = JSON.stringify(value, null, 2);
+          } else if (typeof value === 'string' && value.length > 40) {
+            // Truncate long strings
+            displayValue = `${value.substring(0, 8)}...${value.substring(value.length - 8)}`;
+          } else {
+            displayValue = String(value);
+          }
+          
           return (
             <div key={key} className="flex justify-between text-sm">
               <span className="text-neutral-400 capitalize">{key.replace(/_/g, ' ')}:</span>
-              <span className="text-neutral-200 font-mono text-xs">
-                {typeof value === 'string' && value.length > 40
-                  ? `${value.substring(0, 8)}...${value.substring(value.length - 8)}`
-                  : String(value)}
+              <span className="text-neutral-200 font-mono text-xs max-w-[60%] text-right break-words">
+                {displayValue}
               </span>
             </div>
           );
@@ -134,7 +144,7 @@ export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardPro
         {status === 'pending' && (
           <button
             onClick={handleSign}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors font-medium"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-black rounded-lg transition-colors font-medium"
           >
             <Send className="w-4 h-4" />
             Sign & Send Transaction
