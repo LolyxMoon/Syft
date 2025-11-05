@@ -459,8 +459,9 @@ const VaultBuilder = () => {
             }
             
             // Create allocation array: all assets get 0 except target asset
+            // Contract expects 100% = 100_0000 = 1000000 (4 decimal places)
             targetAllocation = config.assets.map((_asset, idx) => 
-              idx === targetAssetIndex ? Math.round(swapPercentage * 1000) : 0
+              idx === targetAssetIndex ? Math.round(swapPercentage * 10000) : 0
             );
             
             console.log(`[VaultBuilder] Swap to ${targetAsset}: ${swapPercentage}% -> allocation array:`, targetAllocation);

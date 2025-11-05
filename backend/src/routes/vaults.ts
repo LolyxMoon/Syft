@@ -77,16 +77,17 @@ async function initializeVaultContract(
         
         if (targetAssetIndex >= 0) {
           // Create allocation array: target asset gets the allocation, rest gets 0
+          // Contract expects 100% = 100_0000 = 1000000 (multiply by 10000)
           targetAllocation = (config.assets || []).map((_: any, idx: number) => 
-            idx === targetAssetIndex ? rule.targetAllocation * 1000 : 0 // Convert % to basis points
+            idx === targetAssetIndex ? rule.targetAllocation * 10000 : 0
           );
         } else {
           // Fallback: use asset allocations from config
-          targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+          targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
         }
       } else {
         // For other actions, use asset allocations from config
-        targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+        targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
       }
     }
     
@@ -886,16 +887,17 @@ router.post('/build-initialize', async (req: Request, res: Response) => {
           
           if (targetAssetIndex >= 0) {
             // Create allocation array: target asset gets the allocation, rest gets 0
+            // Contract expects 100% = 100_0000 = 1000000 (multiply by 10000)
             targetAllocation = (config.assets || []).map((_: any, idx: number) => 
-              idx === targetAssetIndex ? rule.targetAllocation * 1000 : 0 // Convert % to basis points
+              idx === targetAssetIndex ? rule.targetAllocation * 10000 : 0
             );
           } else {
             // Fallback: use asset allocations from config
-            targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+            targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
           }
         } else {
           // For other actions, use asset allocations from config
-          targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 1000);
+          targetAllocation = (config.assetsWithAllocations || []).map((asset: any) => asset.allocation * 10000);
         }
       }
       
