@@ -630,7 +630,8 @@ router.get('/nfts', async (req: Request, res: Response) => {
     // Format NFT data
     const nfts = (userQuests || []).map((uq: any) => {
       const quest = uq.quests;
-      const imageUrl = getQuestNFTImageUrl(quest.id, quest.category);
+      // Use reward_nft_image from database, fallback to category-based image
+      const imageUrl = quest.reward_nft_image || getQuestNFTImageUrl(quest.id, quest.category);
       
       return {
         nft_id: uq.nft_token_id,
