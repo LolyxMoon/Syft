@@ -5,7 +5,7 @@
 
 -- Update each quest with its corresponding NFT image URL
 UPDATE quests 
-SET reward_nft_image = 'https://syft-stellar.vercel.app/explorer.png'
+SET reward_nft_image = 'https://syft-stellar.vercel.app/wallet-pioneer.png'
 WHERE quest_key = 'connect_wallet';
 
 UPDATE quests 

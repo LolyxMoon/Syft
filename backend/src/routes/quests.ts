@@ -617,6 +617,7 @@ router.get('/nfts', async (req: Request, res: Response) => {
           description,
           reward_nft_name,
           reward_nft_description,
+          reward_nft_image,
           category
         )
       `)
