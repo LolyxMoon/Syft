@@ -768,6 +768,24 @@ router.post('/submit-deployment', async (req: Request, res: Response) => {
       deployed_at: new Date().toISOString(),
     });
 
+    // Auto-complete the "create vault" quest
+    try {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', config.owner)
+        .single();
+      
+      if (user) {
+        const { autoCompleteQuest } = await import('../services/questValidationService.js');
+        await autoCompleteQuest(user.id, 'create_first_vault');
+        console.log(`[Submit Deploy] ✓ Quest auto-completion triggered for user ${user.id}`);
+      }
+    } catch (questError) {
+      console.error('[Submit Deploy] Failed to auto-complete quest:', questError);
+      // Don't fail the deployment if quest completion fails
+    }
+
     // NOTE: Router setup is now handled by the frontend after deployment
     // The owner must sign the set_router transaction for proper authorization
     console.log(`[Vault Deployed] Vault deployed and initialized successfully`);
