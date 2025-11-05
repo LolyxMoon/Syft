@@ -651,7 +651,7 @@ Let's build on Stellar! 🌟`,
             <button
               onClick={sendMessage}
               disabled={!input.trim() || isLoading}
-              className="px-6 py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-neutral-800 disabled:text-neutral-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="px-6 py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-neutral-800 disabled:text-neutral-600 text-black rounded-lg transition-colors flex items-center gap-2"
             >
               <Send className="w-4 h-4" />
               <span>Send</span>

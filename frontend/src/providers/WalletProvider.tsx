@@ -147,17 +147,29 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
           // Set the wallet in the kit to restore the connection
           wallet.setWallet(walletId);
           
-          // Update state with restored wallet info
-          updateState({
-            address: walletAddr,
-            network: walletNetwork,
-            networkPassphrase: passphrase,
-          });
+          // CRITICAL: Actually re-establish connection with Freighter
+          // Just setting the wallet isn't enough - we need to verify the connection
+          const currentAddress = await wallet.getAddress();
           
-          console.log("[WalletProvider] Wallet connection restored successfully");
+          // Verify the address matches what we stored
+          if (currentAddress.address === walletAddr) {
+            // Update state with restored wallet info
+            updateState({
+              address: walletAddr,
+              network: walletNetwork,
+              networkPassphrase: passphrase,
+            });
+            
+            console.log("[WalletProvider] Wallet connection restored and verified successfully");
+          } else {
+            // Address mismatch - user may have switched accounts
+            console.warn("[WalletProvider] Address mismatch during restoration");
+            nullify();
+          }
         } catch (error) {
           console.error("[WalletProvider] Failed to restore wallet connection:", error);
           // If restoration fails, clear the storage
+          // This is expected if user hasn't granted permission yet
           nullify();
         }
       } else {
