@@ -3,14 +3,14 @@ import {
   ISupportedWallet,
   StellarWalletsKit,
   WalletNetwork,
-  sep43Modules,
+  FreighterModule,
 } from "@creit.tech/stellar-wallets-kit";
 import { Horizon } from "@stellar/stellar-sdk";
 import { networkPassphrase, stellarNetwork, horizonUrl } from "../contracts/util";
 
 const kit: StellarWalletsKit = new StellarWalletsKit({
   network: networkPassphrase as WalletNetwork,
-  modules: sep43Modules(),
+  modules: [new FreighterModule()],
 });
 
 export const connectWallet = async () => {
@@ -53,16 +53,6 @@ export const connectWallet = async () => {
           });
         }
       });
-      if (selectedId == "freighter" || selectedId == "hot-wallet") {
-        void kit.getNetwork().then((network) => {
-          console.log("[connectWallet] Got network:", network.network);
-          if (network.network && network.networkPassphrase) {
-            storage.setItem("walletNetwork", network.network);
-            storage.setItem("networkPassphrase", network.networkPassphrase);
-            console.log("[connectWallet] Saved network info to storage");
-          }
-        });
-      }
     },
   });
 };
