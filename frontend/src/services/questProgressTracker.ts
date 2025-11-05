@@ -66,7 +66,7 @@ class QuestProgressTracker {
     this.activeQuest.currentStep++;
 
     // Progress the hint tour to the next step
-    questHints.progressToNextStep();
+    questHints.moveNext();
 
     // Check if quest is fully completed
     if (this.activeQuest.currentStep >= this.activeQuest.totalSteps) {
