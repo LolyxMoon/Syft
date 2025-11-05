@@ -584,18 +584,13 @@ export class TerminalAIService {
         
         // Always ensure wallet is connected (update if needed)
         if (!existingSession || existingSession.publicKey !== walletAddress) {
-          console.log(`[Terminal AI] Auto-connecting wallet ${walletAddress} to session ${sessionId}`);
           // Auto-connect the wallet to this session (view-only mode without secret key)
           (service as any).sessions = (service as any).sessions || new Map();
           (service as any).sessions.set(sessionId, { 
             publicKey: walletAddress,
             secretKey: undefined // No secret key - will prompt user when signing is needed
           });
-        } else {
-          console.log(`[Terminal AI] Wallet already connected: ${walletAddress}`);
         }
-      } else {
-        console.log(`[Terminal AI] No wallet address provided for session ${sessionId}`);
       }
 
       // Get or initialize conversation history
@@ -738,7 +733,7 @@ Format transaction hashes and addresses nicely for readability.`,
           const functionName = toolCall.function.name;
           const functionArgs = JSON.parse(toolCall.function.arguments);
 
-          console.log(`[Terminal AI] Executing function: ${functionName}`, functionArgs);
+          console.log(`[Terminal AI] 🔧 ${functionName}`, functionArgs);
 
           // Execute the blockchain function
           const functionResult = await this.executeFunction(

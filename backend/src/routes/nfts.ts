@@ -4,6 +4,7 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { generateVaultNFTImage, generateVaultPrompt } from '../services/runwareService.js';
+import { buildMintNFTTransaction, submitSignedTransaction } from '../services/nftMintingService.js';
 
 const router = Router();
 
@@ -126,7 +127,8 @@ router.post('/mint', async (req: Request, res: Response) => {
  *     name: string,
  *     description: string,
  *     imageUrl?: string,
- *     vaultPerformance?: number
+ *     vaultPerformance?: number,
+ *     customPrompt?: string
  *   },
  *   walletAddress: string
  * }
@@ -194,7 +196,7 @@ router.post('/:vaultId/nft', async (req: Request, res: Response) => {
       imageUrl: finalImageUrl,
     };
 
-    // Store NFT in database (use vault.id which is the UUID)
+    // Store NFT in database with pending status (use vault.id which is the UUID)
     const { data: nft, error: nftError } = await supabase
       .from('vault_nfts')
       .insert({
@@ -222,6 +224,7 @@ router.post('/:vaultId/nft', async (req: Request, res: Response) => {
       success: true,
       data: {
         nftId: nft.nft_id,
+        id: nft.nft_id, // Also return as 'id' for compatibility
         vaultId: vault.vault_id,
         holder: nft.current_holder,
         metadata: nft.metadata,
@@ -230,6 +233,205 @@ router.post('/:vaultId/nft', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error minting NFT:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+/**
+ * POST /api/nfts/:vaultId/nft/build
+ * Build an unsigned NFT minting transaction for a vault
+ * 
+ * Body: {
+ *   metadata: {
+ *     name: string,
+ *     description: string,
+ *     imageUrl?: string,
+ *     vaultPerformance?: number,
+ *     customPrompt?: string
+ *   },
+ *   walletAddress: string
+ * }
+ */
+router.post('/:vaultId/nft/build', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const { metadata, walletAddress } = req.body;
+
+    // Validate required fields
+    if (!metadata || !walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: metadata, walletAddress',
+      });
+    }
+
+    // Get vault details
+    const { data: vault, error: vaultError } = await supabase
+      .from('vaults')
+      .select('*')
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (vaultError || !vault) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vault not found',
+      });
+    }
+
+    // Generate NFT ID and token ID for pending NFT
+    const timestamp = Date.now();
+    const nftId = `nft_${vaultId}_${timestamp}`;
+    const tokenId = `token_${vaultId}_${timestamp}`;
+
+    // Generate AI image if not provided
+    let finalImageUrl = metadata.imageUrl;
+    if (!finalImageUrl || finalImageUrl.trim() === '') {
+      console.log(`[Build NFT Tx] Generating AI image for ${nftId}`);
+      
+      // Use custom prompt if provided, otherwise generate vault-themed prompt
+      let prompt: string;
+      if (metadata.customPrompt && metadata.customPrompt.trim() !== '') {
+        prompt = metadata.customPrompt;
+        console.log(`[Build NFT Tx] Using custom prompt: "${metadata.customPrompt}"`);
+      } else {
+        prompt = generateVaultPrompt(
+          vault.name || 'Vault',
+          vault.description,
+          0
+        );
+        console.log(`[Build NFT Tx] Using auto-generated vault prompt`);
+      }
+      
+      finalImageUrl = await generateVaultNFTImage(prompt);
+      console.log(`[Build NFT Tx] Generated image URL: ${finalImageUrl}`);
+    }
+
+    // Update metadata with final image URL
+    const finalMetadata = {
+      name: metadata.name,
+      description: metadata.description,
+      image_url: finalImageUrl,
+      vault_performance: metadata.vaultPerformance || 0,
+    };
+
+    // Build the unsigned transaction
+    const mintResult = await buildMintNFTTransaction({
+      toAddress: walletAddress,
+      metadata: finalMetadata,
+      network: 'testnet',
+    });
+
+    if (!mintResult.success || !mintResult.xdr) {
+      return res.status(500).json({
+        success: false,
+        error: mintResult.error || 'Failed to build NFT minting transaction',
+      });
+    }
+
+    // Store pending NFT data temporarily (we'll update after signing)
+    const { data: pendingNft, error: nftError } = await supabase
+      .from('vault_nfts')
+      .insert({
+        nft_id: nftId,
+        token_id: tokenId,
+        vault_id: vault.id,
+        contract_address: vault.contract_address || `pending_${vaultId}`,
+        current_holder: walletAddress,
+        original_owner: walletAddress,
+        metadata: finalMetadata,
+        minted_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (nftError) {
+      console.error('Error storing pending NFT:', nftError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to store pending NFT',
+      });
+    }
+
+    // Return the unsigned transaction for client to sign
+    return res.json({
+      success: true,
+      data: {
+        xdr: mintResult.xdr,
+        nftId: pendingNft.nft_id,
+        metadata: finalMetadata,
+        message: 'Please sign the transaction in your wallet to mint your NFT!',
+      },
+    });
+  } catch (error) {
+    console.error('Error building NFT transaction:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+/**
+ * POST /api/nfts/submit
+ * Submit a signed NFT minting transaction
+ * 
+ * Body: {
+ *   signedXdr: string,
+ *   nftId: string,
+ *   network?: string
+ * }
+ */
+router.post('/submit', async (req: Request, res: Response) => {
+  try {
+    const { signedXdr, nftId, network = 'testnet' } = req.body;
+
+    if (!signedXdr || !nftId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: signedXdr, nftId',
+      });
+    }
+
+    // Submit the signed transaction to the blockchain
+    const submitResult = await submitSignedTransaction(signedXdr, network);
+
+    if (!submitResult.success) {
+      return res.status(500).json({
+        success: false,
+        error: submitResult.error || 'Failed to submit transaction',
+      });
+    }
+
+    // Update the NFT record with transaction hash
+    const { error: updateError } = await supabase
+      .from('vault_nfts')
+      .update({
+        token_id: submitResult.nftTokenId || `token_${Date.now()}`,
+      })
+      .eq('nft_id', nftId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating NFT record:', updateError);
+      // Transaction succeeded but DB update failed - log this
+      console.warn(`NFT ${nftId} minted successfully but DB update failed`);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        transactionHash: submitResult.transactionHash,
+        nftId,
+        nftTokenId: submitResult.nftTokenId,
+      },
+    });
+  } catch (error) {
+    console.error('Error submitting NFT transaction:', error);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',

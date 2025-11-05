@@ -23,7 +23,24 @@ console.log = (...args: any[]) => {
       message.includes('[calculateAPY]') ||
       message.includes('[getTransactionTotals]') ||
       message.includes('[monitorVaultState]') ||
-      message.includes('[getUserPosition]')) {
+      message.includes('[getUserPosition]') ||
+      message.includes('[getYieldsForAsset]') ||
+      message.includes('[Yield Monitor]') ||
+      message.includes('[Blend APY]') ||
+      message.includes('[Staking APY]') ||
+      message.includes('[getBlendPoolSupplyAPY]') ||
+      message.includes('[findSoroswapPools]') ||
+      message.includes('[Soroswap APY]') ||
+      message.includes('[getPoolInfo]') ||
+      message.includes('[calculatePoolAPY]') ||
+      message.includes('[calculateOptimalRouting]') ||
+      message.includes('[PriceService]') ||
+      message.includes('Sync complete') ||
+      message.includes('Monitoring ') ||
+      message.includes('GET /api/terminal') ||
+      message.includes('POST /api/terminal') ||
+      message.includes('GET /jobs/') ||
+      message.includes('POST /chat')) {
     return;
   }
   originalLog.apply(console, args);
@@ -83,46 +100,21 @@ wsService.initialize(server);
 
 // Start server
 server.listen(port, () => {
-  console.log(`
-╔═══════════════════════════════════════╗
-║   🚀 Syft Backend API Server         ║
-║   Environment: ${(process.env.NODE_ENV || 'development').padEnd(21)}║
-║   Port: ${String(port).padEnd(29)}║
-║   URL: http://localhost:${port.toString().padEnd(14)}║
-╚═══════════════════════════════════════╝
-  `);
-  console.log('📡 Server is ready to accept connections');
-  console.log('🏥 Health check: http://localhost:' + port + '/health');
-  console.log('🔌 WebSocket: ws://localhost:' + port + '/ws');
+  console.log(`\n🚀 Syft Backend - http://localhost:${port}`);
+  console.log(`⚙️  ${process.env.STELLAR_NETWORK || 'testnet'} | ${process.env.MVP_MODE === 'true' ? '🟡 Simulation' : '🔴 Live'}\n`);
   
-  // Display transaction mode
-  const mvpMode = process.env.MVP_MODE === 'true';
-  const hasDeployerKey = !!process.env.DEPLOYER_SECRET_KEY;
-  console.log('\n⚙️  Configuration:');
-  console.log(`   Network: ${process.env.STELLAR_NETWORK || 'testnet'}`);
-  console.log(`   MVP Mode: ${mvpMode ? '⚠️  ENABLED (simulated txs)' : '✅ DISABLED (real txs)'}`);
-  console.log(`   Rebalancer Key: ${hasDeployerKey ? '✅ Configured' : '❌ Missing'}`);
-  console.log(`   Transaction Mode: ${!mvpMode && hasDeployerKey ? '🔴 LIVE ON-CHAIN' : '🟡 SIMULATION'}`);
-  
-  // Start background services
-  console.log('\n🔄 Starting background services...');
-  
-  // Start vault sync service (syncs vault state every 2 minutes)
+  // Start background services silently
   const syncInterval = startVaultSync();
-  console.log('✅ Vault sync service started (every 2 minutes)');
-  
-  // Start rule monitoring service (checks rules every 2 minutes)
   const ruleInterval = startRuleMonitoring((trigger) => {
-    console.log(`🎯 Rule triggered for vault ${trigger.vaultId}, executing rebalance...`);
+    console.log(`🎯 Rule triggered for vault ${trigger.vaultId}`);
     // Execute rebalance asynchronously without blocking
-    // Use async IIFE to properly handle the promise without blocking
     (async () => {
       try {
         const result = await executeRebalance(trigger.vaultId, trigger.ruleIndex);
         if (result.success) {
-          console.log(`✅ Rebalance executed successfully for vault ${trigger.vaultId}`);
+          console.log(`✅ Rebalance executed for vault ${trigger.vaultId}`);
           if (result.transactionHash && !result.transactionHash.startsWith('mock_') && !result.transactionHash.startsWith('simulated_')) {
-            console.log(`🔗 TX Hash: ${result.transactionHash}`);
+            console.log(`🔗 TX: ${result.transactionHash}`);
           }
         } else {
           console.error(`❌ Rebalance failed for vault ${trigger.vaultId}:`, result.error);
@@ -130,15 +122,9 @@ server.listen(port, () => {
       } catch (error) {
         console.error(`❌ Error executing rebalance for vault ${trigger.vaultId}:`, error);
       }
-    })(); // Fire and forget - don't block the monitoring loop
+    })();
   });
-  console.log('✅ Rule monitoring service started');
-  
-  // Start protocol yield monitoring service (checks yields every 60 minutes)
   const yieldInterval = startYieldMonitoring(60);
-  console.log('✅ Protocol yield monitoring started (every 60 minutes)');
-  
-  console.log('\n🎉 All services operational!\n');
   
   // Graceful shutdown
   process.on('SIGINT', () => {

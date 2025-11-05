@@ -98,7 +98,10 @@ export function MintAndListModal({
       }
 
       const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-      const response = await fetch(`${backendUrl}/api/nfts/${vaultId}/nft`, {
+      
+      // Step 1: Build unsigned transaction
+      console.log('[Mint NFT] Building transaction...');
+      const buildResponse = await fetch(`${backendUrl}/api/nfts/${vaultId}/nft/build`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,16 +118,52 @@ export function MintAndListModal({
         }),
       });
 
-      const data = await response.json();
+      const buildData = await buildResponse.json();
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to mint NFT');
+      if (!buildData.success || !buildData.data?.xdr) {
+        throw new Error(buildData.error || 'Failed to build minting transaction');
       }
 
+      // Step 2: Sign transaction with user's wallet
+      console.log('[Mint NFT] Requesting wallet signature...');
+      const { wallet } = await import('../../util/wallet');
+      
+      const { signedTxXdr } = await wallet.signTransaction(buildData.data.xdr, {
+        networkPassphrase: 'Test SDF Network ; September 2015',
+      });
+
+      if (!signedTxXdr) {
+        throw new Error('Transaction signing was cancelled');
+      }
+
+      console.log('[Mint NFT] Transaction signed, submitting to network...');
+
+      // Step 3: Submit signed transaction
+      const submitResponse = await fetch(`${backendUrl}/api/nfts/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          signedXdr: signedTxXdr,
+          nftId: buildData.data.nftId,
+          network: 'testnet',
+        }),
+      });
+
+      const submitData = await submitResponse.json();
+
+      if (!submitData.success) {
+        throw new Error(submitData.error || 'Failed to submit transaction');
+      }
+
+      console.log('[Mint NFT] NFT minted successfully!', submitData.data);
+
       // Store the minted NFT ID and proceed to listing step
-      setMintedNftId(data.data.nftId || data.data.id);
+      setMintedNftId(buildData.data.nftId);
       setCurrentStep(2);
     } catch (err: any) {
+      console.error('[Mint NFT] Error:', err);
       setError(err.message || 'Failed to mint NFT');
     } finally {
       setIsMinting(false);

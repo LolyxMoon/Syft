@@ -13,12 +13,6 @@ router.post('/chat', async (req, res): Promise<void> => {
   try {
     const { message, sessionId, walletAddress } = req.body;
 
-    console.log('[Terminal Route] Received request:', {
-      sessionId,
-      walletAddress: walletAddress || 'NOT PROVIDED',
-      messageLength: message?.length || 0,
-    });
-
     if (!message) {
       res.status(400).json({ error: 'Message is required' });
       return;
