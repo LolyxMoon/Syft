@@ -17,6 +17,7 @@ import naturalLanguageRoutes from './naturalLanguage.js';
 import questRoutes from './quests.js';
 import activityRoutes from './activity.js';
 import terminalRoutes from './terminal.js';
+import distributionRoutes from './distributions.js';
 
 const router = Router();
 
@@ -76,5 +77,6 @@ router.use('/chat', chatRoutes);
 router.use('/protocols', protocolRoutes);
 router.use('/nl', naturalLanguageRoutes);
 router.use('/terminal', terminalRoutes);
+router.use('/distributions', distributionRoutes);
 
 export default router;

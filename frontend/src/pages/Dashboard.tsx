@@ -4,6 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, DollarSign, Percent, Box, Activity, AlertCircle } from 'lucide-react';
 import { Card, Button, Skeleton } from '../components/ui';
 import { YieldComparison } from '../components/yield/YieldComparison';
+import { ProfitDistribution } from '../components/profit/ProfitDistribution';
 import { useWallet } from '../providers/WalletProvider';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Link } from 'react-router-dom';
@@ -758,6 +759,18 @@ const Dashboard = () => {
             )}
           </Card>
         </motion.div>
+
+        {/* Profit Distributions Section */}
+        {address && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="mt-6"
+          >
+            <ProfitDistribution walletAddress={address} />
+          </motion.div>
+        )}
       </div>
     </div>
   );

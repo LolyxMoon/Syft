@@ -177,11 +177,12 @@ impl VaultNFTContract {
 
     /// Distribute profits to NFT holders
     /// T126: Implement profit distribution logic proportional to shares
+    /// Now with actual token transfers
     pub fn distribute_profits(
         env: Env,
         vault_address: Address,
         total_profit: i128,
-        _token: Address,
+        token: Address,
     ) -> Result<Map<Address, i128>, VaultNFTError> {
         // Verify caller
         vault_address.require_auth();
@@ -196,7 +197,11 @@ impl VaultNFTContract {
         let mut distributions = Map::new(&env);
         let mut total_distributed: i128 = 0;
         
-        // Calculate distribution for each NFT holder
+        // Use Soroban SDK's token client for transfers
+        use soroban_sdk::token;
+        let token_client = token::TokenClient::new(&env, &token);
+        
+        // Calculate and transfer to each NFT holder
         for i in 0..nft_ids.len() {
             let nft_id = nft_ids.get(i).unwrap();
             let nft: VaultNFT = Self::get_nft(env.clone(), nft_id)?;
@@ -206,14 +211,23 @@ impl VaultNFTContract {
             let holder_share = (total_profit * nft.ownership_percentage) / MAX_OWNERSHIP_PCT;
             
             if holder_share > 0 {
-                // Add to or update holder's distribution
+                // PRODUCTION: Actually transfer tokens from vault to NFT holder
+                token_client.transfer(&vault_address, &nft.holder, &holder_share);
+                
+                // Track distribution
                 let current = distributions.get(nft.holder.clone()).unwrap_or(0);
                 distributions.set(nft.holder.clone(), current + holder_share);
                 total_distributed += holder_share;
+                
+                // Emit individual transfer event for tracking
+                env.events().publish(
+                    (symbol_short!("PROFIT_TX"), &vault_address),
+                    (&nft.holder, holder_share, nft_id)
+                );
             }
         }
         
-        // Emit distribution event
+        // Emit distribution summary event
         env.events().publish(
             (symbol_short!("PROFIT"), &vault_address),
             (total_profit, total_distributed, distributions.len())
