@@ -1,6 +1,7 @@
 import express from 'express';
 import { terminalAIService } from '../services/terminalAIService.js';
 import { jobQueue } from '../services/jobQueue.js';
+import { sessionRateLimiter, globalRateLimiter } from '../utils/rateLimiter.js';
 
 const router = express.Router();
 
@@ -19,6 +20,25 @@ router.post('/chat', async (req, res): Promise<void> => {
 
     if (!sessionId) {
       res.status(400).json({ error: 'Session ID is required' });
+      return;
+    }
+
+    // Check rate limits
+    const sessionLimit = await sessionRateLimiter.checkLimit(sessionId);
+    if (!sessionLimit.allowed) {
+      res.status(429).json({
+        error: 'Rate limit exceeded',
+        message: `Too many requests. Try again in ${sessionLimit.resetIn} seconds.`,
+      });
+      return;
+    }
+
+    const globalLimit = await globalRateLimiter.checkLimit('terminal');
+    if (!globalLimit.allowed) {
+      res.status(429).json({
+        error: 'Service busy',
+        message: 'Too many requests across all users. Please try again later.',
+      });
       return;
     }
 

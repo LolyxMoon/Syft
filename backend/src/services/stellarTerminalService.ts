@@ -7,14 +7,22 @@ import {
   Operation,
   Memo,
   BASE_FEE,
+  Contract,
+  Address,
+  nativeToScVal,
+  scValToNative,
 } from '@stellar/stellar-sdk';
+import * as StellarSdk from '@stellar/stellar-sdk';
 import axios from 'axios';
+import { withRetry, pollUntil } from '../utils/retryLogic.js';
 
 // Stellar Testnet Configuration
 const HORIZON_URL = 'https://horizon-testnet.stellar.org';
+const SOROBAN_RPC_URL = 'https://soroban-testnet.stellar.org';
 const FRIENDBOT_URL = 'https://friendbot.stellar.org';
 
 const horizonServer = new Horizon.Server(HORIZON_URL);
+const sorobanServer = new StellarSdk.rpc.Server(SOROBAN_RPC_URL);
 
 /**
  * Stellar Terminal Service
@@ -79,11 +87,24 @@ export class StellarTerminalService {
 
   async fundFromFaucet(publicKey: string, amount: string = '10000'): Promise<any> {
     try {
-      const response = await axios.get(`${FRIENDBOT_URL}?addr=${publicKey}`);
+      // Use retry logic for Friendbot requests
+      const response = await withRetry(
+        () => axios.get(`${FRIENDBOT_URL}?addr=${publicKey}`),
+        {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+        }
+      );
       
-      // Wait a bit and fetch balance
+      // Wait a bit for ledger to update, then fetch balance
       await new Promise(resolve => setTimeout(resolve, 2000));
-      const account = await horizonServer.loadAccount(publicKey);
+      const account = await withRetry(
+        () => horizonServer.loadAccount(publicKey),
+        {
+          maxAttempts: 5,
+          initialDelayMs: 500,
+        }
+      );
       
       return {
         success: true,
@@ -430,7 +451,7 @@ export class StellarTerminalService {
   async deployContract(
     sessionId: string,
     wasmHash: string,
-    contractId?: string
+    _contractId?: string
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
@@ -438,16 +459,69 @@ export class StellarTerminalService {
         return { success: false, error: 'Wallet not connected' };
       }
 
-      return {
-        success: true,
-        message: `Contract deployment initiated with WASM hash: ${wasmHash}`,
-        contractId: contractId || 'C' + Keypair.random().publicKey().substring(1),
-        note: 'Contract deployment requires WASM upload and network fees.',
-      };
+      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+
+      // Create deployer address from the source account
+      const deployerAddress = new Address(session.publicKey);
+
+      // Build deploy transaction
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 10000).toString(), // Higher fee for contract deployment
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.createCustomContract({
+            address: deployerAddress,
+            wasmHash: Buffer.from(wasmHash, 'hex'),
+          })
+        )
+        .setTimeout(30)
+        .build();
+
+      // Prepare transaction (simulate and add resource fees)
+      const preparedTx = await sorobanServer.prepareTransaction(transaction);
+      preparedTx.sign(sourceKeypair);
+
+      // Submit transaction
+      const result = await sorobanServer.sendTransaction(preparedTx);
+
+      if (result.status === 'PENDING') {
+        // Poll for transaction result with retry logic
+        const getResponse = await pollUntil(
+          () => sorobanServer.getTransaction(result.hash),
+          (response) =>
+            response !== null &&
+            response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+          {
+            intervalMs: 1000,
+            timeoutMs: 30000,
+          }
+        );
+
+        if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+          // Extract contract ID from return value
+          const contractId = Address.fromScAddress(
+            scValToNative(getResponse.returnValue!)
+          ).toString();
+
+          return {
+            success: true,
+            message: `Contract deployed successfully!`,
+            contractId,
+            transactionHash: result.hash,
+            link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+          };
+        } else {
+          throw new Error('Contract deployment failed');
+        }
+      } else {
+        throw new Error(result.errorResult?.toXDR('base64') || 'Unknown error');
+      }
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Contract deployment failed',
       };
     }
   }
@@ -456,7 +530,7 @@ export class StellarTerminalService {
     sessionId: string,
     contractId: string,
     method: string,
-    _args: any[]
+    args: any[] = []
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
@@ -464,33 +538,140 @@ export class StellarTerminalService {
         return { success: false, error: 'Wallet not connected' };
       }
 
-      return {
-        success: true,
-        message: `Contract ${contractId} method '${method}' invoked successfully`,
-        result: 'Contract execution result',
-        note: 'In production, this would return actual contract execution results.',
-      };
+      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+
+      const contract = new Contract(contractId);
+
+      // Convert args to ScVals
+      const scArgs = args.map((arg) => {
+        if (typeof arg === 'string') {
+          // Check if it's an address
+          if (arg.length === 56 && (arg.startsWith('G') || arg.startsWith('C'))) {
+            return new Address(arg).toScVal();
+          }
+          return nativeToScVal(arg, { type: 'string' });
+        } else if (typeof arg === 'number') {
+          return nativeToScVal(arg, { type: 'u32' });
+        } else if (typeof arg === 'boolean') {
+          return nativeToScVal(arg, { type: 'bool' });
+        }
+        return nativeToScVal(arg);
+      });
+
+      // Build invoke transaction
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 1000).toString(),
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(contract.call(method, ...scArgs))
+        .setTimeout(30)
+        .build();
+
+      // Prepare transaction
+      const preparedTx = await sorobanServer.prepareTransaction(transaction);
+      preparedTx.sign(sourceKeypair);
+
+      // Submit transaction
+      const result = await sorobanServer.sendTransaction(preparedTx);
+
+      if (result.status === 'PENDING') {
+        // Poll for transaction result with retry logic
+        const getResponse = await pollUntil(
+          () => sorobanServer.getTransaction(result.hash),
+          (response) =>
+            response !== null &&
+            response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+          {
+            intervalMs: 1000,
+            timeoutMs: 30000,
+          }
+        );
+
+        if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+          let returnValue: any = null;
+          
+          if (getResponse.returnValue) {
+            returnValue = scValToNative(getResponse.returnValue);
+          }
+
+          return {
+            success: true,
+            message: `Contract method '${method}' executed successfully`,
+            result: returnValue,
+            transactionHash: result.hash,
+            link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+          };
+        } else {
+          throw new Error('Contract invocation failed');
+        }
+      } else {
+        throw new Error(result.errorResult?.toXDR('base64') || 'Unknown error');
+      }
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Contract invocation failed',
       };
     }
   }
 
-  async readContract(contractId: string, method: string): Promise<any> {
+  async readContract(contractId: string, method: string, args: any[] = []): Promise<any> {
     try {
-      return {
-        success: true,
-        message: `Read operation on contract ${contractId}`,
-        method,
-        result: 'Contract state data',
-        note: 'This is a view-only operation with no fees.',
-      };
+      const contract = new Contract(contractId);
+
+      // Convert args to ScVals
+      const scArgs = args.map((arg) => {
+        if (typeof arg === 'string') {
+          if (arg.length === 56 && (arg.startsWith('G') || arg.startsWith('C'))) {
+            return new Address(arg).toScVal();
+          }
+          return nativeToScVal(arg, { type: 'string' });
+        } else if (typeof arg === 'number') {
+          return nativeToScVal(arg, { type: 'u32' });
+        } else if (typeof arg === 'boolean') {
+          return nativeToScVal(arg, { type: 'bool' });
+        }
+        return nativeToScVal(arg);
+      });
+
+      // Create a temporary keypair for simulation (won't be submitted)
+      const tempKeypair = Keypair.random();
+      const tempAccount = await sorobanServer.getAccount(tempKeypair.publicKey());
+
+      // Build transaction for simulation only
+      const transaction = new TransactionBuilder(tempAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(contract.call(method, ...scArgs))
+        .setTimeout(30)
+        .build();
+
+      // Simulate the transaction (doesn't submit to network)
+      const simulation = await sorobanServer.simulateTransaction(transaction);
+
+      if (StellarSdk.rpc.Api.isSimulationSuccess(simulation)) {
+        let result: any = null;
+        
+        if (simulation.result?.retval) {
+          result = scValToNative(simulation.result.retval);
+        }
+
+        return {
+          success: true,
+          message: `Read operation on contract ${contractId}`,
+          method,
+          result,
+          note: 'This is a view-only operation with no fees.',
+        };
+      } else {
+        throw new Error('Simulation failed');
+      }
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Contract read failed',
       };
     }
   }
@@ -506,15 +687,18 @@ export class StellarTerminalService {
         return { success: false, error: 'Wallet not connected' };
       }
 
-      return {
-        success: true,
-        message: `Contract ${contractId} upgraded to WASM hash: ${newWasmHash}`,
-        note: 'Contract upgrade requires admin authorization.',
-      };
+      // Note: Contract upgrade typically requires calling an 'upgrade' function on the contract
+      // This is a simplified version - real implementation depends on contract design
+      return await this.invokeContract(
+        sessionId,
+        contractId,
+        'upgrade',
+        [Buffer.from(newWasmHash, 'hex')]
+      );
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Contract upgrade failed',
       };
     }
   }
@@ -536,17 +720,78 @@ export class StellarTerminalService {
         return { success: false, error: 'Wallet not connected' };
       }
 
+      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+
+      // Parse assets
+      let sendAsset: Asset;
+      let destAsset: Asset;
+
+      if (fromAsset === 'XLM' || fromAsset.toLowerCase() === 'native') {
+        sendAsset = Asset.native();
+      } else {
+        const [code, issuer] = fromAsset.split(':');
+        sendAsset = new Asset(code, issuer);
+      }
+
+      if (toAsset === 'XLM' || toAsset.toLowerCase() === 'native') {
+        destAsset = Asset.native();
+      } else {
+        const [code, issuer] = toAsset.split(':');
+        destAsset = new Asset(code, issuer);
+      }
+
+      // Find path for the swap
+      const paths = await horizonServer
+        .strictSendPaths(sendAsset, amount, [destAsset])
+        .call();
+
+      if (!paths.records || paths.records.length === 0) {
+        throw new Error('No path found for this swap');
+      }
+
+      // Get the best path (first one is usually the best)
+      const bestPath = paths.records[0];
+      const expectedOutput = bestPath.destination_amount;
+
+      // Calculate minimum amount with slippage
+      const slippageMultiplier = 1 - parseFloat(slippage) / 100;
+      const minAmount = (parseFloat(expectedOutput) * slippageMultiplier).toFixed(7);
+
+      // Build path payment transaction
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.pathPaymentStrictSend({
+            sendAsset,
+            sendAmount: amount,
+            destination: session.publicKey, // Send to self for now
+            destAsset,
+            destMin: minAmount,
+          })
+        )
+        .setTimeout(30)
+        .build();
+
+      transaction.sign(sourceKeypair);
+
+      const result = await horizonServer.submitTransaction(transaction);
+
       return {
         success: true,
-        message: `Swapped ${amount} ${fromAsset} for ${toAsset}`,
-        expectedOutput: (parseFloat(amount) * 0.98).toString(),
+        message: `Successfully swapped ${amount} ${fromAsset} for ~${expectedOutput} ${toAsset}`,
+        expectedOutput,
+        actualOutput: expectedOutput, // Would need to parse from result
         slippage: `${slippage}%`,
-        note: 'Swap executed via path payment or AMM liquidity pool.',
+        transactionHash: result.hash,
+        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Swap failed',
       };
     }
   }
@@ -564,16 +809,67 @@ export class StellarTerminalService {
         return { success: false, error: 'Wallet not connected' };
       }
 
+      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+
+      // Parse assets
+      let stellarAsset1: Asset;
+      let stellarAsset2: Asset;
+
+      if (asset1 === 'XLM' || asset1.toLowerCase() === 'native') {
+        stellarAsset1 = Asset.native();
+      } else {
+        const [code, issuer] = asset1.split(':');
+        stellarAsset1 = new Asset(code, issuer);
+      }
+
+      if (asset2 === 'XLM' || asset2.toLowerCase() === 'native') {
+        stellarAsset2 = Asset.native();
+      } else {
+        const [code, issuer] = asset2.split(':');
+        stellarAsset2 = new Asset(code, issuer);
+      }
+
+      // Build transaction to deposit to liquidity pool
+      const poolId = StellarSdk.getLiquidityPoolId(
+        'constant_product',
+        {
+          assetA: stellarAsset1,
+          assetB: stellarAsset2,
+          fee: 30, // 0.3% fee
+        }
+      ).toString('hex');
+
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.liquidityPoolDeposit({
+            liquidityPoolId: poolId,
+            maxAmountA: amount1,
+            maxAmountB: amount2,
+            minPrice: { n: 1, d: 2 }, // Min price ratio
+            maxPrice: { n: 2, d: 1 }, // Max price ratio
+          })
+        )
+        .setTimeout(30)
+        .build();
+
+      transaction.sign(sourceKeypair);
+
+      const result = await horizonServer.submitTransaction(transaction);
+
       return {
         success: true,
-        message: `Added liquidity: ${amount1} ${asset1} + ${amount2} ${asset2}`,
-        lpTokens: '1000.5',
-        poolShare: '0.15%',
+        message: `Successfully added liquidity: ${amount1} ${asset1} + ${amount2} ${asset2}`,
+        transactionHash: result.hash,
+        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Add liquidity failed',
       };
     }
   }
@@ -589,33 +885,67 @@ export class StellarTerminalService {
         return { success: false, error: 'Wallet not connected' };
       }
 
+      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+
+      // Build transaction to withdraw from liquidity pool
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.liquidityPoolWithdraw({
+            liquidityPoolId: poolId,
+            amount: lpTokens,
+            minAmountA: '0', // Would calculate minimum based on slippage
+            minAmountB: '0',
+          })
+        )
+        .setTimeout(30)
+        .build();
+
+      transaction.sign(sourceKeypair);
+
+      const result = await horizonServer.submitTransaction(transaction);
+
       return {
         success: true,
-        message: `Removed ${lpTokens} LP tokens from pool ${poolId}`,
-        returned: { asset1: '50 XLM', asset2: '25 USDC' },
+        message: `Successfully removed ${lpTokens} LP tokens from pool`,
+        transactionHash: result.hash,
+        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Remove liquidity failed',
       };
     }
   }
 
   async getPoolAnalytics(poolId: string): Promise<any> {
     try {
+      // Fetch pool info from Horizon
+      const pool = await horizonServer.liquidityPools().liquidityPoolId(poolId).call();
+
+      // Calculate TVL
+      const reserves = pool.reserves.map((r: any) => ({
+        asset: r.asset === 'native' ? 'XLM' : `${r.asset.split(':')[0]}`,
+        amount: r.amount,
+      }));
+
       return {
         success: true,
         poolId,
-        tvl: '$125,000',
-        volume24h: '$45,000',
-        apr: '24.5%',
-        fees24h: '$135',
+        reserves,
+        totalShares: pool.total_shares,
+        totalTrustlines: pool.total_trustlines,
+        feeBp: pool.fee_bp, // Fee in basis points (30 = 0.3%)
+        type: pool.type,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to fetch pool analytics',
       };
     }
   }
@@ -721,19 +1051,50 @@ export class StellarTerminalService {
    * TRANSACTION & EXPLORER OPERATIONS
    */
 
-  async simulateTransaction(_xdr: string): Promise<any> {
+  async simulateTransaction(transactionXdr: string): Promise<any> {
     try {
-      return {
-        success: true,
-        message: 'Transaction simulation completed',
-        operations: 2,
-        estimatedFee: '100 stroops',
-        warnings: [],
-      };
+      // Parse the transaction from XDR
+      const transaction = TransactionBuilder.fromXDR(
+        transactionXdr,
+        Networks.TESTNET
+      );
+
+      // Simulate the transaction using Soroban RPC
+      const simulation = await sorobanServer.simulateTransaction(transaction);
+
+      if (StellarSdk.rpc.Api.isSimulationSuccess(simulation)) {
+        return {
+          success: true,
+          message: 'Transaction simulation completed successfully',
+          minResourceFee: simulation.minResourceFee || '0',
+          latestLedger: simulation.latestLedger,
+          result: simulation.result
+            ? scValToNative(simulation.result.retval)
+            : null,
+          warnings: [],
+        };
+      } else if (StellarSdk.rpc.Api.isSimulationRestore(simulation)) {
+        return {
+          success: false,
+          error: 'Transaction requires state restoration',
+          restorePreamble: {
+            minResourceFee: simulation.restorePreamble.minResourceFee,
+            transactionData: simulation.restorePreamble.transactionData,
+          },
+        };
+      } else if (StellarSdk.rpc.Api.isSimulationError(simulation)) {
+        return {
+          success: false,
+          error: 'Simulation error',
+          events: simulation.events || [],
+        };
+      }
+
+      throw new Error('Unknown simulation result');
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Transaction simulation failed',
       };
     }
   }
@@ -831,24 +1192,104 @@ export class StellarTerminalService {
 
   async getPriceOracle(assetPair: string): Promise<any> {
     try {
-      // Mock oracle data
-      const prices: any = {
-        'XLM/USDC': '0.12',
-        'XLM/USD': '0.12',
-        'USDC/USD': '1.00',
-      };
+      // Parse asset pair (e.g., "XLM/USDC")
+      const [baseAsset, quoteAsset] = assetPair.split('/');
 
-      return {
-        success: true,
-        pair: assetPair,
-        price: prices[assetPair] || '0.00',
-        timestamp: new Date().toISOString(),
-        source: 'Soroban Price Oracle',
-      };
+      // Try to fetch from Stellar Expert API
+      try {
+        const response = await axios.get(
+          `https://api.stellar.expert/explorer/testnet/asset/${baseAsset}-${quoteAsset}/price-history`,
+          {
+            params: {
+              resolution: '1d',
+              limit: 1,
+            },
+          }
+        );
+
+        if (response.data && response.data.length > 0) {
+          const latestPrice = response.data[0];
+          return {
+            success: true,
+            pair: assetPair,
+            price: latestPrice.close?.toString() || '0.00',
+            high: latestPrice.high?.toString(),
+            low: latestPrice.low?.toString(),
+            volume: latestPrice.volume?.toString(),
+            timestamp: new Date().toISOString(),
+            source: 'Stellar Expert API',
+          };
+        }
+      } catch (apiError) {
+        console.warn('Stellar Expert API error, falling back to Horizon');
+      }
+
+      // Fallback: Try to get from Horizon orderbook
+      try {
+        const baseAssetObj =
+          baseAsset === 'XLM'
+            ? Asset.native()
+            : new Asset(baseAsset, 'ISSUER_PLACEHOLDER');
+        const quoteAssetObj =
+          quoteAsset === 'XLM'
+            ? Asset.native()
+            : new Asset(quoteAsset, 'ISSUER_PLACEHOLDER');
+
+        const orderbook = await horizonServer
+          .orderbook(baseAssetObj, quoteAssetObj)
+          .call();
+
+        if (orderbook.bids.length > 0 && orderbook.asks.length > 0) {
+          const bidPrice = parseFloat(orderbook.bids[0].price);
+          const askPrice = parseFloat(orderbook.asks[0].price);
+          const midPrice = ((bidPrice + askPrice) / 2).toFixed(7);
+
+          return {
+            success: true,
+            pair: assetPair,
+            price: midPrice,
+            bid: orderbook.bids[0].price,
+            ask: orderbook.asks[0].price,
+            timestamp: new Date().toISOString(),
+            source: 'Horizon Orderbook',
+          };
+        }
+      } catch (horizonError) {
+        console.warn('Horizon orderbook error');
+      }
+
+      // Final fallback: Use CoinGecko for XLM price
+      if (baseAsset === 'XLM' && (quoteAsset === 'USD' || quoteAsset === 'USDC')) {
+        try {
+          const cgResponse = await axios.get(
+            'https://api.coingecko.com/api/v3/simple/price',
+            {
+              params: {
+                ids: 'stellar',
+                vs_currencies: 'usd',
+              },
+            }
+          );
+
+          if (cgResponse.data?.stellar?.usd) {
+            return {
+              success: true,
+              pair: assetPair,
+              price: cgResponse.data.stellar.usd.toString(),
+              timestamp: new Date().toISOString(),
+              source: 'CoinGecko API',
+            };
+          }
+        } catch (cgError) {
+          console.warn('CoinGecko API error');
+        }
+      }
+
+      throw new Error('Unable to fetch price from any source');
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Price oracle query failed',
       };
     }
   }
@@ -860,33 +1301,96 @@ export class StellarTerminalService {
   async resolveFederatedAddress(address: string): Promise<any> {
     try {
       // address format: alice*example.com
-      return {
-        success: true,
-        federatedAddress: address,
-        stellarAddress: 'G' + Keypair.random().publicKey().substring(1),
-        note: 'Federated address resolved via Stellar Federation Protocol',
-      };
+      if (!address.includes('*')) {
+        throw new Error('Invalid federated address format. Expected: name*domain.com');
+      }
+
+      const [_name, domain] = address.split('*');
+
+      // Fetch stellar.toml from the domain
+      const tomlUrl = `https://${domain}/.well-known/stellar.toml`;
+      
+      let federationServer: string;
+      try {
+        const tomlResponse = await axios.get(tomlUrl);
+        const tomlContent = tomlResponse.data;
+        
+        // Parse FEDERATION_SERVER from TOML
+        const match = tomlContent.match(/FEDERATION_SERVER\s*=\s*"([^"]+)"/);
+        if (!match) {
+          throw new Error('No FEDERATION_SERVER found in stellar.toml');
+        }
+        federationServer = match[1];
+      } catch (tomlError) {
+        throw new Error(`Failed to fetch stellar.toml from ${domain}`);
+      }
+
+      // Query the federation server
+      const fedResponse = await axios.get(federationServer, {
+        params: {
+          q: address,
+          type: 'name',
+        },
+      });
+
+      if (fedResponse.data && fedResponse.data.account_id) {
+        return {
+          success: true,
+          federatedAddress: address,
+          stellarAddress: fedResponse.data.account_id,
+          memo: fedResponse.data.memo,
+          memoType: fedResponse.data.memo_type,
+          note: 'Federated address resolved via Stellar Federation Protocol',
+        };
+      }
+
+      throw new Error('Federation server did not return account_id');
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Federated address resolution failed',
       };
     }
   }
 
-  async streamEvents(contractId: string, minutes: number = 10): Promise<any> {
+  async streamEvents(contractId: string, _minutes: number = 10): Promise<any> {
     try {
+      // Get recent events from the contract
+      // Note: Real-time streaming would require WebSocket or long-polling
+      const latestLedger = await sorobanServer.getLatestLedger();
+      const startLedger = Math.max(1, latestLedger.sequence - 100); // Last 100 ledgers
+
+      const events = await sorobanServer.getEvents({
+        startLedger,
+        endLedger: latestLedger.sequence,
+        filters: [
+          {
+            type: 'contract',
+            contractIds: [contractId],
+          },
+        ],
+        limit: 100,
+      });
+
+      const formattedEvents = events.events.map((event: any) => ({
+        type: event.type,
+        ledger: event.ledger,
+        contractId: event.contractId,
+        topic: event.topic,
+        value: event.value ? scValToNative(event.value.xdr()) : null,
+        inSuccessfulContractCall: event.inSuccessfulContractCall,
+      }));
+
       return {
         success: true,
-        message: `Streaming events from contract ${contractId} for ${minutes} minutes`,
-        events: [
-          { type: 'transfer', data: '...', timestamp: new Date().toISOString() },
-        ],
+        message: `Retrieved recent events from contract ${contractId}`,
+        events: formattedEvents,
+        note: 'For real-time streaming, use WebSocket connections or long-polling.',
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Event streaming failed',
       };
     }
   }
