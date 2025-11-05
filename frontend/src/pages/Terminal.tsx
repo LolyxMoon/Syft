@@ -37,16 +37,17 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 🔗 **Trustlines:** Setup and manage asset trustlines
 📜 **Smart Contracts:** Deploy, invoke, and upgrade Soroban contracts
 💱 **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
-🎨 **NFTs:** Mint, transfer, burn, and list NFTs
+🎨 **NFTs:** Mint, transfer, burn, and list NFTs with AI-generated artwork
 📊 **Analytics:** Transaction history, network stats, price oracles
 🔍 **Explorer:** Search transactions and accounts
 
 **Try asking me:**
 - "Show me my balance"
 - "Fund my account from the faucet"
+- "Mint me a Goku NFT" or "Create a cyberpunk cat NFT"
+- "List my NFTs"
 - "Transfer 100 XLM to [address]"
 - "What's the current XLM/USDC price?"
-- "Show me the latest network stats"
 
 ${isConnected ? `✅ **Wallet Connected:** ${walletAddress}` : '⚠️ **Please connect your wallet** using the button in the top-right corner.'}
 
@@ -85,16 +86,17 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 🔗 **Trustlines:** Setup and manage asset trustlines
 📜 **Smart Contracts:** Deploy, invoke, and upgrade Soroban contracts
 💱 **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
-🎨 **NFTs:** Mint, transfer, burn, and list NFTs
+🎨 **NFTs:** Mint, transfer, burn, and list NFTs with AI-generated artwork
 📊 **Analytics:** Transaction history, network stats, price oracles
 🔍 **Explorer:** Search transactions and accounts
 
 **Try asking me:**
 - "Show me my balance"
 - "Fund my account from the faucet"
+- "Mint me a Goku NFT" or "Create a cyberpunk cat NFT"
+- "List my NFTs"
 - "Transfer 100 XLM to [address]"
 - "What's the current XLM/USDC price?"
-- "Show me the latest network stats"
 
 ${isConnected ? `✅ **Wallet Connected:** ${walletAddress}` : '⚠️ **Please connect your wallet** using the button in the top-right corner.'}
 
@@ -318,6 +320,66 @@ Let's build on Stellar! 🌟`,
   const renderFunctionResult = (result: any) => {
     if (!result) return null;
 
+    // Special rendering for NFT minting success
+    if (result.success && result.imageUrl && result.nftName) {
+      return (
+        <div className="mt-3 border border-primary-500/30 rounded-lg overflow-hidden bg-gradient-to-br from-primary-500/10 to-purple-500/10">
+          {/* NFT Image */}
+          <div className="relative">
+            <img 
+              src={result.imageUrl} 
+              alt={result.nftName}
+              className="w-full h-64 object-cover"
+              onError={(e) => {
+                e.currentTarget.src = 'https://api.dicebear.com/7.x/shapes/svg?seed=nft-minted';
+              }}
+            />
+            <div className="absolute top-3 right-3 bg-green-500/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-white flex items-center gap-1">
+              <span>✨</span>
+              <span>Minted</span>
+            </div>
+          </div>
+
+          {/* NFT Details */}
+          <div className="p-4 space-y-3">
+            <div>
+              <h3 className="text-lg font-bold text-neutral-50 mb-1">{result.nftName}</h3>
+              <p className="text-sm text-neutral-400">Token ID: {result.nftTokenId || 'Pending...'}</p>
+            </div>
+
+            {result.collection && (
+              <div className="flex items-center gap-2 text-xs text-neutral-400">
+                <span className="px-2 py-1 bg-neutral-800 rounded">
+                  Collection: {result.collection}
+                </span>
+              </div>
+            )}
+
+            {result.transactionHash && (
+              <div className="pt-2 border-t border-neutral-800">
+                <div className="text-xs text-neutral-500 mb-1">Transaction Hash:</div>
+                <div className="font-mono text-xs text-primary-400 break-all">
+                  {result.transactionHash}
+                </div>
+              </div>
+            )}
+
+            {result.link && (
+              <a
+                href={result.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                View on Stellar Expert →
+              </a>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Default rendering for other function results
     return (
       <div className="mt-2 p-3 bg-neutral-900/50 border border-primary-500/20 rounded-lg">
         <div className="text-xs font-mono text-neutral-400">
@@ -428,14 +490,38 @@ Let's build on Stellar! 🌟`,
                         ? `https://stellar.expert/explorer/${network}/tx/${result.hash}`
                         : '';
                       
-                      const resultMessage: Message = {
-                        id: Date.now().toString(),
-                        role: 'assistant',
-                        content: result.success
-                          ? `✅ **Transaction Successful!**\nHash: \`${result.hash}\`\n[View on Stellar Expert](${explorerLink})`
-                          : `❌ **Transaction Failed**\n\nError: ${result.error}`,
-                        timestamp: new Date(),
-                      };
+                      // For NFT minting, create a rich result message with NFT details
+                      let resultMessage: Message;
+                      
+                      if (result.success && message.action?.type === 'mint_nft') {
+                        // Create a success message with NFT card rendering
+                        resultMessage = {
+                          id: Date.now().toString(),
+                          role: 'assistant',
+                          content: `🎉 **NFT Minted Successfully!**\n\nYour "${message.action.details.nft_name}" NFT has been created and added to your wallet!`,
+                          timestamp: new Date(),
+                          functionResult: {
+                            success: true,
+                            nftName: message.action.details.nft_name,
+                            imageUrl: message.action.details.image_preview,
+                            nftTokenId: 'Confirming...', // Will be updated via polling
+                            collection: message.action.details.collection,
+                            transactionHash: result.hash,
+                            link: explorerLink,
+                          },
+                        };
+                      } else {
+                        // Regular transaction result message
+                        resultMessage = {
+                          id: Date.now().toString(),
+                          role: 'assistant',
+                          content: result.success
+                            ? `✅ **Transaction Successful!**\nHash: \`${result.hash}\`\n[View on Stellar Expert](${explorerLink})`
+                            : `❌ **Transaction Failed**\n\nError: ${result.error}`,
+                          timestamp: new Date(),
+                        };
+                      }
+                      
                       setMessages((prev) => [...prev, resultMessage]);
 
                       // Check if there's a follow-up action (e.g., swap after trustline)

@@ -387,20 +387,21 @@ const TERMINAL_FUNCTIONS = [
   // NFT FUNCTIONS
   {
     name: 'mint_nft',
-    description: 'Mint NFT with metadata to a collection.',
+    description: 'Mint a custom NFT with AI-generated artwork. Accepts creative prompts like "Goku NFT", "cyberpunk cat", "abstract galaxy art", etc. The AI will generate unique artwork and mint it as an NFT on the Stellar blockchain.',
     parameters: {
       type: 'object',
       properties: {
         metadataUri: {
           type: 'string',
-          description: 'IPFS or HTTP URI for metadata',
+          description: 'Creative prompt for the NFT artwork (e.g., "Goku from Dragon Ball", "cyberpunk cityscape", "mystical phoenix"). This will be used to generate AI artwork via Runware.',
         },
         collectionId: {
           type: 'string',
-          description: 'Collection contract ID',
+          description: 'Collection type: "custom" for user-created NFTs, "quest" for quest reward NFTs, or "vault" for vault-related NFTs',
+          default: 'custom',
         },
       },
-      required: ['metadataUri', 'collectionId'],
+      required: ['metadataUri'],
     },
   },
   {
@@ -699,6 +700,13 @@ When a function returns an action object (requiresSigning: true), format your re
 - Mention that they'll see a Freighter popup to sign & approve
 - Keep it brief - just a few lines - the action card UI shows the details
 - Example format: "✅ Ready to transfer 1000 XLM to GCXHLDX... via Freighter. Click the button below to sign."
+
+SPECIAL - NFT Minting Success:
+When an NFT is successfully minted (with imageUrl in the result), be enthusiastic and mention:
+- The NFT name
+- That the AI-generated artwork is ready
+- That it's been added to their wallet
+- Example: "🎉 Your [NFT Name] NFT has been created with custom AI artwork! It's now in your wallet."
 
 Always be friendly, explain technical concepts clearly, and provide transaction links when operations complete.
 Format transaction hashes and addresses nicely for readability.`,
@@ -1026,7 +1034,7 @@ Format transaction hashes and addresses nicely for readability.`,
 
         // NFT operations
         case 'mint_nft':
-          return await service.mintNFT(sessionId, args.metadataUri, args.collectionId);
+          return await service.mintNFT(sessionId, args.metadataUri, args.collectionId || 'custom');
         case 'transfer_nft':
           return await service.transferNFT(sessionId, args.tokenId, args.toAddress);
         case 'burn_nft':

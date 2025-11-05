@@ -92,18 +92,41 @@ export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardPro
         )}
       </div>
 
+      {/* NFT Image Preview - show if this is an NFT minting action */}
+      {action.type === 'mint_nft' && action.details.image_preview && (
+        <div className="mb-4">
+          <img 
+            src={action.details.image_preview} 
+            alt="NFT Preview" 
+            className="w-full h-48 object-cover rounded-lg border border-primary-500/20"
+            onError={(e) => {
+              // Fallback if image fails to load
+              e.currentTarget.src = 'https://api.dicebear.com/7.x/shapes/svg?seed=nft-preview';
+            }}
+          />
+          <p className="text-xs text-neutral-400 mt-2 text-center">
+            🎨 AI-Generated Artwork
+          </p>
+        </div>
+      )}
+
       {/* Transaction Details */}
       <div className="space-y-2 mb-4 bg-neutral-900/50 rounded-lg p-3">
-        {Object.entries(action.details).map(([key, value]) => (
-          <div key={key} className="flex justify-between text-sm">
-            <span className="text-neutral-400 capitalize">{key.replace(/_/g, ' ')}:</span>
-            <span className="text-neutral-200 font-mono text-xs">
-              {typeof value === 'string' && value.length > 40
-                ? `${value.substring(0, 8)}...${value.substring(value.length - 8)}`
-                : String(value)}
-            </span>
-          </div>
-        ))}
+        {Object.entries(action.details).map(([key, value]) => {
+          // Skip image_preview in the details list (we show it above)
+          if (key === 'image_preview') return null;
+          
+          return (
+            <div key={key} className="flex justify-between text-sm">
+              <span className="text-neutral-400 capitalize">{key.replace(/_/g, ' ')}:</span>
+              <span className="text-neutral-200 font-mono text-xs">
+                {typeof value === 'string' && value.length > 40
+                  ? `${value.substring(0, 8)}...${value.substring(value.length - 8)}`
+                  : String(value)}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Actions */}

@@ -1164,24 +1164,168 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const tokenId = Math.floor(Math.random() * 1000000);
+      console.log(`[Mint NFT] Request to mint NFT for session: ${sessionId}`);
+      console.log(`[Mint NFT] Metadata URI: ${metadataUri}`);
+      console.log(`[Mint NFT] Collection: ${collectionId}`);
 
-      return {
-        success: true,
-        message: `NFT minted successfully!`,
-        tokenId,
-        collection: collectionId,
-        metadataUri,
-        owner: session.publicKey,
-      };
+      // Get NFT contract address from environment
+      const nftContractId = process.env.NFT_CONTRACT_ADDRESS;
+      if (!nftContractId) {
+        return {
+          success: false,
+          error: 'NFT contract not configured. Please set NFT_CONTRACT_ADDRESS in environment variables.',
+        };
+      }
+
+      // Parse the metadataUri as a creative prompt for image generation
+      // The AI will pass things like "Goku NFT" or "a cyberpunk cat"
+      const creativePrompt = metadataUri;
+
+      // Import Runware service dynamically
+      const { generateVaultNFTImage } = await import('./runwareService.js');
+
+      // Generate AI image based on the creative prompt
+      console.log(`[Mint NFT] 🎨 Generating AI image with prompt: "${creativePrompt}"`);
+      let imageUrl: string;
+      
+      try {
+        // Enhance the prompt for better NFT imagery
+        const enhancedPrompt = `${creativePrompt}, detailed digital art, vibrant colors, NFT collection style, high quality, 8k resolution, professional artwork`;
+        imageUrl = await generateVaultNFTImage(enhancedPrompt);
+        console.log(`[Mint NFT] ✅ Image generated: ${imageUrl}`);
+      } catch (imageError: any) {
+        console.error(`[Mint NFT] ❌ Image generation failed:`, imageError.message);
+        // Fallback to placeholder
+        imageUrl = `https://api.dicebear.com/7.x/shapes/svg?seed=${Date.now()}`;
+      }
+
+      // Generate NFT name from prompt (capitalize first letters)
+      const nftName = creativePrompt
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
+      const nftDescription = `${nftName} - Minted via Stellar Terminal AI`;
+
+      // Determine NFT type based on collection
+      const nftType = collectionId.toLowerCase().includes('quest') ? 1 : 0; // 0 = Vault, 1 = Quest
+
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
+
+      const contract = new Contract(nftContractId);
+
+      // Build mint transaction
+      // Contract signature: mint_nft(minter, vault_address, ownership_percentage, name, description, image_url, vault_performance, nft_type)
+      const minterAddress = new Address(session.publicKey);
+      const vaultAddress = minterAddress; // Use minter as vault address for custom NFTs
+      const ownershipPercentage = nativeToScVal(10000, { type: 'i128' }); // 100% ownership
+      const vaultPerformance = nativeToScVal(0, { type: 'i128' });
+      const nftTypeValue = nativeToScVal(nftType, { type: 'u32' });
+
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 1000).toString(),
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          contract.call(
+            'mint_nft',
+            minterAddress.toScVal(),
+            vaultAddress.toScVal(),
+            ownershipPercentage,
+            nativeToScVal(nftName, { type: 'string' }),
+            nativeToScVal(nftDescription, { type: 'string' }),
+            nativeToScVal(imageUrl, { type: 'string' }),
+            vaultPerformance,
+            nftTypeValue
+          )
+        )
+        .setTimeout(300)
+        .build();
+
+      // Prepare transaction (simulate and add resource fees)
+      const preparedTx = await sorobanServer.prepareTransaction(transaction);
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          requiresSigning: true,
+          action: {
+            type: 'mint_nft',
+            title: `🎨 Mint ${nftName}`,
+            description: `Create your custom NFT on Stellar blockchain`,
+            xdr: preparedTx.toXDR(),
+            details: {
+              nft_name: nftName,
+              description: nftDescription,
+              image_preview: imageUrl,
+              collection: collectionId,
+              minter: session.publicKey,
+              contract: nftContractId,
+              network: 'testnet',
+              fee: preparedTx.fee,
+            },
+          },
+          message: `🎨 Your NFT image has been generated! Review the details and sign the transaction to mint "${nftName}" to your wallet.`,
+          imageUrl,
+        };
+      }
+
+      // If we have secret key, sign and submit (backend auto-sign mode)
+      preparedTx.sign(sourceKeypair);
+
+      // Submit transaction
+      const result = await sorobanServer.sendTransaction(preparedTx);
+
+      if (result.status === 'PENDING') {
+        // Poll for transaction result with retry logic
+        const getResponse = await pollUntil(
+          () => sorobanServer.getTransaction(result.hash),
+          (response) =>
+            response !== null &&
+            response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+          {
+            intervalMs: 1000,
+            timeoutMs: 30000,
+          }
+        );
+
+        if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+          // Extract NFT ID from return value
+          let nftTokenId: string | undefined;
+          
+          if (getResponse.returnValue) {
+            const nftId = scValToNative(getResponse.returnValue);
+            nftTokenId = `NFT_${nftId}`;
+          }
+
+          return {
+            success: true,
+            message: `🎉 NFT "${nftName}" minted successfully!`,
+            nftTokenId,
+            nftName,
+            imageUrl,
+            collection: collectionId,
+            owner: session.publicKey,
+            transactionHash: result.hash,
+            link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+          };
+        } else {
+          throw new Error('NFT minting transaction failed on blockchain');
+        }
+      } else {
+        throw new Error(result.errorResult?.toXDR('base64') || 'Transaction submission failed');
+      }
     } catch (error: any) {
+      console.error('[Mint NFT] Error:', error);
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to mint NFT',
       };
     }
   }
