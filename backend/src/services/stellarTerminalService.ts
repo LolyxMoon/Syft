@@ -1214,19 +1214,151 @@ export class StellarTerminalService {
   async burnNFT(sessionId: string, tokenId: string): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
+      }
+
+      // Get NFT contract address from environment
+      const nftContractId = process.env.NFT_CONTRACT_ADDRESS;
+      if (!nftContractId) {
+        return {
+          success: false,
+          error: 'NFT contract not configured. Please set NFT_CONTRACT_ADDRESS in environment variables.',
+        };
+      }
+
+      console.log(`[Burn NFT] 🔥 Burning NFT ${tokenId} for wallet: ${session.publicKey}`);
+
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
+
+      const contract = new Contract(nftContractId);
+
+      // Parse NFT ID - handle both "NFT_123" and "123" formats
+      let nftId: number;
+      if (tokenId.startsWith('NFT_')) {
+        nftId = parseInt(tokenId.replace('NFT_', ''));
+      } else {
+        nftId = parseInt(tokenId);
+      }
+
+      if (isNaN(nftId)) {
+        return {
+          success: false,
+          error: `Invalid NFT ID format: ${tokenId}. Expected format: "NFT_123" or "123"`,
+        };
+      }
+
+      // Build the burn transaction
+      // Contract function signature: burn(env: Env, nft_id: u64, owner: Address)
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 1000).toString(),
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          contract.call(
+            'burn',
+            nativeToScVal(nftId, { type: 'u64' }), // nft_id as u64
+            new Address(session.publicKey).toScVal() // owner address
+          )
+        )
+        .setTimeout(300)
+        .build();
+
+      // Prepare transaction
+      const preparedTx = await sorobanServer.prepareTransaction(transaction);
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: `Ready to burn NFT #${nftId}. This action is permanent and cannot be undone.`,
+          action: {
+            requiresSigning: true,
+            type: 'burn_nft',
+            title: `🔥 Burn NFT #${nftId}`,
+            description: `Permanently destroy NFT #${nftId} from your wallet. This action cannot be undone.`,
+            xdr: preparedTx.toXDR(),
+            details: {
+              nft_id: nftId,
+              token_id: tokenId,
+              contract: nftContractId,
+              owner: session.publicKey,
+              network: 'testnet',
+              fee: preparedTx.fee,
+              warning: '⚠️ This action is permanent and cannot be reversed',
+            },
+          },
+        };
+      }
+
+      // If we have the secret key, sign and submit (for backend operations)
+      preparedTx.sign(sourceKeypair);
+
+      // Submit transaction
+      const result = await sorobanServer.sendTransaction(preparedTx);
+
+      if (result.status === 'PENDING') {
+        // Poll for transaction result
+        const getResponse = await pollUntil(
+          () => sorobanServer.getTransaction(result.hash),
+          (response) =>
+            response !== null &&
+            response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+          {
+            intervalMs: 1000,
+            timeoutMs: 30000,
+          }
+        );
+
+        if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+          console.log(`[Burn NFT] ✅ NFT ${tokenId} burned successfully`);
+          
+          return {
+            success: true,
+            message: `NFT #${nftId} has been permanently burned and removed from your wallet.`,
+            tokenId,
+            nftId,
+            transactionHash: result.hash,
+            explorerUrl: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+          };
+        } else {
+          console.error(`[Burn NFT] ❌ Transaction failed:`, getResponse);
+          
+          return {
+            success: false,
+            error: 'Transaction failed on the blockchain',
+            details: getResponse,
+          };
+        }
       }
 
       return {
-        success: true,
-        message: `NFT #${tokenId} burned successfully`,
-        tokenId,
+        success: false,
+        error: 'Transaction submission failed',
+        details: result,
       };
     } catch (error: any) {
+      console.error('[Burn NFT] Error:', error);
+      
+      // Provide helpful error messages
+      if (error.message?.includes('not found')) {
+        return {
+          success: false,
+          error: `NFT #${tokenId} not found or already burned`,
+        };
+      }
+      
+      if (error.message?.includes('Unauthorized')) {
+        return {
+          success: false,
+          error: `You don't own this NFT or don't have permission to burn it`,
+        };
+      }
+
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to burn NFT',
       };
     }
   }

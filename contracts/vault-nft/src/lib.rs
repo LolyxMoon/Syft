@@ -236,6 +236,60 @@ impl VaultNFTContract {
         
         Ok(total)
     }
+    
+    /// Burn an NFT (permanent deletion)
+    /// This removes the NFT from storage and emits a burn event
+    pub fn burn(
+        env: Env,
+        nft_id: u64,
+        owner: Address,
+    ) -> Result<(), VaultNFTError> {
+        // Verify owner is authorized
+        owner.require_auth();
+        
+        // Get NFT to verify ownership and get vault address
+        let nft: VaultNFT = env.storage()
+            .instance()
+            .get(&(NFT_PREFIX, nft_id))
+            .ok_or(VaultNFTError::NFTNotFound)?;
+        
+        // Verify ownership
+        if nft.holder != owner {
+            return Err(VaultNFTError::Unauthorized);
+        }
+        
+        // Get vault address for updating vault's NFT list
+        let vault_address = nft.vault_address.clone();
+        
+        // Remove NFT from storage
+        env.storage().instance().remove(&(NFT_PREFIX, nft_id));
+        
+        // Remove from vault's NFT list
+        let mut vault_nfts: Vec<u64> = env.storage()
+            .instance()
+            .get(&(VAULT_NFTS_PREFIX, &vault_address))
+            .unwrap_or(Vec::new(&env));
+        
+        // Find and remove the NFT ID from the list
+        let mut new_vault_nfts = Vec::new(&env);
+        for i in 0..vault_nfts.len() {
+            let id = vault_nfts.get(i).unwrap();
+            if id != nft_id {
+                new_vault_nfts.push_back(id);
+            }
+        }
+        
+        // Update vault's NFT list
+        env.storage().instance().set(&(VAULT_NFTS_PREFIX, &vault_address), &new_vault_nfts);
+        
+        // Emit burn event
+        env.events().publish(
+            (symbol_short!("NFT_BURN"), nft_id),
+            (&owner, &vault_address, nft.ownership_percentage)
+        );
+        
+        Ok(())
+    }
 }
 
 // Helper function to format metadata
