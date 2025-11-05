@@ -1027,6 +1027,24 @@ export async function deployVault(
 
     console.log(`[Vault Deployment] ✓ Stored vault metadata in database`);
 
+    // Auto-complete the "create vault" quest
+    try {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', config.owner)
+        .single();
+      
+      if (user) {
+        const { autoCompleteQuest } = await import('./questValidationService.js');
+        await autoCompleteQuest(user.id, 'create_first_vault');
+        console.log(`[Vault Deployment] ✓ Quest auto-completion triggered for user ${user.id}`);
+      }
+    } catch (questError) {
+      console.error('[Vault Deployment] Failed to auto-complete quest:', questError);
+      // Don't fail the deployment if quest completion fails
+    }
+
     // AUTO-SET ROUTER: Configure DEX router for the vault automatically
     console.log(`[Router Setup] Setting router address: ${routerAddress}`);
     try {

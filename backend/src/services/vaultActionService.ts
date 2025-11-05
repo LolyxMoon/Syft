@@ -910,6 +910,24 @@ export async function executeDeposit(
         });
         
         console.log(`✅ Recorded deposit transaction: ${(amountInStroops / 10_000_000).toFixed(1)} XLM = $${amountUSD.toFixed(2)} → ${shares} shares`);
+        
+        // Auto-complete the "make deposit" quest
+        try {
+          const { data: user } = await supabase
+            .from('users')
+            .select('id')
+            .eq('wallet_address', userAddress)
+            .single();
+          
+          if (user) {
+            const { autoCompleteQuest } = await import('./questValidationService.js');
+            await autoCompleteQuest(user.id, 'deposit_to_vault');
+            console.log(`✅ Quest auto-completion triggered for user ${user.id}`);
+          }
+        } catch (questError) {
+          console.error('⚠️  Failed to auto-complete quest:', questError);
+          // Don't fail the deposit if quest completion fails
+        }
       }
     } catch (txError) {
       console.error('⚠️  Failed to record transaction (non-critical):', txError);
