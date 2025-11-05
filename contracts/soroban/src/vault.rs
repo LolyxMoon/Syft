@@ -842,6 +842,33 @@ impl VaultContract {
         Ok(())
     }
 
+    /// Trigger swap based on configured rules (only swap actions)
+    /// Can be called by anyone - executes asset swaps to reach target allocation
+    pub fn trigger_swap(env: Env) -> Result<(), VaultError> {
+        // Check vault is initialized
+        if !env.storage().instance().has(&CONFIG) {
+            return Err(VaultError::NotInitialized);
+        }
+
+        let _config: VaultConfig = env.storage().instance().get(&CONFIG)
+            .ok_or(VaultError::NotInitialized)?;
+        
+        let mut state: VaultState = env.storage().instance().get(&STATE)
+            .ok_or(VaultError::NotInitialized)?;
+
+        // Execute only swap actions
+        crate::rebalance::execute_swap_only(&env)?;
+
+        // Update last rebalance timestamp
+        state.last_rebalance = env.ledger().timestamp();
+        env.storage().instance().set(&STATE, &state);
+
+        // Emit swap event
+        env.events().publish((symbol_short!("swapped"),), state.last_rebalance);
+
+        Ok(())
+    }
+
     /// Trigger staking based on configured rules (only stake actions)
     /// Can be called by anyone - assumes conditions already checked by caller
     pub fn trigger_stake(env: Env) -> Result<(), VaultError> {

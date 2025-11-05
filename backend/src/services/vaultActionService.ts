@@ -727,6 +727,8 @@ export async function executeRebalance(
             methodName = 'trigger_stake';
           } else if (actionType === 'provide_liquidity' || actionType === 'liquidity') {
             methodName = 'trigger_liquidity';
+          } else if (actionType === 'swap') {
+            methodName = 'trigger_swap';
           } else if (actionType === 'rebalance') {
             methodName = 'trigger_rebalance';
           }

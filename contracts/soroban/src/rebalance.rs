@@ -126,6 +126,49 @@ pub fn execute_stake_only(env: &Env) -> Result<(), VaultError> {
     Ok(())
 }
 
+/// Execute only swap actions (excludes rebalance, stake, and liquidity)
+pub fn execute_swap_only(env: &Env) -> Result<(), VaultError> {
+    use soroban_sdk::symbol_short;
+    
+    let config: crate::types::VaultConfig = env.storage().instance()
+        .get(&CONFIG)
+        .ok_or(VaultError::NotInitialized)?;
+    
+    let _state: crate::types::VaultState = env.storage().instance()
+        .get(&STATE)
+        .ok_or(VaultError::NotInitialized)?;
+    
+    // Calculate ACTUAL total value from real balances
+    let mut actual_total_value: i128 = 0;
+    for i in 0..config.assets.len() {
+        if let Some(asset) = config.assets.get(i) {
+            let balance = crate::token_client::get_vault_balance(env, &asset);
+            actual_total_value = actual_total_value.checked_add(balance)
+                .ok_or(VaultError::InvalidAmount)?;
+        }
+    }
+    
+    env.events().publish(
+        (symbol_short!("swp_start"),),
+        actual_total_value
+    );
+    
+    if actual_total_value == 0 {
+        return Err(VaultError::InsufficientBalance);
+    }
+    
+    // Execute only swap rules using ACTUAL total value
+    for i in 0..config.rules.len() {
+        if let Some(rule) = config.rules.get(i) {
+            if rule.action == String::from_str(env, "swap") {
+                execute_rebalance_action(env, &rule, &config.assets, actual_total_value)?;
+            }
+        }
+    }
+    
+    Ok(())
+}
+
 /// Execute only liquidity actions (excludes rebalance and stake)
 pub fn execute_liquidity_only(env: &Env) -> Result<(), VaultError> {
     use soroban_sdk::symbol_short;
