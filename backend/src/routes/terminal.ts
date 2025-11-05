@@ -229,6 +229,55 @@ router.post('/clear', async (req, res): Promise<void> => {
 });
 
 /**
+ * GET /api/terminal/stats/:sessionId
+ * Get conversation statistics for a session
+ */
+router.get('/stats/:sessionId', async (req, res): Promise<void> => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required' });
+      return;
+    }
+
+    const stats = terminalAIService.getConversationStats(sessionId);
+
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error: any) {
+    console.error('Terminal stats error:', error);
+    res.status(500).json({
+      error: 'Failed to get stats',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/terminal/memory
+ * Get global memory statistics
+ */
+router.get('/memory', async (_req, res): Promise<void> => {
+  try {
+    const memoryStats = terminalAIService.getMemoryStats();
+
+    res.json({
+      success: true,
+      memory: memoryStats,
+    });
+  } catch (error: any) {
+    console.error('Terminal memory error:', error);
+    res.status(500).json({
+      error: 'Failed to get memory stats',
+      details: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/terminal/health
  * Health check endpoint
  */
@@ -245,6 +294,11 @@ router.get('/health', (_req, res) => {
       'NFTs',
       'Transaction Management',
       'Network Analytics',
+    ],
+    features: [
+      'Context Management',
+      'Automatic Summarization',
+      'Token Tracking',
     ],
   });
 });

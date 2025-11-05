@@ -1,6 +1,10 @@
 import { openai } from '../lib/openaiClient.js';
 import { stellarTerminalService } from './stellarTerminalService.js';
 import { tavilyService } from './tavilyService.js';
+import { 
+  countConversationTokens, 
+  isApproachingLimit
+} from '../utils/tokenCounter.js';
 
 /**
  * OpenAI Function Definitions for Stellar Terminal
@@ -560,11 +564,27 @@ const TERMINAL_FUNCTIONS = [
 ];
 
 /**
+ * Context metadata for each conversation session
+ */
+interface ConversationContext {
+  messages: any[];
+  tokenCount: number;
+  lastSummarizedAt: number; // Message index of last summarization
+  summarizationCount: number; // How many times we've summarized
+}
+
+/**
  * Terminal AI Service
  * Handles AI chat interactions with blockchain function calling
+ * Features automatic context management with summarization at 80k tokens
  */
 export class TerminalAIService {
-  private conversationHistory: Map<string, any[]> = new Map();
+  private conversationHistory: Map<string, ConversationContext> = new Map();
+  
+  // Context management settings
+  private readonly TOKEN_LIMIT = 100000; // 100k token limit
+  private readonly SUMMARIZATION_THRESHOLD = 0.80; // Summarize at 80% (80k tokens)
+  private readonly MIN_MESSAGES_TO_SUMMARIZE = 10; // Don't summarize if fewer than this many messages
 
   async chat(sessionId: string, message: string, walletAddress?: string): Promise<any> {
     try {
@@ -584,9 +604,9 @@ export class TerminalAIService {
         }
       }
 
-      // Get or initialize conversation history
+      // Get or initialize conversation context
       if (!this.conversationHistory.has(sessionId)) {
-        this.conversationHistory.set(sessionId, [
+        const initialMessages = [
           {
             role: 'system',
             content: `You are a helpful Stellar blockchain assistant. You can help users interact with the Stellar testnet through natural language.
@@ -701,11 +721,27 @@ When an NFT is successfully minted (with imageUrl in the result), be enthusiasti
 Always be friendly, explain technical concepts clearly, and provide transaction links when operations complete.
 Format transaction hashes and addresses nicely for readability.`,
           },
-        ]);
+        ];
+        
+        this.conversationHistory.set(sessionId, {
+          messages: initialMessages,
+          tokenCount: countConversationTokens(initialMessages, process.env.OPENAI_MODEL),
+          lastSummarizedAt: 0,
+          summarizationCount: 0,
+        });
       }
 
-      const history = this.conversationHistory.get(sessionId)!;
-      history.push({ role: 'user', content: message });
+      const context = this.conversationHistory.get(sessionId)!;
+      
+      // Check if we need to summarize before adding new message
+      await this.checkAndSummarizeIfNeeded(sessionId, context);
+      
+      // Add user message
+      context.messages.push({ role: 'user', content: message });
+      context.tokenCount = countConversationTokens(
+        context.messages,
+        process.env.OPENAI_MODEL
+      );
 
       // Convert functions to tools format for OpenAI API
       const tools = TERMINAL_FUNCTIONS.map(func => ({
@@ -716,7 +752,7 @@ Format transaction hashes and addresses nicely for readability.`,
       // Call OpenAI with function calling - NO max_tokens to allow full responses
       const response = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
-        messages: history,
+        messages: context.messages,
         tools,
         tool_choice: 'auto',
         temperature: 0.7,
@@ -730,8 +766,9 @@ Format transaction hashes and addresses nicely for readability.`,
         let firstFunctionName = assistantMessage.tool_calls[0].function.name;
         let lastFunctionResult: any;
 
-        // Add assistant message with tool calls to history
-        history.push(assistantMessage);
+        // Add assistant message with tool calls to context
+        context.messages.push(assistantMessage);
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
 
         // Execute all tool calls requested by the AI
         for (const toolCall of assistantMessage.tool_calls) {
@@ -749,12 +786,13 @@ Format transaction hashes and addresses nicely for readability.`,
 
           lastFunctionResult = functionResult;
 
-          // Add function result to history
-          history.push({
+          // Add function result to context
+          context.messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
             content: JSON.stringify(functionResult),
           });
+          context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
         }
 
         // Allow AI to potentially call MORE functions based on results (multi-step operations)
@@ -771,7 +809,7 @@ Format transaction hashes and addresses nicely for readability.`,
           // Get AI's next action based on previous results
           const nextResponse = await openai.chat.completions.create({
             model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
-            messages: history,
+            messages: context.messages,
             tools,
             tool_choice: 'auto',
             temperature: 0.7,
@@ -783,7 +821,8 @@ Format transaction hashes and addresses nicely for readability.`,
           if (nextMessage.tool_calls && nextMessage.tool_calls.length > 0) {
             console.log(`[Terminal AI] Chain iteration ${iteration}: AI calling more functions`);
             
-            history.push(nextMessage);
+            context.messages.push(nextMessage);
+            context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
 
             // Execute the new tool calls
             for (const toolCall of nextMessage.tool_calls) {
@@ -806,16 +845,18 @@ Format transaction hashes and addresses nicely for readability.`,
 
               lastFunctionResult = functionResult;
 
-              history.push({
+              context.messages.push({
                 role: 'tool',
                 tool_call_id: toolCall.id,
                 content: JSON.stringify(functionResult),
               });
+              context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
             }
           } else {
             // No more function calls, get final response
             continueChain = false;
-            history.push(nextMessage);
+            context.messages.push(nextMessage);
+            context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
 
             return {
               success: true,
@@ -830,12 +871,13 @@ Format transaction hashes and addresses nicely for readability.`,
         // If we hit max iterations, get final response
         const finalResponse = await openai.chat.completions.create({
           model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
-          messages: history,
+          messages: context.messages,
           temperature: 0.7,
         });
 
         const finalMessage = finalResponse.choices[0].message;
-        history.push(finalMessage);
+        context.messages.push(finalMessage);
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
 
         return {
           success: true,
@@ -846,7 +888,8 @@ Format transaction hashes and addresses nicely for readability.`,
         };
       } else {
         // No function call, just a regular response
-        history.push(assistantMessage);
+        context.messages.push(assistantMessage);
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
 
         return {
           success: true,
@@ -861,6 +904,114 @@ Format transaction hashes and addresses nicely for readability.`,
         error: error.message,
         message: 'Sorry, I encountered an error processing your request.',
       };
+    }
+  }
+
+  /**
+   * Check if context needs summarization and perform it if needed
+   * This prevents the context from exceeding the token limit
+   */
+  private async checkAndSummarizeIfNeeded(
+    sessionId: string,
+    context: ConversationContext
+  ): Promise<void> {
+    // Check if we're approaching the token limit
+    const limitCheck = isApproachingLimit(
+      context.messages,
+      TERMINAL_FUNCTIONS,
+      this.TOKEN_LIMIT,
+      this.SUMMARIZATION_THRESHOLD,
+      process.env.OPENAI_MODEL
+    );
+
+    if (!limitCheck.approaching) {
+      return; // No need to summarize yet
+    }
+
+    // Don't summarize if there are too few messages
+    if (context.messages.length < this.MIN_MESSAGES_TO_SUMMARIZE) {
+      console.log(
+        `[Terminal AI] ⚠️  Context approaching limit (${limitCheck.percentage}%) but too few messages to summarize`
+      );
+      return;
+    }
+
+    console.log(
+      `[Terminal AI] 🔄 Context summarization triggered at ${limitCheck.percentage}% (${limitCheck.current}/${limitCheck.limit} tokens)`
+    );
+
+    try {
+      // Get the system message (first message)
+      const systemMessage = context.messages[0];
+      
+      // Get messages to summarize (excluding the system message and recent messages)
+      // Keep the last 10 messages as "recent context"
+      const recentMessageCount = 10;
+      const messagesToKeep = Math.min(recentMessageCount, context.messages.length - 1);
+      const messagesToSummarize = context.messages.slice(1, -messagesToKeep);
+      const recentMessages = context.messages.slice(-messagesToKeep);
+
+      if (messagesToSummarize.length === 0) {
+        console.log('[Terminal AI] ⚠️  No messages to summarize, skipping');
+        return;
+      }
+
+      // Ask AI to summarize the conversation
+      const summarizationPrompt = `Please provide a concise summary of this conversation history between a user and a Stellar blockchain assistant. Focus on:
+1. Key operations performed (transfers, swaps, NFT minting, etc.)
+2. Important addresses and amounts mentioned
+3. Current state of the conversation
+4. Any pending or incomplete tasks
+
+Keep the summary under 500 tokens and maintain all critical information.
+
+Conversation to summarize:
+${JSON.stringify(messagesToSummarize, null, 2)}`;
+
+      const summarizationResponse = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a conversation summarizer. Create concise, information-dense summaries.',
+          },
+          {
+            role: 'user',
+            content: summarizationPrompt,
+          },
+        ],
+        temperature: 0.3, // Lower temperature for more consistent summaries
+      });
+
+      const summary = summarizationResponse.choices[0].message.content;
+
+      // Create new context with system message, summary, and recent messages
+      const newMessages = [
+        systemMessage,
+        {
+          role: 'system',
+          content: `[Conversation Summary - ${new Date().toISOString()}]\n\nPrevious conversation context (${messagesToSummarize.length} messages summarized):\n\n${summary}\n\n[End of Summary - Recent messages follow]`,
+        },
+        ...recentMessages,
+      ];
+
+      // Update the context
+      context.messages = newMessages;
+      context.tokenCount = countConversationTokens(newMessages, process.env.OPENAI_MODEL);
+      context.lastSummarizedAt = newMessages.length - recentMessages.length;
+      context.summarizationCount += 1;
+
+      console.log(
+        `[Terminal AI] ✅ Summarization complete!
+        - Summarized ${messagesToSummarize.length} messages
+        - Kept ${recentMessages.length} recent messages
+        - New token count: ${context.tokenCount} (${Math.round((context.tokenCount / this.TOKEN_LIMIT) * 100)}%)
+        - Saved ~${limitCheck.current - context.tokenCount} tokens
+        - Summarization #${context.summarizationCount} for session ${sessionId}`
+      );
+    } catch (error: any) {
+      console.error('[Terminal AI] ❌ Summarization failed:', error);
+      // Don't throw - continue with the conversation even if summarization fails
     }
   }
 
@@ -1129,10 +1280,6 @@ Format transaction hashes and addresses nicely for readability.`,
     }
   }
 
-  clearHistory(sessionId: string): void {
-    this.conversationHistory.delete(sessionId);
-  }
-
   /**
    * Execute swap directly (used for follow-up swaps after trustline)
    * This maintains conversation context while directly calling the swap function
@@ -1147,15 +1294,16 @@ Format transaction hashes and addresses nicely for readability.`,
     try {
       console.log('[Terminal AI] Direct swap execution:', { sessionId, fromAsset, toAsset, amount, slippage });
       
-      // Get conversation history to maintain context
-      const history = this.conversationHistory.get(sessionId);
+      // Get conversation context to maintain history
+      const context = this.conversationHistory.get(sessionId);
       
       // Add system message about auto-continuation
-      if (history) {
-        history.push({
+      if (context) {
+        context.messages.push({
           role: 'assistant',
           content: `[Auto-continuing after trustline setup] Now executing swap: ${amount} ${fromAsset} → ${toAsset}`,
         });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
       }
       
       const service = stellarTerminalService;
@@ -1164,27 +1312,29 @@ Format transaction hashes and addresses nicely for readability.`,
       console.log('[Terminal AI] Swap result:', JSON.stringify(result, null, 2));
 
       // Add the swap execution to conversation history
-      if (history) {
-        history.push({
+      if (context) {
+        context.messages.push({
           role: 'assistant',
           content: `Executed swap_assets function with parameters: fromAsset=${fromAsset}, toAsset=${toAsset}, amount=${amount}, slippage=${slippage}`,
         });
         
-        history.push({
+        context.messages.push({
           role: 'tool',
           content: JSON.stringify(result),
         });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
       }
 
       // Format response similar to chat responses
       if (result.action) {
         const responseMessage = `✅ Ready to swap ${amount} ${fromAsset} to ${toAsset.split(':')[0]}. Expected output: ~${result.action.details.expected_output}. You'll see a Freighter popup to sign & approve.`;
         
-        if (history) {
-          history.push({
+        if (context) {
+          context.messages.push({
             role: 'assistant',
             content: responseMessage,
           });
+          context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
         }
         
         return {
@@ -1213,11 +1363,12 @@ Format transaction hashes and addresses nicely for readability.`,
 
       const responseMessage = result.message || 'Swap completed successfully';
       
-      if (history) {
-        history.push({
+      if (context) {
+        context.messages.push({
           role: 'assistant',
           content: responseMessage,
         });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
       }
 
       return {
@@ -1231,12 +1382,13 @@ Format transaction hashes and addresses nicely for readability.`,
       console.error('[Terminal AI] Direct swap error:', error);
       
       // Add error to conversation history
-      const history = this.conversationHistory.get(sessionId);
-      if (history) {
-        history.push({
+      const context = this.conversationHistory.get(sessionId);
+      if (context) {
+        context.messages.push({
           role: 'assistant',
           content: `Error executing auto-swap: ${error.message}`,
         });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
       }
       
       return {
@@ -1248,6 +1400,69 @@ Format transaction hashes and addresses nicely for readability.`,
         type: 'function_call',
       };
     }
+  }
+
+  /**
+   * Get conversation statistics for a session
+   */
+  getConversationStats(sessionId: string): {
+    exists: boolean;
+    messageCount?: number;
+    tokenCount?: number;
+    tokenPercentage?: number;
+    summarizationCount?: number;
+    lastSummarizedAt?: number;
+  } {
+    const context = this.conversationHistory.get(sessionId);
+    
+    if (!context) {
+      return { exists: false };
+    }
+
+    return {
+      exists: true,
+      messageCount: context.messages.length,
+      tokenCount: context.tokenCount,
+      tokenPercentage: Math.round((context.tokenCount / this.TOKEN_LIMIT) * 100),
+      summarizationCount: context.summarizationCount,
+      lastSummarizedAt: context.lastSummarizedAt,
+    };
+  }
+
+  /**
+   * Clear conversation history for a session
+   */
+  clearHistory(sessionId: string): void {
+    this.conversationHistory.delete(sessionId);
+    console.log(`[Terminal AI] 🗑️  Cleared conversation history for session: ${sessionId}`);
+  }
+
+  /**
+   * Get all active sessions
+   */
+  getActiveSessions(): string[] {
+    return Array.from(this.conversationHistory.keys());
+  }
+
+  /**
+   * Get total memory usage stats
+   */
+  getMemoryStats(): {
+    activeSessions: number;
+    totalMessages: number;
+    totalTokens: number;
+    averageTokensPerSession: number;
+  } {
+    const sessions = Array.from(this.conversationHistory.values());
+    const totalMessages = sessions.reduce((sum, ctx) => sum + ctx.messages.length, 0);
+    const totalTokens = sessions.reduce((sum, ctx) => sum + ctx.tokenCount, 0);
+
+    return {
+      activeSessions: sessions.length,
+      totalMessages,
+      totalTokens,
+      averageTokensPerSession: sessions.length > 0 ? Math.round(totalTokens / sessions.length) : 0,
+    };
   }
 }
 
