@@ -1386,7 +1386,15 @@ export class StellarTerminalService {
       const nftDescription = `${nftName} - Minted via Stellar Terminal AI`;
 
       // Determine NFT type based on collection
-      const nftType = collectionId.toLowerCase().includes('quest') ? 1 : 0; // 0 = Vault, 1 = Quest
+      // 0 = Vault, 1 = Quest, 2 = Custom
+      let nftType: number;
+      if (collectionId.toLowerCase().includes('quest')) {
+        nftType = 1;
+      } else if (collectionId.toLowerCase().includes('custom')) {
+        nftType = 2;
+      } else {
+        nftType = 0; // Default to Vault
+      }
 
       const sourceAccount = await sorobanServer.getAccount(session.publicKey);
       const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
@@ -1909,41 +1917,57 @@ export class StellarTerminalService {
                   const vaultAddr = nftData.vault_address;
                   
                   // Determine NFT type from the nft_type field in contract data
-                  // nft_type: 0 = Vault, 1 = Quest
+                  // nft_type: 0 = Vault, 1 = Quest, 2 = Custom
                   const nftTypeValue = nftData.nft_type;
                   const isQuestNFT = nftTypeValue === 1;
+                  const isCustomNFT = nftTypeValue === 2;
                   
-                  console.log(`[List NFTs] 📝 NFT #${nftId} type: ${isQuestNFT ? 'Quest' : 'Vault'} (raw value: ${nftTypeValue})`);
+                  // Determine source and type labels
+                  let nftSource: string;
+                  let nftTypeLabel: string;
+                  let defaultName: string;
+                  let defaultDescription: string;
+                  let defaultImage: string;
                   
-                  // Try to parse metadata string if available
-                  let metadata: any = {};
-                  if (nftData.metadata && typeof nftData.metadata === 'string') {
-                    try {
-                      // Metadata might be JSON string or formatted string
-                      metadata = JSON.parse(nftData.metadata);
-                    } catch {
-                      // If not JSON, try to extract from formatted string
-                      // Format: "Name: X, Description: Y, Image: Z, Performance: W"
-                      const nameMatch = nftData.metadata.match(/Name:\s*([^,]+)/);
-                      const descMatch = nftData.metadata.match(/Description:\s*([^,]+)/);
-                      const imageMatch = nftData.metadata.match(/Image:\s*([^,]+)/);
-                      
-                      if (nameMatch) metadata.name = nameMatch[1].trim();
-                      if (descMatch) metadata.description = descMatch[1].trim();
-                      if (imageMatch) metadata.image_url = imageMatch[1].trim();
-                    }
+                  if (isCustomNFT) {
+                    nftSource = 'custom';
+                    nftTypeLabel = 'Custom NFT';
+                    defaultName = `Custom NFT #${nftId}`;
+                    defaultDescription = `Custom NFT created via Stellar Terminal AI`;
+                    defaultImage = 'https://api.dicebear.com/7.x/shapes/svg?seed=custom-nft';
+                  } else if (isQuestNFT) {
+                    nftSource = 'quest';
+                    nftTypeLabel = 'Quest NFT';
+                    defaultName = `Quest NFT #${nftId}`;
+                    defaultDescription = `Quest reward NFT representing ${(ownershipPct / 100).toFixed(2)}% ownership`;
+                    defaultImage = 'https://syft-stellar.vercel.app/quest-nft.png';
+                  } else {
+                    nftSource = 'vault';
+                    nftTypeLabel = 'Vault NFT';
+                    defaultName = `Vault NFT #${nftId}`;
+                    defaultDescription = `Vault ownership NFT representing ${(ownershipPct / 100).toFixed(2)}% ownership`;
+                    defaultImage = 'https://syft-stellar.vercel.app/vault-nft.png';
                   }
+                  
+                  console.log(`[List NFTs] 📝 NFT #${nftId} type: ${nftTypeLabel} (raw value: ${nftTypeValue})`);
+                  
+                  // The contract now stores name, description, and image_url as direct fields
+                  const nftName = nftData.name || defaultName;
+                  const nftDescription = nftData.description || defaultDescription;
+                  const nftImage = nftData.image_url || defaultImage;
+                  
+                  console.log(`[List NFTs] 📸 NFT #${nftId} details: "${nftName}" - ${nftDescription.substring(0, 50)}...`);
                   
                   allNFTs.push({
                     tokenId: `NFT_${nftId}`,
-                    name: metadata.name || (isQuestNFT ? `Quest NFT #${nftId}` : `Vault NFT #${nftId}`),
-                    description: metadata.description || `${isQuestNFT ? 'Quest reward' : 'Vault ownership'} NFT representing ${(ownershipPct / 100).toFixed(2)}% ownership`,
-                    image: metadata.image_url || (isQuestNFT ? 'https://syft-stellar.vercel.app/quest-nft.png' : 'https://syft-stellar.vercel.app/vault-nft.png'),
+                    name: nftName,
+                    description: nftDescription,
+                    image: nftImage,
                     ownership_percentage: ownershipPct,
                     vault_address: vaultAddr,
                     contract_address: contractAddress,
-                    source: isQuestNFT ? 'quest' : 'vault',
-                    type: isQuestNFT ? 'Quest NFT' : 'Vault NFT',
+                    source: nftSource,
+                    type: nftTypeLabel,
                   });
                 } else {
                   console.log(`[List NFTs] ⏭️  NFT #${nftId} exists but owned by someone else: ${nftData.holder.substring(0, 8)}...`);
@@ -1984,18 +2008,23 @@ export class StellarTerminalService {
         ? allNFTs.filter(nft => nft.source === collectionId || nft.type === collectionId)
         : allNFTs;
 
+      const vaultCount = allNFTs.filter(n => n.source === 'vault').length;
+      const questCount = allNFTs.filter(n => n.source === 'quest').length;
+      const customCount = allNFTs.filter(n => n.source === 'custom').length;
+      
       return {
         success: true,
         owner: address,
         collection: collectionId || 'All Collections',
         nfts: filteredNFTs,
         breakdown: {
-          vault: allNFTs.filter(n => n.source === 'vault').length,
-          quest: allNFTs.filter(n => n.source === 'quest').length,
+          vault: vaultCount,
+          quest: questCount,
+          custom: customCount,
           total: filteredNFTs.length,
         },
         message: filteredNFTs.length > 0 
-          ? `You own ${filteredNFTs.length} on-chain NFT${filteredNFTs.length !== 1 ? 's' : ''} (${allNFTs.filter(n => n.source === 'vault').length} Vault, ${allNFTs.filter(n => n.source === 'quest').length} Quest)`
+          ? `You own ${filteredNFTs.length} on-chain NFT${filteredNFTs.length !== 1 ? 's' : ''} (${vaultCount} Vault, ${questCount} Quest, ${customCount} Custom)`
           : 'No on-chain NFTs found for this address.',
       };
     } catch (error: any) {

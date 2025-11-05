@@ -154,7 +154,7 @@ export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardPro
         {(status === 'signing' || status === 'submitting') && (
           <button
             disabled
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500/50 text-white rounded-lg font-medium cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500/50 text-black rounded-lg font-medium cursor-not-allowed"
           >
             <Loader2 className="w-4 h-4 animate-spin" />
             {status === 'signing' ? 'Waiting for signature...' : 'Submitting...'}

@@ -25,6 +25,7 @@ pub enum VaultNFTError {
 pub enum NFTType {
     Vault = 0,
     Quest = 1,
+    Custom = 2,
 }
 
 // Data structures
@@ -35,8 +36,11 @@ pub struct VaultNFT {
     pub vault_address: Address,
     pub ownership_percentage: i128,
     pub holder: Address,
-    pub metadata: String,
-    pub nft_type: NFTType,  // New field to distinguish NFT types
+    pub name: String,  // Store name directly
+    pub description: String,  // Store description directly
+    pub image_url: String,  // Store image_url directly
+    pub vault_performance: i128,  // Store performance directly
+    pub nft_type: NFTType,  // Field to distinguish NFT types
 }
 
 #[contracttype]
@@ -82,21 +86,16 @@ impl VaultNFTContract {
         
         let next_id = nft_id + 1;
         
-        // Create NFT metadata from individual fields
-        let metadata = NFTMetadata {
-            name: name.clone(),
-            description: description.clone(),
-            image_url: image_url.clone(),
-            vault_performance,
-        };
-        
-        // Create NFT
+        // Create NFT with all fields stored directly
         let nft = VaultNFT {
             nft_id: next_id,
             vault_address: vault_address.clone(),
             ownership_percentage,
             holder: minter.clone(),
-            metadata: format_metadata(&metadata),
+            name,
+            description,
+            image_url,
+            vault_performance,
             nft_type,  // Store the NFT type
         };
         
@@ -290,10 +289,4 @@ impl VaultNFTContract {
         
         Ok(())
     }
-}
-
-// Helper function to format metadata
-fn format_metadata(metadata: &NFTMetadata) -> String {
-    // Simple JSON-like formatting for metadata
-    metadata.name.clone()
 }

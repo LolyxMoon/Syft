@@ -24,11 +24,32 @@ const Terminal = () => {
   const { address: walletAddress } = useWallet();
   const isConnected = !!walletAddress; // Wallet is connected if address exists
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'system',
-      content: `🚀 **Welcome to Stellar Terminal AI!**
+  // localStorage keys
+  const STORAGE_KEY_MESSAGES = 'syft_terminal_messages';
+  const STORAGE_KEY_SESSION = 'syft_terminal_session_id';
+
+  // Initialize messages from localStorage or default welcome message
+  const getInitialMessages = (): Message[] => {
+    try {
+      const savedMessages = localStorage.getItem(STORAGE_KEY_MESSAGES);
+      if (savedMessages) {
+        const parsed = JSON.parse(savedMessages);
+        // Convert timestamp strings back to Date objects
+        return parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+      }
+    } catch (error) {
+      console.error('[Terminal] Failed to load messages from localStorage:', error);
+    }
+
+    // Return default welcome message
+    return [
+      {
+        id: '0',
+        role: 'system',
+        content: `🚀 **Welcome to Stellar Terminal AI!**
 
 I'm your intelligent blockchain assistant for the Stellar testnet. I can help you with:
 
@@ -52,19 +73,53 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 ${isConnected ? `✅ **Wallet Connected:** ${walletAddress}` : '⚠️ **Please connect your wallet** using the button in the top-right corner.'}
 
 Let's build on Stellar! 🌟`,
-      timestamp: new Date(),
-      type: 'text',
-    },
-  ]);
+        timestamp: new Date(),
+        type: 'text',
+      },
+    ];
+  };
+
+  // Initialize sessionId from localStorage or create new one
+  const getInitialSessionId = (): string => {
+    try {
+      const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION);
+      if (savedSessionId) {
+        return savedSessionId;
+      }
+    } catch (error) {
+      console.error('[Terminal] Failed to load sessionId from localStorage:', error);
+    }
+    return `session_${Date.now()}_${Math.random()}`;
+  };
+
+  const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random()}`);
+  const [sessionId] = useState(getInitialSessionId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
+    } catch (error) {
+      console.error('[Terminal] Failed to save messages to localStorage:', error);
+    }
+  }, [messages]);
+
+  // Save sessionId to localStorage on mount
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_SESSION, sessionId);
+    } catch (error) {
+      console.error('[Terminal] Failed to save sessionId to localStorage:', error);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -74,7 +129,7 @@ Let's build on Stellar! 🌟`,
   useEffect(() => {
     setMessages((prev) => {
       const newMessages = [...prev];
-      if (newMessages.length > 0 && newMessages[0].id === '0') {
+      if (newMessages.length > 0 && newMessages[0].id === '0' && newMessages[0].role === 'system') {
         newMessages[0] = {
           ...newMessages[0],
           content: `🚀 **Welcome to Stellar Terminal AI!**
@@ -101,6 +156,7 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 ${isConnected ? `✅ **Wallet Connected:** ${walletAddress}` : '⚠️ **Please connect your wallet** using the button in the top-right corner.'}
 
 Let's build on Stellar! 🌟`,
+          timestamp: new Date(newMessages[0].timestamp), // Preserve original timestamp
         };
       }
       return newMessages;
@@ -207,6 +263,11 @@ Let's build on Stellar! 🌟`,
   const clearChat = async () => {
     try {
       await axios.post(`${API_BASE_URL}/api/terminal/clear`, { sessionId });
+      
+      // Clear localStorage
+      localStorage.removeItem(STORAGE_KEY_MESSAGES);
+      localStorage.removeItem(STORAGE_KEY_SESSION);
+      
       setMessages([
         {
           id: '0',
@@ -369,7 +430,7 @@ Let's build on Stellar! 🌟`,
                 href={result.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full text-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors text-sm font-medium"
+                className="block w-full text-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-black rounded-lg transition-colors text-sm font-medium"
               >
                 View on Stellar Expert →
               </a>
