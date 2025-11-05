@@ -10,15 +10,10 @@ const TERMINAL_FUNCTIONS = [
   // WALLET FUNCTIONS
   {
     name: 'connect_wallet',
-    description: 'Connect or create a Freighter wallet. Can import existing wallet with secret key.',
+    description: 'DEPRECATED - Wallet should be connected via Freighter browser extension only. User\'s wallet is automatically available when connected through the UI. Do NOT call this function - inform user to connect via the wallet button in the top-right corner of the interface.',
     parameters: {
       type: 'object',
-      properties: {
-        secretKey: {
-          type: 'string',
-          description: 'Optional: Secret key to import existing wallet (starts with S)',
-        },
-      },
+      properties: {},
     },
   },
   {
@@ -70,37 +65,32 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'export_secret_key',
-    description: 'Export secret key with security warnings. Use for backup purposes.',
+    description: 'Export secret key with security warnings. Use for backup purposes only. This shows the connected wallet\'s secret key (if available) along with critical security warnings.',
     parameters: {
       type: 'object',
-      properties: {
-        publicKey: {
-          type: 'string',
-          description: 'The public key of the account',
-        },
-      },
-      required: ['publicKey'],
+      properties: {},
+      required: [],
     },
   },
 
   // ASSET FUNCTIONS
   {
     name: 'create_asset',
-    description: 'Create a custom asset with specified code, supply, and issuer.',
+    description: `Generate an asset identifier for a custom Stellar asset. NOTE: This does NOT submit a blockchain transaction. In Stellar, assets are created implicitly when first transferred. This function generates the asset string format (CODE:ISSUER) that recipients need to establish trustlines. No signature required. IMPORTANT: The user (issuer) does NOT need to setup a trustline for their own asset - issuers automatically trust their own assets. Only recipients need to setup trustlines to receive the asset.`,
     parameters: {
       type: 'object',
       properties: {
         assetCode: {
           type: 'string',
-          description: 'Asset code (e.g., SYFT, USDC) - max 12 characters',
+          description: 'Asset code (e.g., MYCATTY, SYFT, USDC) - max 12 alphanumeric characters',
         },
         supply: {
           type: 'string',
-          description: 'Total supply to issue',
+          description: 'Intended total supply (informational only, not enforced on-chain)',
         },
         description: {
           type: 'string',
-          description: 'Optional asset description',
+          description: 'Optional asset description for reference',
         },
       },
       required: ['assetCode', 'supply'],
@@ -158,7 +148,7 @@ const TERMINAL_FUNCTIONS = [
   // TRUSTLINE FUNCTIONS
   {
     name: 'setup_trustline',
-    description: 'Add trustline for a custom asset with optional limit.',
+    description: `Add trustline for a custom asset with optional limit. IMPORTANT: Users do NOT need trustlines for assets they themselves issued - issuers automatically trust their own assets. Only call this function when the user wants to trust someone else's asset. Check if the issuer address matches the user's wallet address before suggesting a trustline setup.`,
     parameters: {
       type: 'object',
       properties: {
@@ -168,7 +158,7 @@ const TERMINAL_FUNCTIONS = [
         },
         issuer: {
           type: 'string',
-          description: 'Asset issuer public key',
+          description: 'Asset issuer public key (must be different from the user\'s wallet address)',
         },
         limit: {
           type: 'string',
@@ -949,7 +939,17 @@ Format transaction hashes and addresses nicely for readability.`,
       switch (functionName) {
         // Wallet operations
         case 'connect_wallet':
-          return await service.connectWallet(sessionId, args.secretKey);
+          // DEPRECATED: Wallet connection should only happen via Freighter
+          return {
+            success: false,
+            error: 'Wallet connection via AI is disabled for security.',
+            message: '🔐 Please connect your wallet using the **Connect Wallet** button in the top-right corner of the interface. This ensures your private keys remain secure in your browser wallet (Freighter).',
+            instructions: [
+              '1. Click the "Connect Wallet" button (top-right)',
+              '2. Approve the connection in your Freighter popup',
+              '3. Once connected, you can use all blockchain features',
+            ],
+          };
         case 'fund_from_faucet':
           return await service.fundFromFaucet(args.publicKey, args.amount);
         case 'get_balance':
@@ -957,7 +957,7 @@ Format transaction hashes and addresses nicely for readability.`,
         case 'create_account':
           return await service.createAccount(args.seedAmount);
         case 'export_secret_key':
-          return await service.exportSecretKey(args.publicKey);
+          return await service.exportSecretKey(sessionId);
 
         // Asset operations
         case 'create_asset':

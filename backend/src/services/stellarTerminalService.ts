@@ -36,22 +36,34 @@ export class StellarTerminalService {
    * WALLET OPERATIONS
    */
 
-  async connectWallet(sessionId: string, secretKey?: string): Promise<any> {
+  async connectWallet(sessionId: string, publicKey?: string): Promise<any> {
     try {
-      let keypair: Keypair;
+      // PRODUCTION MODE: Only accept wallet connections via Freighter (public key only)
+      // This ensures ALL transactions require user signature - no auto-signing
       
-      if (secretKey) {
-        keypair = Keypair.fromSecret(secretKey);
-      } else {
-        // For demo, generate new keypair
-        keypair = Keypair.random();
+      if (!publicKey) {
+        return {
+          success: false,
+          error: 'No wallet address provided. Please connect via Freighter wallet extension.',
+          message: '⚠️ For security, please connect your wallet using the Freighter browser extension. This ensures you review and approve every transaction.',
+        };
       }
 
-      const publicKey = keypair.publicKey();
+      // Validate public key format
+      if (!publicKey || publicKey.length !== 56 || !publicKey.startsWith('G')) {
+        return {
+          success: false,
+          error: 'Invalid Stellar address format',
+        };
+      }
+
+      // Store ONLY the public key - NO secret key stored
       this.sessions.set(sessionId, { 
-        publicKey, 
-        secretKey: secretKey || keypair.secret() 
+        publicKey,
+        secretKey: undefined, // Explicitly no secret key - all transactions must be signed by user
       });
+
+      console.log(`[Connect Wallet] 🔐 Wallet connected (Freighter mode): ${publicKey}`);
 
       // Load account details
       try {
@@ -64,6 +76,8 @@ export class StellarTerminalService {
           balances,
           accountExists: true,
           message: `Wallet connected successfully! Address: ${publicKey}`,
+          mode: 'freighter',
+          note: '🔐 Secure mode: All transactions will require your signature via Freighter.',
         };
       } catch (error: any) {
         if (error?.response?.status === 404) {
@@ -71,8 +85,8 @@ export class StellarTerminalService {
             success: true,
             publicKey,
             accountExists: false,
-            message: `Wallet generated! Address: ${publicKey}. Fund this account to activate it.`,
-            secretKey: keypair.secret(), // Return for user to save
+            message: `Wallet address detected but not yet funded on the network. Address: ${publicKey}`,
+            note: 'Fund this account from the faucet to activate it.',
           };
         }
         throw error;
@@ -178,15 +192,36 @@ export class StellarTerminalService {
     }
   }
 
-  async exportSecretKey(_publicKey: string): Promise<any> {
+  async exportSecretKey(sessionId: string): Promise<any> {
     try {
-      // In production, you'd retrieve from secure storage
-      // For demo purposes, we return a warning
+      const session = this.sessions.get(sessionId);
+      if (!session) {
+        return { 
+          success: false, 
+          error: 'Session not found. Please connect your wallet first.' 
+        };
+      }
+
+      // Security warning - in production, this should require additional authentication
+      // and should NEVER be done through a web interface
       return {
         success: true,
-        message: 'Secret key export requires secure authentication.',
-        warning: '⚠️ Never share your secret key. Store it in a secure password manager.',
-        note: 'In a production environment, use mnemonics (BIP39) for better security.',
+        message: '⚠️ **Secret Key Export - SECURITY WARNING**',
+        warning: [
+          '🔴 CRITICAL: Never share your secret key with anyone!',
+          '🔴 Never send it via email, chat, or any messaging app',
+          '🔴 Store it in a secure password manager only',
+          '🔴 Anyone with this key has FULL control of your account',
+        ],
+        publicKey: session.publicKey,
+        secretKey: session.secretKey || 'Secret key not available (wallet connection only)',
+        recommendations: [
+          '✅ Use a hardware wallet for maximum security',
+          '✅ Use Freighter browser extension for daily transactions',
+          '✅ Use BIP39 mnemonics instead of raw secret keys',
+          '✅ Never store secret keys in code or config files',
+        ],
+        note: 'If you connected via Freighter, the secret key is not accessible here (which is good for security!).',
       };
     } catch (error: any) {
       return {
@@ -204,29 +239,73 @@ export class StellarTerminalService {
     sessionId: string,
     assetCode: string,
     supply: string,
-    _description?: string
+    description?: string
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const issuerKeypair = Keypair.fromSecret(session.secretKey);
-      const issuer = issuerKeypair.publicKey();
+      // Validate asset code (1-12 alphanumeric characters)
+      if (!assetCode || assetCode.length > 12 || !/^[a-zA-Z0-9]+$/.test(assetCode)) {
+        return {
+          success: false,
+          error: 'Invalid asset code. Must be 1-12 alphanumeric characters.',
+        };
+      }
 
+      // Validate supply
+      const supplyAmount = parseFloat(supply);
+      if (isNaN(supplyAmount) || supplyAmount <= 0) {
+        return {
+          success: false,
+          error: 'Invalid supply amount. Must be a positive number.',
+        };
+      }
+
+      console.log(`[Create Asset] 🪙 Creating asset ${assetCode} with supply ${supply}`);
+
+      const issuer = session.publicKey;
+
+      // Verify account exists
+      await horizonServer.loadAccount(issuer);
+
+      // In Stellar, issuers have UNLIMITED supply of their own assets automatically
+      // No transaction needed - they can distribute tokens directly to holders
+      // The asset will exist on-chain the moment it's first transferred
+      
       return {
         success: true,
-        message: `Asset ${assetCode} created successfully!`,
+        message: `✅ Asset ${assetCode} created successfully!`,
         assetCode,
         issuer,
         supply,
-        note: 'To use this asset, other accounts must establish a trustline to it.',
+        assetString: `${assetCode}:${issuer}`,
+        description,
+        explanation: `💡 As the issuer, you have unlimited ${assetCode} to distribute! The asset will appear on-chain after the first transfer.`,
+        viewInFreighter: {
+          note: '📱 To see your token in Freighter:',
+          steps: [
+            '1. Open Freighter → Click "..." → "Manage Assets"',
+            '2. Add custom asset with:',
+            `   • Code: ${assetCode}`,
+            `   • Issuer: ${issuer.substring(0, 8)}...${issuer.substring(issuer.length - 8)}`,
+            '⚠️ Note: As issuer, Freighter may not show a balance (you have unlimited supply)'
+          ]
+        },
+        nextSteps: [
+          '📤 Transfer tokens to recipients who have trustlines',
+          `� After first transfer, view on: https://stellar.expert/explorer/testnet/asset/${assetCode}-${issuer}`,
+          '💰 You have unlimited supply as the issuer'
+        ],
+        tip: `💡 Try: "transfer 1000 ${assetCode} to [recipient_address]"`,
       };
     } catch (error: any) {
+      console.error('[Create Asset] Error:', error);
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to create asset',
       };
     }
   }
@@ -330,11 +409,11 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      console.log('[batchTransfer] Session lookup:', { sessionId, found: !!session, hasSecretKey: !!session?.secretKey });
+      if (!session) {
+        return { success: false, error: 'Wallet not connected. Please connect your wallet first.' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
 
       let txBuilder = new TransactionBuilder(sourceAccount, {
@@ -361,6 +440,33 @@ export class StellarTerminalService {
       }
 
       const transaction = txBuilder.setTimeout(300).build();
+
+      // If no secret key, return unsigned XDR for Freighter signing
+      if (!session.secretKey) {
+        const xdr = transaction.toXDR();
+        return {
+          success: true,
+          requiresSigning: true,
+          unsignedXdr: xdr,
+          actionCard: {
+            title: '💸 Batch Transfer',
+            description: `Send ${transfers.length} payment${transfers.length > 1 ? 's' : ''}`,
+            details: {
+              transfers: transfers.map(t => ({
+                to: t.destination.slice(0, 8) + '...' + t.destination.slice(-8),
+                asset: t.asset,
+                amount: t.amount
+              })),
+              wallet: session.publicKey.slice(0, 8) + '...' + session.publicKey.slice(-8),
+              network: 'Testnet',
+              fee: `${parseInt(BASE_FEE) * transfers.length} stroops`
+            }
+          }
+        };
+      }
+
+      // Legacy mode: auto-sign if secret key available
+      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       transaction.sign(sourceKeypair);
 
       const result = await horizonServer.submitTransaction(transaction);
@@ -392,12 +498,19 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { 
+          success: false, 
+          error: 'Session not found. Please connect your wallet first.',
+          message: '⚠️ Please ensure your wallet is connected via the Connect Wallet button in the top-right corner.',
+        };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      console.log(`[Setup Trustline] 🔗 Setting up trustline for ${assetCode}:${issuer}`);
+      console.log(`[Setup Trustline] Session found for: ${session.publicKey}`);
+
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       const asset = new Asset(assetCode, issuer);
 
@@ -414,6 +527,33 @@ export class StellarTerminalService {
         .setTimeout(300)
         .build();
 
+      // If no secret key, return unsigned transaction for Freighter signing
+      if (!sourceKeypair) {
+        console.log(`[Setup Trustline] 🔐 Returning unsigned transaction for Freighter signing`);
+        
+        return {
+          success: true,
+          requiresSigning: true,
+          action: {
+            type: 'setup_trustline',
+            title: `🔗 Setup Trustline for ${assetCode}`,
+            description: `Establish a trustline to receive ${assetCode} tokens from issuer ${issuer.substring(0, 8)}...`,
+            xdr: transaction.toXDR(),
+            details: {
+              asset_code: assetCode,
+              issuer: issuer,
+              limit: limit || 'unlimited',
+              wallet: session.publicKey,
+              network: 'testnet',
+              fee: BASE_FEE,
+            },
+          },
+          message: `Ready to setup trustline for ${assetCode}. Sign the transaction in Freighter to proceed.`,
+        };
+      }
+
+      // If we have secret key (demo/testing mode), auto-sign
+      console.log(`[Setup Trustline] ⚠️ Auto-signing with secret key (demo mode)`);
       transaction.sign(sourceKeypair);
       const result = await horizonServer.submitTransaction(transaction);
 
@@ -422,11 +562,13 @@ export class StellarTerminalService {
         message: `Trustline established for ${assetCode} from issuer ${issuer}`,
         transactionHash: result.hash,
         limit: limit || 'unlimited',
+        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
       };
     } catch (error: any) {
+      console.error('[Setup Trustline] Error:', error);
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to setup trustline',
       };
     }
   }
@@ -438,12 +580,17 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { 
+          success: false, 
+          error: 'Session not found. Please connect your wallet first.',
+        };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
+      console.log(`[Revoke Trustline] 🔓 Revoking trustline for ${assetCode}:${issuer}`);
+
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       const asset = new Asset(assetCode, issuer);
 
@@ -460,6 +607,30 @@ export class StellarTerminalService {
         .setTimeout(300)
         .build();
 
+      // If no secret key, return unsigned transaction for Freighter signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          requiresSigning: true,
+          action: {
+            type: 'revoke_trustline',
+            title: `🔓 Revoke Trustline for ${assetCode}`,
+            description: `Remove trustline for ${assetCode} from issuer ${issuer.substring(0, 8)}...`,
+            xdr: transaction.toXDR(),
+            details: {
+              asset_code: assetCode,
+              issuer: issuer,
+              wallet: session.publicKey,
+              network: 'testnet',
+              fee: BASE_FEE,
+              warning: '⚠️ You will no longer be able to receive this asset after revoking the trustline',
+            },
+          },
+          message: `Ready to revoke trustline for ${assetCode}. Sign the transaction in Freighter to proceed.`,
+        };
+      }
+
+      // Auto-sign if secret key available (demo mode)
       transaction.sign(sourceKeypair);
       const result = await horizonServer.submitTransaction(transaction);
 
@@ -467,11 +638,13 @@ export class StellarTerminalService {
         success: true,
         message: `Trustline revoked for ${assetCode} from issuer ${issuer}`,
         transactionHash: result.hash,
+        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
       };
     } catch (error: any) {
+      console.error('[Revoke Trustline] Error:', error);
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to revoke trustline',
       };
     }
   }
@@ -758,8 +931,9 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      console.log('[upgradeContract] Session lookup:', { sessionId, found: !!session, hasSecretKey: !!session?.secretKey });
+      if (!session) {
+        return { success: false, error: 'Wallet not connected. Please connect your wallet first.' };
       }
 
       // Note: Contract upgrade typically requires calling an 'upgrade' function on the contract
@@ -1337,20 +1511,162 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
+      }
+
+      // Get NFT contract address from environment
+      const nftContractId = process.env.NFT_CONTRACT_ADDRESS;
+      if (!nftContractId) {
+        return {
+          success: false,
+          error: 'NFT contract not configured. Please set NFT_CONTRACT_ADDRESS in environment variables.',
+        };
+      }
+
+      console.log(`[Transfer NFT] 📤 Transferring NFT ${tokenId} to ${toAddress}`);
+
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
+
+      const contract = new Contract(nftContractId);
+
+      // Parse NFT ID - handle both "NFT_123" and "123" formats
+      let nftId: number;
+      if (tokenId.startsWith('NFT_')) {
+        nftId = parseInt(tokenId.replace('NFT_', ''));
+      } else {
+        nftId = parseInt(tokenId);
+      }
+
+      if (isNaN(nftId)) {
+        return {
+          success: false,
+          error: `Invalid NFT ID format: ${tokenId}. Expected format: "NFT_123" or "123"`,
+        };
+      }
+
+      // Validate recipient address
+      if (!toAddress || toAddress.length !== 56) {
+        return {
+          success: false,
+          error: 'Invalid recipient address. Must be a 56-character Stellar address.',
+        };
+      }
+
+      // Build the transfer transaction
+      // Contract function signature: transfer(env: Env, nft_id: u64, from: Address, to: Address)
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 1000).toString(),
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          contract.call(
+            'transfer',
+            nativeToScVal(nftId, { type: 'u64' }), // nft_id as u64
+            new Address(session.publicKey).toScVal(), // from address
+            new Address(toAddress).toScVal() // to address
+          )
+        )
+        .setTimeout(300)
+        .build();
+
+      // Prepare transaction
+      const preparedTx = await sorobanServer.prepareTransaction(transaction);
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: `Ready to transfer NFT #${nftId} to ${toAddress.substring(0, 8)}...`,
+          action: {
+            requiresSigning: true,
+            type: 'transfer_nft',
+            title: `📤 Transfer NFT #${nftId}`,
+            description: `Transfer NFT #${nftId} to ${toAddress.substring(0, 8)}...${toAddress.substring(toAddress.length - 8)}`,
+            xdr: preparedTx.toXDR(),
+            details: {
+              nft_id: nftId,
+              token_id: tokenId,
+              from: session.publicKey,
+              to: toAddress,
+              contract: nftContractId,
+              network: 'testnet',
+              fee: preparedTx.fee,
+            },
+          },
+        };
+      }
+
+      // If we have the secret key, sign and submit
+      preparedTx.sign(sourceKeypair);
+
+      // Submit transaction
+      const result = await sorobanServer.sendTransaction(preparedTx);
+
+      if (result.status === 'PENDING') {
+        // Poll for transaction result
+        const getResponse = await pollUntil(
+          () => sorobanServer.getTransaction(result.hash),
+          (response) =>
+            response !== null &&
+            response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+          {
+            intervalMs: 1000,
+            timeoutMs: 30000,
+          }
+        );
+
+        if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+          console.log(`[Transfer NFT] ✅ NFT ${tokenId} transferred successfully`);
+          
+          return {
+            success: true,
+            message: `NFT #${nftId} has been transferred to ${toAddress}`,
+            tokenId,
+            nftId,
+            from: session.publicKey,
+            to: toAddress,
+            transactionHash: result.hash,
+            link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+          };
+        } else {
+          console.error(`[Transfer NFT] ❌ Transaction failed:`, getResponse);
+          
+          return {
+            success: false,
+            error: 'Transaction failed on the blockchain',
+            details: getResponse,
+          };
+        }
       }
 
       return {
-        success: true,
-        message: `NFT #${tokenId} transferred to ${toAddress}`,
-        tokenId,
-        newOwner: toAddress,
+        success: false,
+        error: 'Transaction submission failed',
+        details: result,
       };
     } catch (error: any) {
+      console.error('[Transfer NFT] Error:', error);
+      
+      // Provide helpful error messages
+      if (error.message?.includes('not found')) {
+        return {
+          success: false,
+          error: `NFT #${tokenId} not found or doesn't exist`,
+        };
+      }
+      
+      if (error.message?.includes('Unauthorized')) {
+        return {
+          success: false,
+          error: `You don't own this NFT or don't have permission to transfer it`,
+        };
+      }
+
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to transfer NFT',
       };
     }
   }
@@ -1559,6 +1875,8 @@ export class StellarTerminalService {
           
           let checkedCount = 0;
           let foundCount = 0;
+          let consecutiveFailures = 0;
+          const MAX_CONSECUTIVE_FAILURES = 10; // Stop after 5 consecutive NFT IDs not found
           
           for (let nftId = 1; nftId <= maxNFTsToCheck; nftId++) {
             try {
@@ -1573,8 +1891,13 @@ export class StellarTerminalService {
               const nftResult = await sorobanServer.simulateTransaction(nftTx);
               
               if (StellarSdk.rpc.Api.isSimulationSuccess(nftResult) && nftResult.result?.retval) {
+                // Successfully found an NFT at this ID
                 checkedCount++;
+                consecutiveFailures = 0; // Reset failure counter
+                
                 const nftData = scValToNative(nftResult.result.retval);
+                
+                console.log(`[List NFTs] 📍 NFT #${nftId} exists. Holder: ${nftData.holder}`);
                 
                 // Check if this NFT is owned by the queried address
                 if (nftData.holder === address) {
@@ -1622,16 +1945,30 @@ export class StellarTerminalService {
                     source: isQuestNFT ? 'quest' : 'vault',
                     type: isQuestNFT ? 'Quest NFT' : 'Vault NFT',
                   });
+                } else {
+                  console.log(`[List NFTs] ⏭️  NFT #${nftId} exists but owned by someone else: ${nftData.holder.substring(0, 8)}...`);
                 }
               } else {
-                // NFT ID doesn't exist in this contract, stop checking this contract
-                console.log(`[List NFTs] 🛑 NFT #${nftId} doesn't exist in contract ${contractAddress.substring(0, 8)}..., moving to next contract`);
-                break;
+                // NFT ID doesn't exist - increment consecutive failures
+                consecutiveFailures++;
+                console.log(`[List NFTs] ⚠️  NFT #${nftId} not found (consecutive failures: ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
+                
+                // Only break after several consecutive failures (to handle gaps in NFT IDs)
+                if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                  console.log(`[List NFTs] 🛑 Reached ${MAX_CONSECUTIVE_FAILURES} consecutive missing NFTs, assuming end of collection`);
+                  break;
+                }
               }
             } catch (nftError: any) {
-              // NFT might not exist or error reading, likely reached the end of this contract
-              console.log(`[List NFTs] 🛑 Error at NFT #${nftId} in contract ${contractAddress.substring(0, 8)}...: ${nftError.message}`);
-              break;
+              // Error reading NFT - could be missing or actual error
+              consecutiveFailures++;
+              console.log(`[List NFTs] ❌ Error at NFT #${nftId}: ${nftError.message} (consecutive failures: ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
+              
+              // Only break after several consecutive failures
+              if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                console.log(`[List NFTs] 🛑 Too many consecutive errors, stopping scan for this contract`);
+                break;
+              }
             }
           }
           
