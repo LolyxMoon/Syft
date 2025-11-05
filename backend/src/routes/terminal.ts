@@ -11,7 +11,13 @@ const router = express.Router();
  */
 router.post('/chat', async (req, res): Promise<void> => {
   try {
-    const { message, sessionId } = req.body;
+    const { message, sessionId, walletAddress } = req.body;
+
+    console.log('[Terminal Route] Received request:', {
+      sessionId,
+      walletAddress: walletAddress || 'NOT PROVIDED',
+      messageLength: message?.length || 0,
+    });
 
     if (!message) {
       res.status(400).json({ error: 'Message is required' });
@@ -49,7 +55,7 @@ router.post('/chat', async (req, res): Promise<void> => {
     jobQueue.createJob(jobId);
 
     // Start processing in background
-    processTerminalChat(jobId, sessionId, message);
+    processTerminalChat(jobId, sessionId, message, walletAddress);
 
     // Return job ID immediately
     res.json({
@@ -70,11 +76,11 @@ router.post('/chat', async (req, res): Promise<void> => {
 /**
  * Background processing function
  */
-async function processTerminalChat(jobId: string, sessionId: string, message: string) {
+async function processTerminalChat(jobId: string, sessionId: string, message: string, walletAddress?: string) {
   try {
     jobQueue.markProcessing(jobId);
 
-    const response = await terminalAIService.chat(sessionId, message);
+    const response = await terminalAIService.chat(sessionId, message, walletAddress);
 
     jobQueue.completeJob(jobId, response);
   } catch (error: any) {
@@ -129,6 +135,76 @@ router.get('/jobs/:jobId', async (req, res): Promise<void> => {
     });
   }
 });
+
+/**
+ * POST /api/terminal/swap
+ * Direct swap function call (used for follow-up swaps after trustline)
+ */
+router.post('/swap', async (req, res): Promise<void> => {
+  try {
+    const { sessionId, fromAsset, toAsset, amount, slippage } = req.body;
+
+    console.log('[Terminal Route] Direct swap request:', {
+      sessionId,
+      fromAsset,
+      toAsset,
+      amount,
+      slippage,
+    });
+
+    if (!sessionId || !fromAsset || !toAsset || !amount) {
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
+    }
+
+    // Create a job ID for this swap request
+    const jobId = `swap_${sessionId}_${Date.now()}`;
+    
+    // Create the job
+    jobQueue.createJob(jobId);
+
+    // Start processing in background
+    processDirectSwap(jobId, sessionId, fromAsset, toAsset, amount, slippage || '0.5');
+
+    // Return job ID immediately
+    res.json({
+      success: true,
+      jobId,
+      status: 'processing',
+      message: 'Swap is being processed',
+    });
+  } catch (error: any) {
+    console.error('Terminal swap error:', error);
+    res.status(500).json({
+      error: 'Failed to process swap',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Background processing for direct swap
+ */
+async function processDirectSwap(
+  jobId: string,
+  sessionId: string,
+  fromAsset: string,
+  toAsset: string,
+  amount: string,
+  slippage: string
+) {
+  try {
+    jobQueue.markProcessing(jobId);
+
+    // Call the swap function directly via terminalAIService
+    const response = await terminalAIService.executeSwap(sessionId, fromAsset, toAsset, amount, slippage);
+
+    jobQueue.completeJob(jobId, response);
+  } catch (error: any) {
+    console.error('Direct swap processing error:', error);
+    jobQueue.failJob(jobId, error.message);
+  }
+}
 
 /**
  * POST /api/terminal/clear

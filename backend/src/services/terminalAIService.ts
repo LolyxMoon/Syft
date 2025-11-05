@@ -1,5 +1,6 @@
 import { openai } from '../lib/openaiClient.js';
 import { stellarTerminalService } from './stellarTerminalService.js';
+import { tavilyService } from './tavilyService.js';
 
 /**
  * OpenAI Function Definitions for Stellar Terminal
@@ -41,7 +42,7 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'get_balance',
-    description: 'Show all balances (XLM + custom assets) for an account including trustlines.',
+    description: 'Show all balances (XLM + custom assets) for an account including trustlines. Use ONLY when user explicitly asks to check/show balance. When user requests swap/transfer with relative amounts (half, 50%, etc.), use this to calculate then IMMEDIATELY proceed with the action.',
     parameters: {
       type: 'object',
       properties: {
@@ -299,21 +300,21 @@ const TERMINAL_FUNCTIONS = [
   // DEX & LIQUIDITY FUNCTIONS
   {
     name: 'swap_assets',
-    description: 'Swap assets on testnet DEX with slippage protection.',
+    description: 'Swap assets on testnet DEX with slippage protection. Call this IMMEDIATELY when user requests a swap - even if you need to check balance first for percentage calculations.',
     parameters: {
       type: 'object',
       properties: {
         fromAsset: {
           type: 'string',
-          description: 'Asset to swap from',
+          description: 'Asset to swap from (e.g., XLM, USDC)',
         },
         toAsset: {
           type: 'string',
-          description: 'Asset to swap to',
+          description: 'Asset to swap to (e.g., XLM, USDC)',
         },
         amount: {
           type: 'string',
-          description: 'Amount to swap',
+          description: 'Exact amount to swap (calculate from balance if user said "half", "50%", etc.)',
         },
         slippage: {
           type: 'string',
@@ -546,6 +547,25 @@ const TERMINAL_FUNCTIONS = [
       required: ['address'],
     },
   },
+  {
+    name: 'web_search',
+    description: 'Search the web for real-time information using Tavily advanced search. Use this freely when you need to find: asset issuer addresses, contract addresses, Stellar documentation, protocol information, current market data, or any information not in your knowledge base. ALWAYS use this for asset issuers when user doesn\'t provide them. You can call this multiple times to refine your search.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query (e.g., "Stellar testnet USDC issuer address", "BTC token issuer on Stellar testnet", "Soroswap router contract address"). Be specific and include "Stellar testnet" for testnet assets.',
+        },
+        maxResults: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 10, max: 20)',
+          default: 10,
+        },
+      },
+      required: ['query'],
+    },
+  },
 ];
 
 /**
@@ -555,8 +575,29 @@ const TERMINAL_FUNCTIONS = [
 export class TerminalAIService {
   private conversationHistory: Map<string, any[]> = new Map();
 
-  async chat(sessionId: string, message: string): Promise<any> {
+  async chat(sessionId: string, message: string, walletAddress?: string): Promise<any> {
     try {
+      // Auto-connect wallet if provided
+      if (walletAddress) {
+        const service = stellarTerminalService;
+        const existingSession = (service as any).sessions?.get(sessionId);
+        
+        // Always ensure wallet is connected (update if needed)
+        if (!existingSession || existingSession.publicKey !== walletAddress) {
+          console.log(`[Terminal AI] Auto-connecting wallet ${walletAddress} to session ${sessionId}`);
+          // Auto-connect the wallet to this session (view-only mode without secret key)
+          (service as any).sessions = (service as any).sessions || new Map();
+          (service as any).sessions.set(sessionId, { 
+            publicKey: walletAddress,
+            secretKey: undefined // No secret key - will prompt user when signing is needed
+          });
+        } else {
+          console.log(`[Terminal AI] Wallet already connected: ${walletAddress}`);
+        }
+      } else {
+        console.log(`[Terminal AI] No wallet address provided for session ${sessionId}`);
+      }
+
       // Get or initialize conversation history
       if (!this.conversationHistory.has(sessionId)) {
         this.conversationHistory.set(sessionId, [
@@ -565,7 +606,7 @@ export class TerminalAIService {
             content: `You are a helpful Stellar blockchain assistant. You can help users interact with the Stellar testnet through natural language.
 
 Key capabilities:
-- Wallet management (connect, fund, check balances)
+- Wallet management (fund, check balances)
 - Asset operations (create, transfer, batch transfers)
 - Trustlines (setup, revoke)
 - Smart contracts (deploy, invoke, read, upgrade)
@@ -573,9 +614,91 @@ Key capabilities:
 - NFTs (mint, transfer, burn, list)
 - Transaction management (simulate, history, explorer)
 - Network analytics and price oracles
+- Web search (Tavily) - for real-time information lookup
+
+IMPORTANT - Web Search Usage:
+You have access to web_search function with ADVANCED search mode for deep, accurate results. Use it FREELY and MULTIPLE TIMES if needed:
+- Asset issuer addresses (e.g., "Stellar testnet USDC issuer address", "BTC token Stellar testnet issuer", "random testnet asset issuers")
+- Contract addresses (e.g., "Soroswap router address")
+- Protocol documentation or guides
+- Current market information
+- Any information you're uncertain about
+
+When user asks to swap/transfer assets without providing issuer addresses:
+1. Web search for the asset issuer (be specific: include "Stellar testnet" in your query)
+2. If first search doesn't find a valid issuer, try different search terms
+3. Use multiple searches if needed to find accurate information
+4. Once you have the issuer, proceed with the swap/transfer operation
+
+CRITICAL TESTNET LIMITATION:
+Stellar testnet has VERY LIMITED liquidity pools. Most swaps will fail with "No path found for this swap".
+Known working swaps on testnet:
+- XLM ↔ USDC (issuer: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5) ✅
+
+If user requests swap to "random token" or any non-USDC asset:
+1. Inform them that testnet has limited liquidity
+2. Suggest swapping to USDC as the only reliable option
+3. Explain that mainnet has many more trading pairs
+4. DO NOT attempt swaps to tokens without confirmed liquidity pools
+
+Example response:
+"Stellar testnet has limited liquidity pools. The most reliable swap on testnet is XLM ↔ USDC. Would you like me to swap your XLM to USDC instead? On mainnet, there are many more token pairs available."
+
+CRITICAL: Do NOT show web search results in your response! Web search is a SILENT helper tool. Only show the final blockchain operation (swap, transfer, trustline) to the user. Your reasoning is internal - just present the final action.
+
+IMPORTANT - Wallet Integration:
+The user's wallet is already connected to the platform${walletAddress ? ` (${walletAddress})` : ''}. When they ask about "my wallet" or "my balance", use their connected wallet address.
+
+IMPORTANT - Transaction Execution:
+When a user clearly requests a blockchain operation (transfer, swap, deploy, etc.), IMMEDIATELY call the appropriate function. DO NOT ask for confirmation or secret keys first.
+- The functions will automatically return an interactive UI card for the user to sign with their wallet
+- Users will see a "Sign & Send" button that triggers their wallet popup (Freighter)
+- This is secure and production-ready - never ask users for secret keys in chat
+
+Examples of direct execution:
+- "Transfer 100 XLM to GABC..." → Immediately call transfer_asset function
+- "Swap 50 XLM for USDC" → Immediately call swap_assets function
+- "Deploy contract with hash XYZ" → Immediately call deploy_contract function
+
+IMPORTANT - Handling Percentage/Relative Amounts (MULTI-STEP OPERATIONS):
+When users say "swap half of my XLM" or "transfer 50% of my balance", you MUST perform BOTH steps:
+1. Call get_balance to determine the exact amount
+2. THEN IMMEDIATELY call swap_assets/transfer_asset with the calculated amount in the SAME conversation turn
+
+You have the ability to call MULTIPLE functions in sequence. Use this for:
+- Percentage-based swaps/transfers
+- Operations that need balance checking first
+- Multi-step workflows
+
+Example flow for "swap half of my XLM to USDC":
+STEP 1: Call get_balance(publicKey: "GBWFM...") 
+STEP 2: See result → 12892.8809766 XLM
+STEP 3: Calculate half → 6446.4404883 XLM
+STEP 4: IMMEDIATELY call swap_assets(fromAsset: "XLM", toAsset: "USDC", amount: "6446.4404883")
+
+DO NOT stop after get_balance! Continue with the actual swap operation in the same turn.
+
+IMPORTANT - Trustline Requirements:
+When swapping to a non-XLM asset, the user MUST have a trustline established for that asset first.
+If the swap_assets function returns a "setup_trustline" action:
+1. Explain to the user that they need to establish a trustline first
+2. Tell them to sign the trustline transaction
+3. The system will AUTOMATICALLY proceed with the swap after the trustline is signed (no need for user to retry)
+4. The follow-up swap will happen seamlessly in the background
+
+Example response for trustline requirement:
+"To receive USDC, you first need a trustline for USDC on the Testnet. I've prepared the trustline transaction - sign it in Freighter, then I'll automatically proceed with your swap!"
+
+IMPORTANT - Response Formatting for Actions:
+When a function returns an action object (requiresSigning: true), format your response VERY CONCISELY:
+- DO NOT include or mention the XDR string - it's too long and will cause display issues
+- Provide a SHORT, friendly summary of what's happening
+- Include key details: from/to addresses (truncated), amount, asset, network
+- Mention that they'll see a Freighter popup to sign & approve
+- Keep it brief - just a few lines - the action card UI shows the details
+- Example format: "✅ Ready to transfer 1000 XLM to GCXHLDX... via Freighter. Click the button below to sign."
 
 Always be friendly, explain technical concepts clearly, and provide transaction links when operations complete.
-When users ask about blockchain operations, use the appropriate function calls.
 Format transaction hashes and addresses nicely for readability.`,
           },
         ]);
@@ -603,40 +726,122 @@ Format transaction hashes and addresses nicely for readability.`,
 
       // Check if AI wants to call a function
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        const toolCall = assistantMessage.tool_calls[0];
-        const functionName = toolCall.function.name;
-        const functionArgs = JSON.parse(toolCall.function.arguments);
+        // Store the first function call info
+        let firstFunctionName = assistantMessage.tool_calls[0].function.name;
+        let lastFunctionResult: any;
 
-        // Execute the blockchain function
-        const functionResult = await this.executeFunction(
-          sessionId,
-          functionName,
-          functionArgs
-        );
-
-        // Add function call and result to history
+        // Add assistant message with tool calls to history
         history.push(assistantMessage);
-        history.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(functionResult),
-        });
 
-        // Get AI's interpretation of the result
-        const secondResponse = await openai.chat.completions.create({
+        // Execute all tool calls requested by the AI
+        for (const toolCall of assistantMessage.tool_calls) {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+
+          console.log(`[Terminal AI] Executing function: ${functionName}`, functionArgs);
+
+          // Execute the blockchain function
+          const functionResult = await this.executeFunction(
+            sessionId,
+            functionName,
+            functionArgs
+          );
+
+          lastFunctionResult = functionResult;
+
+          // Add function result to history
+          history.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(functionResult),
+          });
+        }
+
+        // Allow AI to potentially call MORE functions based on results (multi-step operations)
+        // This enables "get balance then swap" workflows
+        let continueChain = true;
+        let maxIterations = 5; // Prevent infinite loops (increased for web_search + trustline + swap chains)
+        let iteration = 0;
+        let primaryFunctionName = firstFunctionName; // Track the primary operation
+        let primaryFunctionResult = lastFunctionResult;
+
+        while (continueChain && iteration < maxIterations) {
+          iteration++;
+          
+          // Get AI's next action based on previous results
+          const nextResponse = await openai.chat.completions.create({
+            model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
+            messages: history,
+            tools,
+            tool_choice: 'auto',
+            temperature: 0.7,
+          });
+
+          const nextMessage = nextResponse.choices[0].message;
+
+          // Check if AI wants to call more functions
+          if (nextMessage.tool_calls && nextMessage.tool_calls.length > 0) {
+            console.log(`[Terminal AI] Chain iteration ${iteration}: AI calling more functions`);
+            
+            history.push(nextMessage);
+
+            // Execute the new tool calls
+            for (const toolCall of nextMessage.tool_calls) {
+              const functionName = toolCall.function.name;
+              const functionArgs = JSON.parse(toolCall.function.arguments);
+
+              console.log(`[Terminal AI] Chain executing: ${functionName}`, functionArgs);
+
+              const functionResult = await this.executeFunction(
+                sessionId,
+                functionName,
+                functionArgs
+              );
+
+              // Track the primary operation (skip web_search as it's just a helper)
+              if (functionName !== 'web_search') {
+                primaryFunctionName = functionName;
+                primaryFunctionResult = functionResult;
+              }
+
+              lastFunctionResult = functionResult;
+
+              history.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: JSON.stringify(functionResult),
+              });
+            }
+          } else {
+            // No more function calls, get final response
+            continueChain = false;
+            history.push(nextMessage);
+
+            return {
+              success: true,
+              message: nextMessage.content,
+              functionCalled: primaryFunctionName, // Return the PRIMARY function (not web_search)
+              functionResult: primaryFunctionResult,
+              type: 'function_call',
+            };
+          }
+        }
+
+        // If we hit max iterations, get final response
+        const finalResponse = await openai.chat.completions.create({
           model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
           messages: history,
           temperature: 0.7,
         });
 
-        const finalMessage = secondResponse.choices[0].message;
+        const finalMessage = finalResponse.choices[0].message;
         history.push(finalMessage);
 
         return {
           success: true,
           message: finalMessage.content,
-          functionCalled: functionName,
-          functionResult,
+          functionCalled: primaryFunctionName, // Use primary function, not web_search
+          functionResult: primaryFunctionResult,
           type: 'function_call',
         };
       } else {
@@ -781,6 +986,8 @@ Format transaction hashes and addresses nicely for readability.`,
         // Utilities
         case 'resolve_federated_address':
           return await service.resolveFederatedAddress(args.address);
+        case 'web_search':
+          return await this.webSearch(args.query, args.maxResults);
 
         default:
           return {
@@ -796,8 +1003,158 @@ Format transaction hashes and addresses nicely for readability.`,
     }
   }
 
+  /**
+   * Web search using Tavily for real-time information
+   */
+  private async webSearch(query: string, maxResults: number = 10): Promise<any> {
+    try {
+      if (!tavilyService.isConfigured()) {
+        return {
+          success: false,
+          error: 'Web search is not available. Tavily API key not configured.',
+          message: 'Please ask the user to configure TAVILY_API_KEY in environment variables.',
+        };
+      }
+
+      console.log(`[Terminal AI] Web search: "${query}"`);
+
+      const searchResults = await tavilyService.search(query, {
+        searchDepth: 'advanced', // Use advanced mode for deeper, more accurate results
+        maxResults,
+        includeAnswer: true,
+        includeDomains: [
+          'stellar.org',
+          'soroban.stellar.org',
+          'developers.stellar.org',
+          'stellar.expert',
+          'github.com',
+          'docs.stellar.org',
+        ],
+      });
+
+      // Format results for AI consumption
+      const formattedResults = searchResults.results.map(r => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.content.slice(0, 300), // First 300 chars
+      }));
+
+      return {
+        success: true,
+        query,
+        answer: searchResults.answer,
+        results: formattedResults,
+        message: `Found ${formattedResults.length} results for: ${query}`,
+      };
+    } catch (error: any) {
+      console.error('[Terminal AI] Web search error:', error);
+      return {
+        success: false,
+        error: error.message,
+        message: 'Web search failed. Please try again or rephrase your query.',
+      };
+    }
+  }
+
   clearHistory(sessionId: string): void {
     this.conversationHistory.delete(sessionId);
+  }
+
+  /**
+   * Execute swap directly (used for follow-up swaps after trustline)
+   * This maintains conversation context while directly calling the swap function
+   */
+  async executeSwap(
+    sessionId: string,
+    fromAsset: string,
+    toAsset: string,
+    amount: string,
+    slippage: string = '0.5'
+  ): Promise<any> {
+    try {
+      console.log('[Terminal AI] Direct swap execution:', { sessionId, fromAsset, toAsset, amount, slippage });
+      
+      // Get conversation history to maintain context
+      const history = this.conversationHistory.get(sessionId);
+      
+      // Add system message about auto-continuation
+      if (history) {
+        history.push({
+          role: 'assistant',
+          content: `[Auto-continuing after trustline setup] Now executing swap: ${amount} ${fromAsset} → ${toAsset}`,
+        });
+      }
+      
+      const service = stellarTerminalService;
+      const result = await service.swapAssets(sessionId, fromAsset, toAsset, amount, slippage);
+
+      // Add the swap execution to conversation history
+      if (history) {
+        history.push({
+          role: 'assistant',
+          content: `Executed swap_assets function with parameters: fromAsset=${fromAsset}, toAsset=${toAsset}, amount=${amount}, slippage=${slippage}`,
+        });
+        
+        history.push({
+          role: 'tool',
+          content: JSON.stringify(result),
+        });
+      }
+
+      // Format response similar to chat responses
+      if (result.action) {
+        const responseMessage = `✅ Ready to swap ${amount} ${fromAsset} to ${toAsset.split(':')[0]}. Expected output: ~${result.action.details.expected_output}. You'll see a Freighter popup to sign & approve.`;
+        
+        if (history) {
+          history.push({
+            role: 'assistant',
+            content: responseMessage,
+          });
+        }
+        
+        return {
+          success: true,
+          message: responseMessage,
+          functionCalled: 'swap_assets',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      const responseMessage = result.message || (result.success ? 'Swap completed successfully' : 'Swap failed');
+      
+      if (history) {
+        history.push({
+          role: 'assistant',
+          content: responseMessage,
+        });
+      }
+
+      return {
+        success: result.success,
+        message: responseMessage,
+        functionCalled: 'swap_assets',
+        functionResult: result,
+        type: 'function_call',
+      };
+    } catch (error: any) {
+      console.error('[Terminal AI] Direct swap error:', error);
+      
+      // Add error to conversation history
+      const history = this.conversationHistory.get(sessionId);
+      if (history) {
+        history.push({
+          role: 'assistant',
+          content: `Error executing auto-swap: ${error.message}`,
+        });
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        message: `Failed to execute swap: ${error.message}`,
+      };
+    }
   }
 }
 

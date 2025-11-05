@@ -349,8 +349,8 @@ export function NaturalLanguageBuilder({
       if (data.jobId && data.status === 'processing') {
         console.log('[Chat] Async job detected, polling for results...');
         
-        // Poll for results
-        const maxAttempts = 60; // 60 seconds max
+        // Poll for results - 10 minutes max for complex vault generation with web search
+        const maxAttempts = 600; // 600 attempts × 1 second = 10 minutes
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
           
@@ -373,7 +373,7 @@ export function NaturalLanguageBuilder({
         }
         
         if (data.status === 'processing') {
-          throw new Error('Request timeout - please try again');
+          throw new Error('Request timeout after 10 minutes - operation may be too complex or stuck');
         }
       }
 

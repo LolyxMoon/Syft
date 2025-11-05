@@ -47,7 +47,7 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
 
   // Helper function to poll for job status
   const pollJobStatus = async (jobId: string): Promise<any> => {
-    const maxAttempts = 120; // Poll for up to 60 seconds
+    const maxAttempts = 600; // Poll for up to 10 minutes (600 seconds)
     const pollInterval = 1000; // Poll every 1 second
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -80,7 +80,7 @@ export function AISuggestions({ vaultId, onApplySuggestion }: AISuggestionsProps
       }
     }
     
-    throw new Error('Job timed out - took longer than expected');
+    throw new Error('Job timed out after 10 minutes - operation may be too complex or stuck');
   };
 
   const generateNewSuggestions = async () => {

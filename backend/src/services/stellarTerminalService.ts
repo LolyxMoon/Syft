@@ -239,12 +239,17 @@ export class StellarTerminalService {
     memo?: string
   ): Promise<any> {
     try {
+      console.log(`[transferAsset] Looking for session: ${sessionId}`);
+      console.log(`[transferAsset] Sessions map has ${this.sessions.size} entries`);
+      
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
+      console.log(`[transferAsset] Session found:`, session ? `publicKey=${session.publicKey}` : 'NOT FOUND');
+      
+      if (!session || !session.publicKey) {
+        console.error(`[transferAsset] No session found for ${sessionId}`);
         return { success: false, error: 'Wallet not connected' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
 
       let stellarAsset: Asset;
@@ -255,7 +260,7 @@ export class StellarTerminalService {
         stellarAsset = new Asset(code, issuer);
       }
 
-      const transaction = new TransactionBuilder(sourceAccount, {
+      const transactionBuilder = new TransactionBuilder(sourceAccount, {
         fee: BASE_FEE,
         networkPassphrase: Networks.TESTNET,
       })
@@ -266,23 +271,50 @@ export class StellarTerminalService {
             amount,
           })
         )
-        .setTimeout(30);
+        .setTimeout(300); // 5 minutes to give user time to review and sign
 
       if (memo) {
-        transaction.addMemo(Memo.text(memo));
+        transactionBuilder.addMemo(Memo.text(memo));
       }
 
-      const built = transaction.build();
-      built.sign(sourceKeypair);
+      const transaction = transactionBuilder.build();
 
-      const result = await horizonServer.submitTransaction(built);
+      // Check if user has secret key (auto-sign mode)
+      if (session.secretKey) {
+        const sourceKeypair = Keypair.fromSecret(session.secretKey);
+        transaction.sign(sourceKeypair);
 
+        const result = await horizonServer.submitTransaction(transaction);
+
+        return {
+          success: true,
+          message: `Successfully transferred ${amount} ${asset} to ${destination}`,
+          transactionHash: result.hash,
+          ledger: result.ledger,
+          link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+        };
+      }
+
+      // No secret key - return unsigned transaction for wallet signing
       return {
         success: true,
-        message: `Successfully transferred ${amount} ${asset} to ${destination}`,
-        transactionHash: result.hash,
-        ledger: result.ledger,
-        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+        requiresSigning: true,
+        action: {
+          type: 'transfer_asset',
+          title: 'Transfer Asset',
+          description: `Transfer ${amount} ${asset} to ${destination}`,
+          xdr: transaction.toXDR(),
+          details: {
+            from: session.publicKey,
+            to: destination,
+            asset,
+            amount,
+            memo: memo || 'None',
+            fee: BASE_FEE,
+            network: 'testnet',
+          },
+        },
+        message: `Please review and sign the transaction to transfer ${amount} ${asset}.`,
       };
     } catch (error: any) {
       return {
@@ -328,7 +360,7 @@ export class StellarTerminalService {
         );
       }
 
-      const transaction = txBuilder.setTimeout(30).build();
+      const transaction = txBuilder.setTimeout(300).build();
       transaction.sign(sourceKeypair);
 
       const result = await horizonServer.submitTransaction(transaction);
@@ -379,7 +411,7 @@ export class StellarTerminalService {
             limit: limit || undefined,
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
 
       transaction.sign(sourceKeypair);
@@ -425,7 +457,7 @@ export class StellarTerminalService {
             limit: '0', // Setting limit to 0 removes the trustline
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
 
       transaction.sign(sourceKeypair);
@@ -455,12 +487,12 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       // Create deployer address from the source account
       const deployerAddress = new Address(session.publicKey);
@@ -476,11 +508,32 @@ export class StellarTerminalService {
             wasmHash: Buffer.from(wasmHash, 'hex'),
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
 
       // Prepare transaction (simulate and add resource fees)
       const preparedTx = await sorobanServer.prepareTransaction(transaction);
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: 'Please sign this transaction with your wallet to deploy the contract.',
+          action: {
+            type: 'deploy_contract',
+            title: 'Deploy Smart Contract',
+            description: `Deploy contract with WASM hash ${wasmHash.substring(0, 8)}...`,
+            xdr: preparedTx.toXDR(),
+            details: {
+              wasm_hash: wasmHash,
+              deployer: session.publicKey,
+              network: 'testnet',
+              fee: preparedTx.fee,
+            },
+          },
+        };
+      }
+
       preparedTx.sign(sourceKeypair);
 
       // Submit transaction
@@ -534,12 +587,12 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       const contract = new Contract(contractId);
 
@@ -565,11 +618,33 @@ export class StellarTerminalService {
         networkPassphrase: Networks.TESTNET,
       })
         .addOperation(contract.call(method, ...scArgs))
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
 
       // Prepare transaction
       const preparedTx = await sorobanServer.prepareTransaction(transaction);
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: 'Please sign this transaction with your wallet to invoke the contract.',
+          action: {
+            type: 'invoke_contract',
+            title: `Call ${method}()`,
+            description: `Invoke method '${method}' on contract ${contractId.substring(0, 8)}...`,
+            xdr: preparedTx.toXDR(),
+            details: {
+              contract: contractId,
+              method: method,
+              arguments: JSON.stringify(args),
+              network: 'testnet',
+              fee: preparedTx.fee,
+            },
+          },
+        };
+      }
+
       preparedTx.sign(sourceKeypair);
 
       // Submit transaction
@@ -645,7 +720,7 @@ export class StellarTerminalService {
         networkPassphrase: Networks.TESTNET,
       })
         .addOperation(contract.call(method, ...scArgs))
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
 
       // Simulate the transaction (doesn't submit to network)
@@ -716,12 +791,12 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       // Parse assets
       let sendAsset: Asset;
@@ -739,6 +814,70 @@ export class StellarTerminalService {
       } else {
         const [code, issuer] = toAsset.split(':');
         destAsset = new Asset(code, issuer);
+      }
+
+      // Check if trustlines exist for non-native assets
+      const balances = sourceAccount.balances;
+      const needsTrustlines: Array<{code: string, issuer: string}> = [];
+
+      // Check destination asset trustline (the one we're receiving)
+      if (!destAsset.isNative()) {
+        const hasTrustline = balances.some(
+          (balance: any) =>
+            balance.asset_code === destAsset.getCode() &&
+            balance.asset_issuer === destAsset.getIssuer()
+        );
+        
+        if (!hasTrustline) {
+          needsTrustlines.push({
+            code: destAsset.getCode(),
+            issuer: destAsset.getIssuer(),
+          });
+        }
+      }
+
+      // If trustlines are needed and no secret key, return action to setup trustlines first
+      if (needsTrustlines.length > 0 && !sourceKeypair) {
+        const trustlineOps = needsTrustlines.map(asset =>
+          Operation.changeTrust({
+            asset: new Asset(asset.code, asset.issuer),
+          })
+        );
+
+        const trustlineTransaction = new TransactionBuilder(sourceAccount, {
+          fee: BASE_FEE,
+          networkPassphrase: Networks.TESTNET,
+        });
+
+        trustlineOps.forEach(op => trustlineTransaction.addOperation(op));
+        
+        const trustlineTx = trustlineTransaction.setTimeout(300).build();
+
+        return {
+          success: true,
+          message: `To receive ${toAsset}, you first need a trustline for ${needsTrustlines.map(a => a.code).join(', ')} on the Testnet.\n\nI've prepared the trustline transaction for ${needsTrustlines.map(a => `${a.code} (issuer: ${a.issuer})`).join(', ')}). Sign it in Freighter, then **I'll automatically proceed with your swap**.\n\n**What you'll do:**\n- Sign&Approve the trustline in Freighter.\n- The swap will proceed automatically after signing.\n\nIf you'd like, you can also retry manually after signing.`,
+          action: {
+            type: 'setup_trustline',
+            title: 'Setup Trustline Required',
+            description: `Establish trustline for ${needsTrustlines.map(a => a.code).join(', ')} before swapping`,
+            xdr: trustlineTx.toXDR(),
+            details: {
+              assets: needsTrustlines,
+              network: 'testnet',
+              reason: 'Required to receive swapped assets',
+            },
+            // Store the original swap parameters for auto-continuation
+            followUpAction: {
+              type: 'swap_assets',
+              params: {
+                fromAsset,
+                toAsset,
+                amount,
+                slippage,
+              },
+            },
+          },
+        };
       }
 
       // Find path for the swap
@@ -772,8 +911,31 @@ export class StellarTerminalService {
             destMin: minAmount,
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: 'Please sign this transaction with your wallet to complete the swap.',
+          action: {
+            type: 'swap_assets',
+            title: 'DEX Swap',
+            description: `Swap ${amount} ${fromAsset} for ~${expectedOutput} ${toAsset}`,
+            xdr: transaction.toXDR(),
+            details: {
+              from_asset: fromAsset,
+              to_asset: toAsset,
+              from_amount: amount,
+              expected_output: expectedOutput,
+              min_output: minAmount,
+              slippage: `${slippage}%`,
+              network: 'testnet',
+            },
+          },
+        };
+      }
 
       transaction.sign(sourceKeypair);
 
@@ -805,12 +967,12 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       // Parse assets
       let stellarAsset1: Asset;
@@ -853,8 +1015,30 @@ export class StellarTerminalService {
             maxPrice: { n: 2, d: 1 }, // Max price ratio
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: 'Please sign this transaction with your wallet to add liquidity.',
+          action: {
+            type: 'add_liquidity',
+            title: 'Add Liquidity',
+            description: `Add ${amount1} ${asset1} + ${amount2} ${asset2} to pool`,
+            xdr: transaction.toXDR(),
+            details: {
+              asset1: asset1,
+              asset2: asset2,
+              amount1: amount1,
+              amount2: amount2,
+              pool_id: poolId,
+              network: 'testnet',
+            },
+          },
+        };
+      }
 
       transaction.sign(sourceKeypair);
 
@@ -881,12 +1065,12 @@ export class StellarTerminalService {
   ): Promise<any> {
     try {
       const session = this.sessions.get(sessionId);
-      if (!session || !session.secretKey) {
-        return { success: false, error: 'Wallet not connected' };
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
-      const sourceKeypair = Keypair.fromSecret(session.secretKey);
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
       // Build transaction to withdraw from liquidity pool
       const transaction = new TransactionBuilder(sourceAccount, {
@@ -901,8 +1085,27 @@ export class StellarTerminalService {
             minAmountB: '0',
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: 'Please sign this transaction with your wallet to remove liquidity.',
+          action: {
+            type: 'remove_liquidity',
+            title: 'Remove Liquidity',
+            description: `Withdraw ${lpTokens} LP tokens from pool`,
+            xdr: transaction.toXDR(),
+            details: {
+              pool_id: poolId,
+              lp_tokens: lpTokens,
+              network: 'testnet',
+            },
+          },
+        };
+      }
 
       transaction.sign(sourceKeypair);
 
@@ -1397,3 +1600,4 @@ export class StellarTerminalService {
 }
 
 export const stellarTerminalService = new StellarTerminalService();
+

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Terminal as TerminalIcon, Sparkles, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { useWallet } from '../providers/WalletProvider';
+import { TerminalActionCard, TransactionAction } from '../components/TerminalActionCard';
 
 // Backend API URL configuration
 const API_BASE_URL = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
@@ -14,9 +16,14 @@ interface Message {
   functionCalled?: string;
   functionResult?: any;
   type?: 'text' | 'function_call';
+  action?: TransactionAction; // Action requiring user interaction
 }
 
 const Terminal = () => {
+  // Get connected wallet from WalletProvider
+  const { address: walletAddress } = useWallet();
+  const isConnected = !!walletAddress; // Wallet is connected if address exists
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
@@ -25,7 +32,7 @@ const Terminal = () => {
 
 I'm your intelligent blockchain assistant for the Stellar testnet. I can help you with:
 
-✨ **Wallet Operations:** Connect wallets, check balances, fund from faucet
+✨ **Wallet Operations:** Check balances, fund from faucet
 💰 **Asset Management:** Create assets, transfer funds, batch transactions
 🔗 **Trustlines:** Setup and manage asset trustlines
 📜 **Smart Contracts:** Deploy, invoke, and upgrade Soroban contracts
@@ -35,11 +42,13 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 🔍 **Explorer:** Search transactions and accounts
 
 **Try asking me:**
-- "Connect my wallet and show me my balance"
+- "Show me my balance"
 - "Fund my account from the faucet"
 - "Transfer 100 XLM to [address]"
 - "What's the current XLM/USDC price?"
 - "Show me the latest network stats"
+
+${isConnected ? `✅ **Wallet Connected:** ${walletAddress}` : '⚠️ **Please connect your wallet** using the button in the top-right corner.'}
 
 Let's build on Stellar! 🌟`,
       timestamp: new Date(),
@@ -60,8 +69,44 @@ Let's build on Stellar! 🌟`,
     scrollToBottom();
   }, [messages]);
 
+  // Update welcome message when wallet connection changes
+  useEffect(() => {
+    setMessages((prev) => {
+      const newMessages = [...prev];
+      if (newMessages.length > 0 && newMessages[0].id === '0') {
+        newMessages[0] = {
+          ...newMessages[0],
+          content: `🚀 **Welcome to Stellar Terminal AI!**
+
+I'm your intelligent blockchain assistant for the Stellar testnet. I can help you with:
+
+✨ **Wallet Operations:** Check balances, fund from faucet
+💰 **Asset Management:** Create assets, transfer funds, batch transactions
+🔗 **Trustlines:** Setup and manage asset trustlines
+📜 **Smart Contracts:** Deploy, invoke, and upgrade Soroban contracts
+💱 **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
+🎨 **NFTs:** Mint, transfer, burn, and list NFTs
+📊 **Analytics:** Transaction history, network stats, price oracles
+🔍 **Explorer:** Search transactions and accounts
+
+**Try asking me:**
+- "Show me my balance"
+- "Fund my account from the faucet"
+- "Transfer 100 XLM to [address]"
+- "What's the current XLM/USDC price?"
+- "Show me the latest network stats"
+
+${isConnected ? `✅ **Wallet Connected:** ${walletAddress}` : '⚠️ **Please connect your wallet** using the button in the top-right corner.'}
+
+Let's build on Stellar! 🌟`,
+        };
+      }
+      return newMessages;
+    });
+  }, [isConnected, walletAddress]);
+
   const pollJobStatus = async (jobId: string): Promise<any> => {
-    const maxAttempts = 60; // 60 attempts = 30 seconds max
+    const maxAttempts = 1200; // 1200 attempts × 500ms = 10 minutes max (for complex operations like web search + multi-step functions)
     const pollInterval = 500; // Poll every 500ms
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -84,7 +129,7 @@ Let's build on Stellar! 🌟`,
       }
     }
 
-    throw new Error('Request timeout - please try again');
+    throw new Error('Request timeout after 10 minutes - operation may be too complex or stuck');
   };
 
   const sendMessage = async () => {
@@ -104,9 +149,16 @@ Let's build on Stellar! 🌟`,
 
     try {
       // Start the background job
+      console.log('[Terminal] Sending message with wallet:', {
+        sessionId,
+        walletAddress: isConnected ? walletAddress : undefined,
+        isConnected,
+      });
+      
       const startResponse = await axios.post(`${API_BASE_URL}/api/terminal/chat`, {
         message: input,
         sessionId,
+        walletAddress: isConnected ? walletAddress : undefined,
       });
 
       if (!startResponse.data.success || !startResponse.data.jobId) {
@@ -127,6 +179,7 @@ Let's build on Stellar! 🌟`,
           functionCalled: result.functionCalled,
           functionResult: result.functionResult,
           type: result.type,
+          action: result.functionResult?.action, // Include action if present
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -197,8 +250,37 @@ Let's build on Stellar! 🌟`,
         );
       }
 
-      // Links
+      // Links - support both markdown style [text](url) and plain URLs
       if (line.includes('http')) {
+        // Check for markdown-style links first: [text](url)
+        const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+        if (markdownLinkRegex.test(line)) {
+          const parts = line.split(/(\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g);
+          return (
+            <div key={idx} className="mb-1">
+              {parts.map((part, i) => {
+                const match = part.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/);
+                if (match) {
+                  const [, text, url] = match;
+                  return (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary-400 hover:text-primary-300 underline"
+                    >
+                      {text}
+                    </a>
+                  );
+                }
+                return <span key={i}>{part}</span>;
+              })}
+            </div>
+          );
+        }
+        
+        // Fall back to plain URL detection
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const parts = line.split(urlRegex);
         return (
@@ -212,7 +294,7 @@ Let's build on Stellar! 🌟`,
                   rel="noopener noreferrer"
                   className="text-primary-400 hover:text-primary-300 underline"
                 >
-                  {part}
+                  View on Explorer
                 </a>
               ) : (
                 <span key={i}>{part}</span>
@@ -330,11 +412,98 @@ Let's build on Stellar! 🌟`,
                   </div>
                 )}
 
-                <div className="text-sm text-neutral-200 leading-relaxed">
+                <div className="text-sm text-neutral-200 leading-relaxed break-words overflow-hidden">
                   {formatContent(message.content)}
                 </div>
 
                 {message.functionResult && renderFunctionResult(message.functionResult)}
+
+                {message.action && (
+                  <TerminalActionCard
+                    action={message.action}
+                    onComplete={async (result) => {
+                      // Add a new message with the transaction result
+                      const network = message.action?.details?.network || 'testnet';
+                      const explorerLink = result.hash 
+                        ? `https://stellar.expert/explorer/${network}/tx/${result.hash}`
+                        : '';
+                      
+                      const resultMessage: Message = {
+                        id: Date.now().toString(),
+                        role: 'assistant',
+                        content: result.success
+                          ? `✅ **Transaction Successful!**\nHash: \`${result.hash}\`\n[View on Stellar Expert](${explorerLink})`
+                          : `❌ **Transaction Failed**\n\nError: ${result.error}`,
+                        timestamp: new Date(),
+                      };
+                      setMessages((prev) => [...prev, resultMessage]);
+
+                      // Check if there's a follow-up action (e.g., swap after trustline)
+                      if (result.success && message.action?.followUpAction) {
+                        const followUp = message.action.followUpAction;
+                        
+                        if (followUp.type === 'swap_assets') {
+                          // Automatically trigger the swap now that trustline is established
+                          const followUpMessage: Message = {
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
+                            content: `🔄 **Trustline established!** Now proceeding with your swap...`,
+                            timestamp: new Date(),
+                          };
+                          setMessages((prev) => [...prev, followUpMessage]);
+
+                          // Trigger the swap directly using the stored parameters
+                          setIsLoading(true);
+                          try {
+                            const { fromAsset, toAsset, amount, slippage } = followUp.params;
+                            
+                            // Call the swap function directly via API instead of sending a chat message
+                            // This preserves the exact asset parameters (with issuer)
+                            const startResponse = await axios.post(`${API_BASE_URL}/api/terminal/swap`, {
+                              sessionId,
+                              fromAsset,
+                              toAsset,
+                              amount,
+                              slippage: slippage || '0.5',
+                            });
+
+                            if (!startResponse.data.success || !startResponse.data.jobId) {
+                              throw new Error('Failed to start swap processing');
+                            }
+
+                            const swapResult = await pollJobStatus(startResponse.data.jobId);
+
+                            if (swapResult.success) {
+                              const swapResponseMessage: Message = {
+                                id: (Date.now() + 2).toString(),
+                                role: 'assistant',
+                                content: swapResult.message,
+                                timestamp: new Date(),
+                                functionCalled: swapResult.functionCalled,
+                                functionResult: swapResult.functionResult,
+                                type: swapResult.type,
+                                action: swapResult.functionResult?.action,
+                              };
+                              setMessages((prev) => [...prev, swapResponseMessage]);
+                            } else {
+                              throw new Error(swapResult.error || 'Swap failed');
+                            }
+                          } catch (error: any) {
+                            const errorMessage: Message = {
+                              id: (Date.now() + 2).toString(),
+                              role: 'assistant',
+                              content: `❌ Auto-swap failed: ${error.message}. Please try your swap command again manually.`,
+                              timestamp: new Date(),
+                            };
+                            setMessages((prev) => [...prev, errorMessage]);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }
+                      }
+                    }}
+                  />
+                )}
 
                 <div className="mt-2 text-xs text-neutral-500">
                   {message.timestamp.toLocaleTimeString()}
