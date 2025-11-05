@@ -16,6 +16,7 @@ import protocolRoutes from './protocols.js';
 import naturalLanguageRoutes from './naturalLanguage.js';
 import questRoutes from './quests.js';
 import activityRoutes from './activity.js';
+import terminalRoutes from './terminal.js';
 
 const router = Router();
 
@@ -52,6 +53,7 @@ router.get('/', (_req, res) => {
       naturalLanguage: '/api/nl',
       quests: '/api/quests',
       activity: '/api/activity',
+      terminal: '/api/terminal',
     },
   });
 });
@@ -73,5 +75,6 @@ router.use('/tokens', tokenRoutes);
 router.use('/chat', chatRoutes);
 router.use('/protocols', protocolRoutes);
 router.use('/nl', naturalLanguageRoutes);
+router.use('/terminal', terminalRoutes);
 
 export default router;

@@ -35,6 +35,10 @@ export default defineConfig(() => {
     },
     server: {
       proxy: {
+        "/api": {
+          target: "http://localhost:8000",
+          changeOrigin: true,
+        },
         "/friendbot": {
           target: "http://localhost:8000/friendbot",
           changeOrigin: true,

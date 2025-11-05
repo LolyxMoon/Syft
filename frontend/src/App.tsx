@@ -11,6 +11,7 @@ import Analytics from "./pages/Analytics";
 import Backtests from "./pages/Backtests";
 import Suggestions from "./pages/Suggestions";
 import Quests from "./pages/Quests";
+import Terminal from "./pages/Terminal";
 import { Toaster } from "./components/ui";
 
 import AppLayout from "./layouts/AppLayout";
@@ -56,6 +57,7 @@ function App() {
           <Route path="backtests" element={<Backtests />} />
           <Route path="suggestions" element={<Suggestions />} />
           <Route path="quests" element={<Quests />} />
+          <Route path="terminal" element={<Terminal />} />
 
           <Route path="vaults/:vaultId" element={<VaultDetail />} />
         </Route>
