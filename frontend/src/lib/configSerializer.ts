@@ -272,8 +272,33 @@ export class ConfigSerializer {
       throw new Error('Invalid configuration: missing or invalid rules array');
     }
 
-    // Create asset blocks
-    config.assets.forEach((asset, index) => {
+    // CLEANUP: Remove assets with 0% allocation (these are auto-added target assets for swaps)
+    const cleanedAssets = config.assets.filter(asset => {
+      if (asset.allocation === 0) {
+        console.log('[ConfigSerializer] Filtering out 0% allocation asset:', asset.code);
+        return false;
+      }
+      return true;
+    });
+    
+    // CLEANUP: Default swap action targetAllocation to 100% if not set
+    const cleanedRules = config.rules.map((rule: any) => {
+      if (rule.action === 'swap' || rule.action?.type === 'swap') {
+        const actionParams = rule.action?.parameters || rule;
+        if (actionParams.targetAllocation === undefined) {
+          console.log('[ConfigSerializer] Defaulting swap action targetAllocation to 100%');
+          if (rule.action?.parameters) {
+            rule.action.parameters.targetAllocation = 100;
+          } else {
+            rule.targetAllocation = 100;
+          }
+        }
+      }
+      return rule;
+    });
+
+    // Create asset blocks (use cleaned assets)
+    cleanedAssets.forEach((asset, index) => {
       const assetId = `asset-${nodeIdCounter++}`;
       
       let assetType: 'XLM' | 'USDC' | 'CUSTOM' = 'CUSTOM';
@@ -300,8 +325,8 @@ export class ConfigSerializer {
     // Group rules by action signature to detect shared actions
     const actionMap = new Map<string, string>(); // action signature -> action node ID
     
-    // Create condition and action blocks for each rule
-    config.rules.forEach((rule: any, index) => {
+    // Create condition and action blocks for each rule (use cleaned rules)
+    cleanedRules.forEach((rule: any, index) => {
       // Handle both old flat format and new nested format
       let condition, action;
       
