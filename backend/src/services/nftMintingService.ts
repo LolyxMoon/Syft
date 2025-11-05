@@ -16,6 +16,7 @@ export interface MintNFTParams {
   toAddress: string;
   metadata: NFTMetadata;
   network?: string;
+  nftType?: 'vault' | 'quest';  // New parameter to specify NFT type
 }
 
 export interface MintNFTResult {
@@ -34,21 +35,32 @@ export async function buildMintNFTTransaction(
   params: MintNFTParams
 ): Promise<MintNFTResult> {
   try {
-    const { toAddress, metadata, network = 'testnet' } = params;
+    const { toAddress, metadata, network = 'testnet', nftType = 'quest' } = params;
 
     if (!NFT_CONTRACT_ADDRESS) {
       throw new Error('NFT_CONTRACT_ADDRESS not configured in environment');
     }
 
     // Validate Stellar address format
-    if (!toAddress || toAddress.length !== 56 || !toAddress.startsWith('G')) {
-      throw new Error('Invalid Stellar address format');
+    if (!toAddress) {
+      throw new Error('Wallet address is required');
+    }
+
+    // More lenient validation - Stellar addresses can be 56 chars and start with G, or contract addresses start with C
+    const trimmedAddress = toAddress.trim();
+    if (trimmedAddress.length !== 56) {
+      throw new Error(`Invalid Stellar address length: ${trimmedAddress.length} (expected 56). Address: ${trimmedAddress}`);
+    }
+    
+    if (!trimmedAddress.startsWith('G') && !trimmedAddress.startsWith('C')) {
+      throw new Error(`Invalid Stellar address format. Must start with G or C. Address: ${trimmedAddress}`);
     }
 
     console.log('[NFT Minting] Building mint transaction:', {
-      toAddress,
+      toAddress: trimmedAddress,
       metadata,
       network,
+      nftType,
       contractAddress: NFT_CONTRACT_ADDRESS,
     });
 
@@ -56,7 +68,7 @@ export async function buildMintNFTTransaction(
     
     // Convert addresses to ScVal
     const contractAddress = new StellarSdk.Address(NFT_CONTRACT_ADDRESS);
-    const minterAddress = new StellarSdk.Address(toAddress);
+    const minterAddress = new StellarSdk.Address(trimmedAddress);
     
     // For quest NFTs, we can use a placeholder vault address or the contract itself
     // In your case, since these are quest reward NFTs, not vault NFTs, 
@@ -70,7 +82,7 @@ export async function buildMintNFTTransaction(
     const contract = new StellarSdk.Contract(NFT_CONTRACT_ADDRESS);
     
     // Get source account for fee estimation
-    const sourceAccount = await servers.horizonServer.loadAccount(toAddress);
+    const sourceAccount = await servers.horizonServer.loadAccount(trimmedAddress);
     
     // Determine network passphrase
     const networkPassphrase = 
@@ -80,7 +92,10 @@ export async function buildMintNFTTransaction(
         ? StellarSdk.Networks.FUTURENET
         : StellarSdk.Networks.TESTNET;
 
-    // Build the transaction - pass metadata as individual parameters
+    // Create NFTType enum value (0 = Vault, 1 = Quest)
+    const nftTypeValue = StellarSdk.nativeToScVal(nftType === 'vault' ? 0 : 1, { type: 'u32' });
+
+    // Build the transaction - pass metadata as individual parameters including nft_type
     let transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
       fee: StellarSdk.BASE_FEE,
       networkPassphrase,
@@ -94,7 +109,8 @@ export async function buildMintNFTTransaction(
           StellarSdk.nativeToScVal(metadata.name),
           StellarSdk.nativeToScVal(metadata.description),
           StellarSdk.nativeToScVal(metadata.image_url),
-          StellarSdk.nativeToScVal(metadata.vault_performance || 0, { type: 'i128' })
+          StellarSdk.nativeToScVal(metadata.vault_performance || 0, { type: 'i128' }),
+          nftTypeValue  // Add NFT type parameter
         )
       )
       .setTimeout(300)

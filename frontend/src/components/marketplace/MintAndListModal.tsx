@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Image, ShoppingBag, AlertCircle, Package, Check, X } from 'lucide-react';
+import { useWallet } from '../../providers/WalletProvider';
 
 interface MintAndListModalProps {
   isOpen: boolean;
@@ -22,6 +23,8 @@ export function MintAndListModal({
   contractAddress: _contractAddress,
   onSuccess 
 }: MintAndListModalProps) {
+  const { address: walletAddress } = useWallet();
+  
   // Step 1: Mint NFT, Step 2: List on Marketplace
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   
@@ -58,10 +61,9 @@ export function MintAndListModal({
   const fetchExistingNFTs = async () => {
     setIsLoadingNfts(true);
     try {
-      const walletAddress = localStorage.getItem('walletAddress');
       if (!walletAddress) return;
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/nfts`);
       const data = await response.json();
 
@@ -88,16 +90,17 @@ export function MintAndListModal({
     setIsMinting(true);
 
     try {
-      const walletAddress = localStorage.getItem('walletAddress');
       if (!walletAddress) {
         throw new Error('Wallet not connected');
       }
+
+      console.log('[Mint NFT] Wallet address:', walletAddress, 'Length:', walletAddress.length);
 
       if (!nftName.trim()) {
         throw new Error('NFT name is required');
       }
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
       // Step 1: Build unsigned transaction
       console.log('[Mint NFT] Building transaction...');
@@ -175,7 +178,6 @@ export function MintAndListModal({
     setIsListing(true);
 
     try {
-      const walletAddress = localStorage.getItem('walletAddress');
       if (!walletAddress) {
         throw new Error('Wallet not connected');
       }
@@ -190,7 +192,7 @@ export function MintAndListModal({
         throw new Error('Please select an NFT to list');
       }
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/marketplace/listings`, {
         method: 'POST',
         headers: {

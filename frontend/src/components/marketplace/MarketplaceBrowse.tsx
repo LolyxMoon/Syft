@@ -28,6 +28,7 @@ interface Listing {
       name: string;
       description: string;
       imageUrl?: string;
+      image_url?: string; // Support both formats
     };
     vaults: {
       vault_id: string;
@@ -489,12 +490,19 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
               onClick={() => onSelectListing?.(listing)}
             >
               {/* NFT Image */}
-              {listing.vault_nfts?.metadata?.imageUrl ? (
+              {(listing.vault_nfts?.metadata?.imageUrl || listing.vault_nfts?.metadata?.image_url) ? (
                 <div className="relative h-48 overflow-hidden bg-neutral-900">
                   <img
-                    src={listing.vault_nfts.metadata.imageUrl}
+                    src={listing.vault_nfts.metadata.imageUrl || listing.vault_nfts.metadata.image_url}
                     alt={listing.vault_nfts.metadata.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      // If image fails to load, show fallback
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.parentElement) {
+                        e.currentTarget.parentElement.innerHTML = '<div class="h-48 bg-gradient-to-br from-primary-500/20 to-primary-600/20 flex items-center justify-center"><svg class="w-16 h-16 text-primary-500/50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>';
+                      }
+                    }}
                   />
                 </div>
               ) : (

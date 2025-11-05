@@ -323,6 +323,7 @@ router.post('/:vaultId/nft/build', async (req: Request, res: Response) => {
       toAddress: walletAddress,
       metadata: finalMetadata,
       network: 'testnet',
+      nftType: 'vault',  // Specify this is a Vault NFT
     });
 
     if (!mintResult.success || !mintResult.xdr) {

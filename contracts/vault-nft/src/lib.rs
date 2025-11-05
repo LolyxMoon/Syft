@@ -19,6 +19,14 @@ pub enum VaultNFTError {
     OwnershipExceeded = 5,
 }
 
+// NFT Type enumeration
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum NFTType {
+    Vault = 0,
+    Quest = 1,
+}
+
 // Data structures
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -28,6 +36,7 @@ pub struct VaultNFT {
     pub ownership_percentage: i128,
     pub holder: Address,
     pub metadata: String,
+    pub nft_type: NFTType,  // New field to distinguish NFT types
 }
 
 #[contracttype]
@@ -55,6 +64,7 @@ impl VaultNFTContract {
         description: String,
         image_url: String,
         vault_performance: i128,
+        nft_type: NFTType,  // New parameter to specify NFT type
     ) -> Result<u64, VaultNFTError> {
         // Verify minter is authorized
         minter.require_auth();
@@ -87,6 +97,7 @@ impl VaultNFTContract {
             ownership_percentage,
             holder: minter.clone(),
             metadata: format_metadata(&metadata),
+            nft_type,  // Store the NFT type
         };
         
         // Store NFT

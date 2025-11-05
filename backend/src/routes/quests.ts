@@ -427,6 +427,7 @@ router.post('/claim', async (req: Request, res: Response) => {
         vault_performance: 0, // Quest NFTs don't have performance metrics
       },
       network,
+      nftType: 'quest',  // Specify this is a Quest NFT
     });
 
     if (!mintResult.success || !mintResult.xdr) {
