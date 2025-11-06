@@ -447,7 +447,7 @@ AI: "This is a low-risk strategy because:
 # Frontend .env.local
 VITE_PUBLIC_VAPI_PUBLIC_KEY=ae7d6d88-88cf-4800-9863-77badd2ff560
 VITE_PUBLIC_ASSISTANT_ID=f3695e73-ff32-446e-9e79-a427e5b9656c
-VITE_PUBLIC_BACKEND_URL=http://localhost:3001
+VITE_VITE_PUBLIC_BACKEND_URL=http://localhost:3001
 
 # Backend .env
 OPENAI_API_KEY=your_openai_api_key

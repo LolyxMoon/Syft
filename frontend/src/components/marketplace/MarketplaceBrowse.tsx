@@ -91,7 +91,7 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
     setError('');
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const params = new URLSearchParams({
         status: 'active',
         sortBy,
@@ -172,7 +172,7 @@ export function MarketplaceBrowse({ onSelectListing }: MarketplaceBrowseProps) {
       });
 
       // Backend URL (local fallback)
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
       // Call subscribe endpoint
       console.log(`[Subscribe] Sending request with network: "${effectiveNetwork}"`);

@@ -503,7 +503,7 @@ Modify system prompt in VAPI dashboard or `vapi-assistant-config.json`:
 # Frontend (.env.production)
 VITE_PUBLIC_VAPI_PUBLIC_KEY=your_production_key
 VITE_PUBLIC_ASSISTANT_ID=your_production_assistant_id
-VITE_PUBLIC_BACKEND_URL=https://api.syft.com
+VITE_VITE_PUBLIC_BACKEND_URL=https://api.syft.com
 
 # Backend (.env.production)
 OPENAI_API_KEY=your_production_openai_key

@@ -189,7 +189,7 @@
 
    **Frontend (.env)**
    ```env
-   VITE_PUBLIC_BACKEND_URL=http://localhost:3001
+   VITE_VITE_PUBLIC_BACKEND_URL=http://localhost:3001
    VITE_STELLAR_NETWORK=testnet
    ```
 
@@ -777,7 +777,7 @@ Security is our top priority. Syft implements multiple layers of protection:
 
 3. **Set Environment Variables**
    ```
-   VITE_PUBLIC_BACKEND_URL=https://your-backend.herokuapp.com
+   VITE_VITE_PUBLIC_BACKEND_URL=https://your-backend.herokuapp.com
    VITE_STELLAR_NETWORK=testnet
    ```
 

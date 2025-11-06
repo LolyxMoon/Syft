@@ -162,7 +162,7 @@ const Backtests = () => {
     
     try {
       setLoadingVaults(true);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       
       const response = await fetch(`${backendUrl}/api/vaults/user/${address}?status=active&network=${normalizedNetwork}`);
@@ -183,7 +183,7 @@ const Backtests = () => {
     
     try {
       setLoading(true);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       
       // Use the user endpoint to get all backtests for this user
@@ -272,7 +272,7 @@ const Backtests = () => {
         setProgress(prev => Math.min(prev + 10, 90));
       }, 300);
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
 
       // Use vault's actual asset allocations
@@ -546,7 +546,7 @@ const Backtests = () => {
 
   const handleDeleteBacktest = async (backtestId: string) => {
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/backtests/${backtestId}`, {
         method: 'DELETE',
       });

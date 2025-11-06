@@ -163,12 +163,14 @@ export const Button = ({
 
 const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
   const sizes = {
-    sm: 'h-3 w-12',
-    md: 'h-4 w-16',
-    lg: 'h-5 w-20',
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6',
   };
   
   return (
-    <div className={clsx('bg-gray-300/30 rounded animate-pulse', sizes[size])} />
+    <div className={clsx('animate-spin', sizes[size])}>
+      <div className="w-full h-full rounded-full border-2 border-current border-t-transparent" />
+    </div>
   );
 };

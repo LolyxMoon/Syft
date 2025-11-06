@@ -99,7 +99,7 @@ const Suggestions = () => {
     setError(null);
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       const response = await fetch(
         `${backendUrl}/api/vaults/user/${address}?network=${normalizedNetwork}`
@@ -171,7 +171,7 @@ const Suggestions = () => {
     setSuggestionsMessage(null);
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
       // Always try to get existing suggestions first (GET endpoint)
       // This checks memory cache and database (last 24 hours)

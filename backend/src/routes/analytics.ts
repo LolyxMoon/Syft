@@ -70,7 +70,17 @@ router.get('/portfolio/:userAddress', async (req: Request, res: Response) => {
     const { userAddress } = req.params;
     const network = (req.query.network as string) || 'testnet';
 
+    console.log(`[Portfolio Analytics] Fetching for ${userAddress} on ${network}`);
     const analytics = await getPortfolioAnalytics(userAddress, network);
+
+    console.log('[Portfolio Analytics] Response:', {
+      totalTVL: analytics.totalTVL,
+      totalEarnings: analytics.totalEarnings,
+      sharpeRatio: analytics.sharpeRatio,
+      maxDrawdown: analytics.maxDrawdown,
+      volatility: analytics.volatility,
+      vaultCount: analytics.vaultCount,
+    });
 
     return res.json({
       success: true,

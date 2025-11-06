@@ -24,7 +24,7 @@ export async function getTokenInfo(address: string, network: string = 'testnet')
   }
 
   try {
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const response = await fetch(`${backendUrl}/api/tokens/validate/${address}?network=${network}`);
     
     if (!response.ok) {

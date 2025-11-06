@@ -129,7 +129,7 @@ const Analytics = () => {
   };
 
   const fetchRiskAnalytics = async () => {
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const normalizedNetwork = network?.toLowerCase() || 'testnet';
     
     try {
@@ -204,7 +204,7 @@ const Analytics = () => {
   };
 
   const fetchPerformanceAnalytics = async () => {
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const normalizedNetwork = network?.toLowerCase() || 'testnet';
     
     try {
@@ -376,7 +376,7 @@ const Analytics = () => {
   };
 
   const fetchTimeAnalytics = async () => {
-    const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const normalizedNetwork = network?.toLowerCase() || 'testnet';
     
     try {

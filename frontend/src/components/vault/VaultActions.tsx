@@ -38,7 +38,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
     
     setLoadingShares(true);
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/position/${address}`);
       const data = await response.json();
       
@@ -588,7 +588,11 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       {isProcessing && (
         <div className="mt-6 text-center">
-          <Skeleton className="h-8 w-32 mx-auto" />
+          <div className="flex justify-center mb-3">
+            <div className="w-8 h-8 animate-spin">
+              <div className="w-full h-full rounded-full border-[3px] border-primary-500 border-t-transparent" />
+            </div>
+          </div>
           <p className="text-neutral-400 mt-2">Processing transaction...</p>
         </div>
       )}

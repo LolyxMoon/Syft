@@ -99,6 +99,15 @@ interface PortfolioAnalytics {
     name: string;
     apy: number;
   } | null;
+  // Risk metrics
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  volatility: number;
+  valueAtRisk: number;
+  beta: number;
+  alpha: number;
+  informationRatio: number;
   vaultCount: number;
   activeVaultCount: number;
 }
@@ -614,6 +623,233 @@ export async function getVaultAnalytics(vaultId: string): Promise<VaultAnalytics
 }
 
 /**
+ * Calculate portfolio-level risk metrics
+ */
+async function calculatePortfolioRiskMetrics(
+  vaults: any[]
+): Promise<{
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  volatility: number;
+  valueAtRisk: number;
+  beta: number;
+  alpha: number;
+  informationRatio: number;
+}> {
+  try {
+    if (!vaults || vaults.length === 0) {
+      return {
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        maxDrawdown: 0,
+        volatility: 0,
+        valueAtRisk: 0,
+        beta: 1,
+        alpha: 0,
+        informationRatio: 0,
+      };
+    }
+
+    // Get all vault IDs
+    const vaultIds = vaults.map(v => v.id);
+    console.log(`[calculatePortfolioRiskMetrics] Calculating for ${vaultIds.length} vaults:`, vaultIds);
+
+    // Get 30 days of portfolio performance history
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    const { data: snapshots } = await supabase
+      .from('vault_performance')
+      .select('*')
+      .in('vault_id', vaultIds)
+      .gte('timestamp', thirtyDaysAgo)
+      .order('timestamp', { ascending: true });
+
+    console.log(`[calculatePortfolioRiskMetrics] Found ${snapshots?.length || 0} snapshots in last 30 days`);
+
+    if (!snapshots || snapshots.length < 2) {
+      console.warn('[calculatePortfolioRiskMetrics] Not enough snapshot data - returning zeros');
+      return {
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        maxDrawdown: 0,
+        volatility: 0,
+        valueAtRisk: 0,
+        beta: 1,
+        alpha: 0,
+        informationRatio: 0,
+      };
+    }
+
+    // Group snapshots by hour and vault (to avoid double-counting)
+    const groupedByHourAndVault: Record<string, Record<number, any>> = {};
+    
+    snapshots.forEach(snapshot => {
+      const hourKey = new Date(snapshot.timestamp).toISOString().slice(0, 13);
+      if (!groupedByHourAndVault[hourKey]) {
+        groupedByHourAndVault[hourKey] = {};
+      }
+      
+      const existing = groupedByHourAndVault[hourKey][snapshot.vault_id];
+      if (!existing || new Date(snapshot.timestamp) > new Date(existing.timestamp)) {
+        groupedByHourAndVault[hourKey][snapshot.vault_id] = snapshot;
+      }
+    });
+
+    // Calculate portfolio value at each time point
+    const portfolioHistory: Array<{ timestamp: string; totalValue: number }> = [];
+    
+    for (const hourKey of Object.keys(groupedByHourAndVault).sort()) {
+      const vaultSnapshots = Object.values(groupedByHourAndVault[hourKey]);
+      const totalValue = vaultSnapshots.reduce((sum, s: any) => sum + s.total_value, 0);
+      const latestTimestamp = vaultSnapshots.reduce((latest: string, s: any) => {
+        return new Date(s.timestamp) > new Date(latest) ? s.timestamp : latest;
+      }, vaultSnapshots[0].timestamp);
+      
+      portfolioHistory.push({
+        timestamp: latestTimestamp,
+        totalValue,
+      });
+    }
+
+    if (portfolioHistory.length < 2) {
+      console.warn('[calculatePortfolioRiskMetrics] Not enough portfolio history points');
+      return {
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        maxDrawdown: 0,
+        volatility: 0,
+        valueAtRisk: 0,
+        beta: 1,
+        alpha: 0,
+        informationRatio: 0,
+      };
+    }
+
+    // Calculate daily returns
+    const dailyReturns: number[] = [];
+    for (let i = 1; i < portfolioHistory.length; i++) {
+      const prevValue = portfolioHistory[i - 1].totalValue;
+      const currValue = portfolioHistory[i].totalValue;
+      if (prevValue > 0) {
+        const dailyReturn = (currValue - prevValue) / prevValue;
+        dailyReturns.push(dailyReturn);
+      }
+    }
+
+    if (dailyReturns.length === 0) {
+      console.warn('[calculatePortfolioRiskMetrics] No valid daily returns');
+      return {
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        maxDrawdown: 0,
+        volatility: 0,
+        valueAtRisk: 0,
+        beta: 1,
+        alpha: 0,
+        informationRatio: 0,
+      };
+    }
+
+    // Calculate average return
+    const avgReturn = dailyReturns.reduce((sum, r) => sum + r, 0) / dailyReturns.length;
+
+    // Calculate standard deviation (volatility)
+    const variance = dailyReturns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / dailyReturns.length;
+    const stdDev = Math.sqrt(variance);
+    const volatility = stdDev * Math.sqrt(365) * 100; // Annualized volatility
+
+    // Calculate Sharpe Ratio (assuming 4% risk-free rate)
+    const riskFreeRate = 0.04;
+    const annualizedReturn = avgReturn * 365;
+    const annualizedStdDev = stdDev * Math.sqrt(365);
+    const sharpeRatio = annualizedStdDev > 0 
+      ? (annualizedReturn - riskFreeRate) / annualizedStdDev 
+      : 0;
+
+    // Calculate Sortino Ratio (only downside deviation)
+    const negativeReturns = dailyReturns.filter(r => r < 0);
+    const downsideVariance = negativeReturns.length > 0
+      ? negativeReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / negativeReturns.length
+      : 0;
+    const downsideStdDev = Math.sqrt(downsideVariance) * Math.sqrt(365);
+    const sortinoRatio = downsideStdDev > 0
+      ? (annualizedReturn - riskFreeRate) / downsideStdDev
+      : sharpeRatio;
+
+    // Calculate Maximum Drawdown
+    let maxDrawdown = 0;
+    let peak = portfolioHistory[0].totalValue;
+
+    for (const point of portfolioHistory) {
+      const value = point.totalValue;
+      
+      if (value > peak) {
+        peak = value;
+      }
+
+      const drawdown = ((value - peak) / peak) * 100;
+      
+      if (drawdown < maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+
+    // Calculate Value at Risk (95% confidence, 1-day)
+    const sortedReturns = [...dailyReturns].sort((a, b) => a - b);
+    const varIndex = Math.floor(sortedReturns.length * 0.05);
+    const valueAtRisk = sortedReturns[varIndex] * 100; // Convert to percentage
+
+    // Calculate Beta (market sensitivity) - simplified to 1 for crypto
+    const beta = 1.0;
+
+    // Calculate Alpha (excess return over market)
+    const alpha = (annualizedReturn - 0.10) * 100; // Assuming 10% market return
+
+    // Calculate Information Ratio
+    const excessReturns = dailyReturns.map(r => r - (0.10 / 365)); // Daily market return
+    const trackingError = Math.sqrt(
+      excessReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / excessReturns.length
+    ) * Math.sqrt(365);
+    const informationRatio = trackingError > 0
+      ? (annualizedReturn - 0.10) / trackingError
+      : 0;
+
+    console.log('[calculatePortfolioRiskMetrics] Risk Metrics:', {
+      sharpeRatio: sharpeRatio.toFixed(2),
+      sortinoRatio: sortinoRatio.toFixed(2),
+      maxDrawdown: `${maxDrawdown.toFixed(1)}%`,
+      volatility: `${volatility.toFixed(1)}%`,
+      valueAtRisk: `${valueAtRisk.toFixed(1)}%`,
+      dataPoints: dailyReturns.length,
+    });
+
+    return {
+      sharpeRatio,
+      sortinoRatio,
+      maxDrawdown,
+      volatility,
+      valueAtRisk,
+      beta,
+      alpha,
+      informationRatio,
+    };
+  } catch (error) {
+    console.error('[calculatePortfolioRiskMetrics] Error:', error);
+    return {
+      sharpeRatio: 0,
+      sortinoRatio: 0,
+      maxDrawdown: 0,
+      volatility: 0,
+      valueAtRisk: 0,
+      beta: 1,
+      alpha: 0,
+      informationRatio: 0,
+    };
+  }
+}
+
+/**
  * Get portfolio-wide analytics for a user
  */
 export async function getPortfolioAnalytics(
@@ -640,6 +876,14 @@ export async function getPortfolioAnalytics(
         worstPerformingVault: null,
         vaultCount: 0,
         activeVaultCount: 0,
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        maxDrawdown: 0,
+        volatility: 0,
+        valueAtRisk: 0,
+        beta: 1,
+        alpha: 0,
+        informationRatio: 0,
       };
     }
 
@@ -677,6 +921,9 @@ export async function getPortfolioAnalytics(
       ? vaultAnalytics.reduce((sum, va) => sum + (va.apy * va.tvl), 0) / totalTVL
       : 0;
 
+    // Calculate portfolio-level risk metrics
+    const riskMetrics = await calculatePortfolioRiskMetrics(vaults);
+
     // Find best and worst performing vaults
     let bestPerformingVault = null;
     let worstPerformingVault = null;
@@ -710,6 +957,8 @@ export async function getPortfolioAnalytics(
       worstPerformingVault,
       vaultCount: vaults.length,
       activeVaultCount: vaults.filter(v => v.status === 'active').length,
+      // Add risk metrics to response
+      ...riskMetrics,
     };
   } catch (error) {
     console.error('[getPortfolioAnalytics] Error:', error);
@@ -840,7 +1089,10 @@ export async function getPortfolioPerformanceHistory(
 
     const firstValue = portfolioHistory[0].totalValue;
 
-    return portfolioHistory.map((point) => {
+    // Calculate rolling volatility for each point (using a 7-day window)
+    const windowSize = 7;
+    
+    return portfolioHistory.map((point, index) => {
       const currentValue = point.totalValue;
       const timeDiff = new Date(point.timestamp).getTime() - new Date(portfolioHistory[0].timestamp).getTime();
       const daysPassed = timeDiff / (1000 * 60 * 60 * 24);
@@ -852,10 +1104,44 @@ export async function getPortfolioPerformanceHistory(
         apy = Math.max(-100, Math.min(10000, apy));
       }
 
+      // Calculate rolling volatility for this point
+      let volatility = 0;
+      if (index >= windowSize) {
+        const windowData = portfolioHistory.slice(Math.max(0, index - windowSize), index + 1);
+        const returns: number[] = [];
+        
+        for (let i = 1; i < windowData.length; i++) {
+          const prevVal = windowData[i - 1].totalValue;
+          const currVal = windowData[i].totalValue;
+          if (prevVal > 0) {
+            returns.push((currVal - prevVal) / prevVal);
+          }
+        }
+        
+        if (returns.length > 0) {
+          const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+          const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+          const stdDev = Math.sqrt(variance);
+          volatility = stdDev * Math.sqrt(365) * 100; // Annualized
+        }
+      }
+
+      // Calculate drawdown at this point (from peak)
+      let peak = portfolioHistory[0].totalValue;
+      for (let i = 0; i <= index; i++) {
+        if (portfolioHistory[i].totalValue > peak) {
+          peak = portfolioHistory[i].totalValue;
+        }
+      }
+      const drawdown = peak > 0 ? ((currentValue - peak) / peak) * 100 : 0;
+
       return {
         date: new Date(point.timestamp).toLocaleDateString(),
         value: currentValue,
         apy: apy,
+        volatility: volatility,
+        drawdown: drawdown,
+        timestamp: point.timestamp,
       };
     });
   } catch (error) {

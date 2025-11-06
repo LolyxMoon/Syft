@@ -40,7 +40,7 @@ export function ListingModal({
       const walletAddress = localStorage.getItem('walletAddress');
       if (!walletAddress) return;
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/nfts`);
       const data = await response.json();
 
@@ -80,7 +80,7 @@ export function ListingModal({
         throw new Error('Please select an NFT to list');
       }
 
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
       // Prepare listing data
       const listingData: any = {

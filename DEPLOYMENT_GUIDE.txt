@@ -224,7 +224,7 @@ PART 4: FRONTEND DEPLOYMENT (VERCEL)
    VITE_PUBLIC_STELLAR_HORIZON_URL = https://horizon-futurenet.stellar.org
    VITE_PUBLIC_SUPABASE_URL = [Your Supabase URL from Part 2]
    VITE_PUBLIC_SUPABASE_ANON_KEY = [Your Supabase anon key from Part 2]
-   VITE_PUBLIC_BACKEND_URL = https://syft-defi-backend.herokuapp.com
+   VITE_VITE_PUBLIC_BACKEND_URL = https://syft-defi-backend.herokuapp.com
    VITE_PUBLIC_VAULT_FACTORY_CONTRACT_ID = [Your deployed contract ID]
 
 6. Click "Deploy"
@@ -255,7 +255,7 @@ PART 4: FRONTEND DEPLOYMENT (VERCEL)
    vercel env add VITE_PUBLIC_STELLAR_NETWORK
    [Enter value: FUTURENET]
    
-   vercel env add VITE_PUBLIC_BACKEND_URL
+   vercel env add VITE_VITE_PUBLIC_BACKEND_URL
    [Enter value: https://syft-defi-backend.herokuapp.com]
    
    [Repeat for all env vars from 4.2 step 5]
@@ -339,7 +339,7 @@ PART 6: CUSTOM DOMAIN (OPTIONAL)
    api.yourdomain.com → [DNS target from step 2]
 
 4. Update frontend env var:
-   VITE_PUBLIC_BACKEND_URL = https://api.yourdomain.com
+   VITE_VITE_PUBLIC_BACKEND_URL = https://api.yourdomain.com
 
 5. Update backend CORS:
    heroku config:set CORS_ORIGINS="https://syft.yourdomain.com" --app syft-defi-backend
@@ -407,7 +407,7 @@ Solution:
 
 Problem: Frontend can't connect to backend
 Solution:
-  - Check VITE_PUBLIC_BACKEND_URL is correct
+  - Check VITE_VITE_PUBLIC_BACKEND_URL is correct
   - Verify CORS_ORIGINS on backend includes Vercel URL
   - Check browser console for CORS errors
   - Test backend health endpoint directly

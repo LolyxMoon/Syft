@@ -176,7 +176,7 @@ export function NaturalLanguageBuilder({
     try {
       console.log('[Chat] Creating session with wallet:', walletAddress);
       
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/chat/sessions`, {
         method: 'POST',
         headers: {
@@ -210,7 +210,7 @@ export function NaturalLanguageBuilder({
   const loadSession = async (sessionId: string) => {
     try {
       console.log('[Chat] Fetching messages for session:', sessionId);
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/chat/sessions/${sessionId}/messages`);
 
       if (!response.ok) {
@@ -321,7 +321,7 @@ export function NaturalLanguageBuilder({
       }
 
       // Call backend API to generate vault
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       console.log('[Chat] Sending request to backend with sessionId:', sessionId);
       const response = await fetch(`${backendUrl}/api/vaults/generate-from-prompt`, {
         method: 'POST',

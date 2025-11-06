@@ -106,7 +106,7 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
 
   const fetchXLMPrice = async () => {
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/price/xlm`);
       if (response.ok) {
         const data = await response.json();
@@ -125,7 +125,7 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
     if (!address) return;
     
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/vaults/${vaultId}/position/${address}`);
       if (response.ok) {
         const data = await response.json();
@@ -141,7 +141,7 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
 
   const fetchVaultAnalytics = async () => {
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/analytics/vault/${vaultId}`);
       if (response.ok) {
         const data = await response.json();
@@ -162,7 +162,7 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
     setError('');
 
     try {
-      const backendUrl = import.meta.env.PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       
       // Load vault data - include requesterAddress to get full config if owner
       const queryParams = address ? `?requesterAddress=${address}` : '';

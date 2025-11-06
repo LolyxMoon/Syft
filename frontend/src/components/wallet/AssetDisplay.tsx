@@ -38,7 +38,7 @@ export const AssetDisplay = () => {
     setError(null);
 
     try {
-      const apiUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const apiUrl = import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${apiUrl}/api/wallet/${address}/assets`);
       
       if (!response.ok) {
