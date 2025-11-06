@@ -93,13 +93,22 @@ const Analytics = () => {
   const [historicalVolatility, setHistoricalVolatility] = useState<any[]>([]);
   const [drawdownHistory, setDrawdownHistory] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [liquidityLoaded, setLiquidityLoaded] = useState(false);
   const { address, network } = useWallet();
 
   useEffect(() => {
     if (address) {
+      setLiquidityLoaded(false); // Reset liquidity when main data changes
       fetchAnalytics();
     }
-  }, [address, network, selectedPeriod, selectedView]);
+  }, [address, network, selectedPeriod]); // Removed selectedView to prevent refetch on tab switch
+
+  // Fetch liquidity data only when liquidity tab is viewed and not yet loaded
+  useEffect(() => {
+    if (address && selectedView === 'liquidity' && !liquidityLoaded && liquidityMetrics.length === 0) {
+      fetchLiquidityAnalytics();
+    }
+  }, [selectedView, address, liquidityLoaded]);
 
   const fetchAnalytics = async (isRefresh = false) => {
     if (!address) return;
@@ -240,11 +249,6 @@ const Analytics = () => {
           }
         }
       }
-
-      // Still fetch liquidity separately as it comes from Horizon
-      if (selectedView === 'liquidity') {
-        await fetchLiquidityAnalytics();
-      }
     } catch (err: any) {
       console.error('Failed to fetch analytics:', err);
       setError(err.message || 'Failed to load analytics');
@@ -366,13 +370,16 @@ const Analytics = () => {
           { asset: 'XLM/ETH', poolDepth: 0, avgSlippage: 0, volume24h: 0, liquidityScore: 0 }
         ]);
       }
+      setLiquidityLoaded(true);
     } catch (err) {
       console.error('Failed to fetch liquidity analytics:', err);
+      setLiquidityLoaded(true); // Mark as loaded even on error to prevent infinite retries
       throw err;
     }
   };
 
   const handleRefresh = () => {
+    setLiquidityLoaded(false); // Reset liquidity loaded flag on refresh
     fetchAnalytics(true);
   };
 
