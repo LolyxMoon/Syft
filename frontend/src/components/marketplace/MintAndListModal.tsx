@@ -141,7 +141,7 @@ export function MintAndListModal({
 
       console.log('[Mint NFT] Transaction signed, submitting to network...');
 
-      // Step 3: Submit signed transaction
+      // Step 3: Submit signed transaction with all NFT data
       const submitResponse = await fetch(`${backendUrl}/api/nfts/submit`, {
         method: 'POST',
         headers: {
@@ -150,6 +150,11 @@ export function MintAndListModal({
         body: JSON.stringify({
           signedXdr: signedTxXdr,
           nftId: buildData.data.nftId,
+          tokenId: buildData.data.tokenId,
+          vaultDbId: buildData.data.vaultDbId,
+          walletAddress: buildData.data.walletAddress,
+          contractAddress: buildData.data.contractAddress,
+          metadata: buildData.data.metadata,
           network: 'testnet',
         }),
       });

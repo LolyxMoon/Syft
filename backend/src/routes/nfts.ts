@@ -333,36 +333,18 @@ router.post('/:vaultId/nft/build', async (req: Request, res: Response) => {
       });
     }
 
-    // Store pending NFT data temporarily (we'll update after signing)
-    const { data: pendingNft, error: nftError } = await supabase
-      .from('vault_nfts')
-      .insert({
-        nft_id: nftId,
-        token_id: tokenId,
-        vault_id: vault.id,
-        contract_address: vault.contract_address || `pending_${vaultId}`,
-        current_holder: walletAddress,
-        original_owner: walletAddress,
-        metadata: finalMetadata,
-        minted_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (nftError) {
-      console.error('Error storing pending NFT:', nftError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to store pending NFT',
-      });
-    }
-
-    // Return the unsigned transaction for client to sign
+    // DO NOT insert into database yet - wait for user to sign and submit
+    // Return the unsigned transaction for client to sign along with metadata
     return res.json({
       success: true,
       data: {
         xdr: mintResult.xdr,
-        nftId: pendingNft.nft_id,
+        nftId: nftId,
+        tokenId: tokenId,
+        vaultId: vaultId,
+        vaultDbId: vault.id,
+        walletAddress: walletAddress,
+        contractAddress: vault.contract_address || `pending_${vaultId}`,
         metadata: finalMetadata,
         message: 'Please sign the transaction in your wallet to mint your NFT!',
       },
@@ -383,17 +365,39 @@ router.post('/:vaultId/nft/build', async (req: Request, res: Response) => {
  * Body: {
  *   signedXdr: string,
  *   nftId: string,
+ *   tokenId: string,
+ *   vaultDbId: string (UUID),
+ *   walletAddress: string,
+ *   contractAddress: string,
+ *   metadata: object,
  *   network?: string
  * }
  */
 router.post('/submit', async (req: Request, res: Response) => {
   try {
-    const { signedXdr, nftId, network = 'testnet' } = req.body;
+    const { 
+      signedXdr, 
+      nftId, 
+      tokenId,
+      vaultDbId,
+      walletAddress,
+      contractAddress,
+      metadata,
+      network = 'testnet' 
+    } = req.body;
 
     if (!signedXdr || !nftId) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: signedXdr, nftId',
+      });
+    }
+
+    // Validate all required fields for NFT creation
+    if (!tokenId || !vaultDbId || !walletAddress || !contractAddress || !metadata) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required NFT data fields',
       });
     }
 
@@ -407,28 +411,41 @@ router.post('/submit', async (req: Request, res: Response) => {
       });
     }
 
-    // Update the NFT record with transaction hash
-    const { error: updateError } = await supabase
+    // NOW create the NFT record in database after successful transaction
+    const { data: nft, error: insertError } = await supabase
       .from('vault_nfts')
-      .update({
-        token_id: submitResult.nftTokenId || `token_${Date.now()}`,
+      .insert({
+        nft_id: nftId,
+        token_id: submitResult.nftTokenId || tokenId,
+        vault_id: vaultDbId,
+        contract_address: contractAddress,
+        current_holder: walletAddress,
+        original_owner: walletAddress,
+        metadata: metadata,
+        minted_at: new Date().toISOString(),
       })
-      .eq('nft_id', nftId)
       .select()
       .single();
 
-    if (updateError) {
-      console.error('Error updating NFT record:', updateError);
-      // Transaction succeeded but DB update failed - log this
-      console.warn(`NFT ${nftId} minted successfully but DB update failed`);
+    if (insertError) {
+      console.error('Error creating NFT record:', insertError);
+      // Transaction succeeded but DB insert failed - log this
+      console.warn(`NFT ${nftId} minted on blockchain but DB insert failed`);
+      return res.status(500).json({
+        success: false,
+        error: 'NFT minted on blockchain but failed to save to database',
+      });
     }
 
     return res.json({
       success: true,
       data: {
         transactionHash: submitResult.transactionHash,
-        nftId,
-        nftTokenId: submitResult.nftTokenId,
+        nftId: nft.nft_id,
+        nftTokenId: submitResult.nftTokenId || tokenId,
+        holder: nft.current_holder,
+        metadata: nft.metadata,
+        mintedAt: nft.minted_at,
       },
     });
   } catch (error) {
