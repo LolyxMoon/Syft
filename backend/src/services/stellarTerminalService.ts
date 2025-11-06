@@ -15,6 +15,7 @@ import {
 import * as StellarSdk from '@stellar/stellar-sdk';
 import axios from 'axios';
 import { withRetry, pollUntil } from '../utils/retryLogic.js';
+import { optimizeWasm, validateWasm } from '../utils/wasmOptimizer.js';
 
 // Stellar Testnet Configuration
 const HORIZON_URL = 'https://horizon-testnet.stellar.org';
@@ -652,6 +653,192 @@ export class StellarTerminalService {
   /**
    * SMART CONTRACT OPERATIONS
    */
+
+  async installWasm(sessionId: string, wasmBuffer: Buffer): Promise<any> {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
+      }
+
+      const originalSize = wasmBuffer.length;
+      console.log(`[Install WASM] Starting WASM installation (${originalSize} bytes)...`);
+
+      // Step 1: Validate WASM format
+      const validation = validateWasm(wasmBuffer);
+      if (!validation.valid) {
+        console.error(`[Install WASM] ❌ Validation failed: ${validation.error}`);
+        return {
+          success: false,
+          error: validation.error || 'Invalid WASM file format',
+          message: `❌ **Invalid WASM File**\n\n${validation.error}\n\nPlease ensure you're uploading a valid WebAssembly (.wasm) file compiled for Soroban.`,
+        };
+      }
+
+      console.log('[Install WASM] ✅ WASM validation passed');
+
+      // Step 2: Optimize WASM automatically
+      console.log('[Install WASM] 🔧 Optimizing WASM for Soroban...');
+      const optimizationResult = await optimizeWasm(wasmBuffer);
+      
+      const finalWasm = optimizationResult.optimizedWasm || wasmBuffer;
+      const finalSize = finalWasm.length;
+      
+      if (optimizationResult.success && optimizationResult.compressionRatio && optimizationResult.compressionRatio > 0) {
+        console.log(`[Install WASM] ✅ Optimization successful: ${originalSize} → ${finalSize} bytes (${optimizationResult.compressionRatio}% reduction)`);
+      } else if (optimizationResult.warnings && optimizationResult.warnings.length > 0) {
+        console.warn(`[Install WASM] ⚠️  Optimization warnings:`, optimizationResult.warnings);
+      }
+
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
+
+      // Build upload transaction with optimized WASM
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 100000).toString(), // High fee for WASM upload
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.uploadContractWasm({
+            wasm: finalWasm,
+          })
+        )
+        .setTimeout(300)
+        .build();
+
+      // Prepare transaction (simulate and add resource fees)
+      const preparedTx = await sorobanServer.prepareTransaction(transaction);
+
+      // If no secret key, return unsigned transaction for wallet signing
+      if (!sourceKeypair) {
+        const optimizationInfo = optimizationResult.compressionRatio && optimizationResult.compressionRatio > 0
+          ? `Optimized: ${(originalSize / 1024).toFixed(2)} KB → ${(finalSize / 1024).toFixed(2)} KB (${optimizationResult.compressionRatio}% smaller)`
+          : optimizationResult.warnings?.includes('already optimized')
+          ? 'Already optimized'
+          : 'Optimization unavailable - using original';
+
+        return {
+          success: true,
+          message: 'Please sign this transaction with your wallet to install the WASM.',
+          action: {
+            type: 'install_wasm',
+            title: 'Install Smart Contract WASM',
+            description: `Upload contract WASM to Stellar network (${(finalSize / 1024).toFixed(2)} KB)\n${optimizationInfo}`,
+            xdr: preparedTx.toXDR(),
+            details: {
+              original_size_kb: (originalSize / 1024).toFixed(2),
+              final_size_kb: (finalSize / 1024).toFixed(2),
+              optimization: optimizationInfo,
+              uploader: session.publicKey,
+              network: 'testnet',
+              fee: preparedTx.fee,
+            },
+          },
+        };
+      }
+
+      preparedTx.sign(sourceKeypair);
+
+      // Submit transaction
+      const result = await sorobanServer.sendTransaction(preparedTx);
+
+      if (result.status === 'PENDING') {
+        // Poll for transaction result
+        const getResponse = await pollUntil(
+          () => sorobanServer.getTransaction(result.hash),
+          (response) =>
+            response !== null &&
+            response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+          {
+            intervalMs: 1000,
+            timeoutMs: 60000, // Longer timeout for WASM upload
+          }
+        );
+
+        if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+          // Extract WASM hash from return value
+          const wasmHash = scValToNative(getResponse.returnValue!);
+          const wasmHashHex = Buffer.from(wasmHash).toString('hex');
+
+          console.log(`[Install WASM] ✅ WASM installed successfully! Hash: ${wasmHashHex}`);
+
+          const optimizationMsg = optimizationResult.compressionRatio && optimizationResult.compressionRatio > 0
+            ? `\n\n🔧 **Optimized:** ${(originalSize / 1024).toFixed(2)} KB → ${(finalSize / 1024).toFixed(2)} KB (${optimizationResult.compressionRatio}% reduction using ${optimizationResult.method})`
+            : '';
+
+          return {
+            success: true,
+            message: `✅ **WASM Installed Successfully!**\n\n**WASM Hash:** \`${wasmHashHex}\`${optimizationMsg}\n\nYou can now deploy contracts using this WASM hash.\n\nTry: "Deploy a contract with WASM hash ${wasmHashHex.substring(0, 16)}..."`,
+            wasmHash: wasmHashHex,
+            originalSize,
+            optimizedSize: finalSize,
+            compressionRatio: optimizationResult.compressionRatio,
+            optimizationMethod: optimizationResult.method,
+            transactionHash: result.hash,
+            link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+          };
+        } else {
+          // Get detailed error from transaction
+          const txResult = getResponse as any;
+          const diagnosticEvents = txResult.diagnosticEvents || [];
+          
+          let errorDetails = 'WASM installation failed';
+          if (diagnosticEvents.length > 0) {
+            const errorEvent = diagnosticEvents.find((e: any) => 
+              e.topics?.some((t: any) => t.toString().includes('error'))
+            );
+            if (errorEvent && errorEvent.data) {
+              errorDetails += `: ${errorEvent.data}`;
+            }
+          }
+          
+          throw new Error(errorDetails);
+        }
+      } else {
+        throw new Error(result.errorResult?.toXDR('base64') || 'Unknown error');
+      }
+    } catch (error: any) {
+      console.error('[Install WASM] ❌ Error:', error);
+      
+      // Parse error message for helpful feedback
+      let userMessage = error.message || 'WASM installation failed';
+      let suggestions: string[] = [];
+      
+      if (userMessage.includes('section size mismatch') || userMessage.includes('BinaryReaderError')) {
+        suggestions.push('🔧 **The WASM file needs to be optimized for Soroban**');
+        suggestions.push('');
+        suggestions.push('**Why this happens:**');
+        suggestions.push('  • Unoptimized WASM files have debug sections and extra metadata');
+        suggestions.push('  • Soroban requires clean, optimized WASM files');
+        suggestions.push('  • Cloud environments (like Heroku) don\'t have stellar-cli installed');
+        suggestions.push('');
+        suggestions.push('💡 **Solution: Upload .optimized.wasm Files**');
+        suggestions.push('');
+        suggestions.push('**On your local machine:**');
+        suggestions.push('1. Build your contract:');
+        suggestions.push('   `cargo build --target wasm32-unknown-unknown --release`');
+        suggestions.push('');
+        suggestions.push('2. Optimize with stellar-cli:');
+        suggestions.push('   `stellar contract optimize --wasm target/wasm32-unknown-unknown/release/your-contract.wasm`');
+        suggestions.push('');
+        suggestions.push('3. Upload the generated .optimized.wasm file');
+        suggestions.push('');
+        suggestions.push('**Quick test:** Look in your `target/` folder for existing `.optimized.wasm` files');
+        suggestions.push('Example: `mock_staking_pool.optimized.wasm` or `syft_vault.optimized.wasm`');
+        
+        userMessage = '❌ **WASM Upload Failed: Optimization Required**\n\n' + 
+                     suggestions.join('\n') + 
+                     '\n\n**Technical Error:** ' + userMessage;
+      }
+      
+      return {
+        success: false,
+        error: userMessage,
+        message: userMessage,
+        originalError: error.message,
+      };
+    }
+  }
 
   async deployContract(
     sessionId: string,

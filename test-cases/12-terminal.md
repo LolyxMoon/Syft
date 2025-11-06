@@ -169,22 +169,89 @@
 
 ---
 
-## TC-TERMINAL-010: Deploy Smart Contract
+## TC-TERMINAL-010: Deploy Smart Contract (Complete Flow with File Upload)
 **Priority**: P1  
-**Precondition**: Contract WASM file available
+**Precondition**: Contract WASM file available (.wasm file - optimized or unoptimized)
 
 ### Test Steps
-1. Type: "Deploy a smart contract from [wasm_path]"
-2. Sign transaction
+1. Click the WASM upload button (file icon with upload arrow) next to the message input
+2. Select a `.wasm` file from your computer (can be unoptimized)
+3. System automatically validates and optimizes the WASM
+4. Sign installation transaction in Freighter popup
+5. Wait for WASM installation confirmation with hash
+6. Type: "Deploy a contract with WASM hash [hash_from_step_5]"
+7. Sign deployment transaction in Freighter popup
 
-### Expected Results
-- ✅ AI processes deploy command
-- ✅ Uploads WASM to network
+### Expected Results - Upload & Validation Phase
+- ✅ File picker opens accepting only .wasm files
+- ✅ Upload progress message appears: "📤 Uploading [filename] (X.XX KB)..."
+- ✅ System validates WASM format (checks magic number, version)
+- ✅ Invalid WASMs show clear error: "❌ Invalid WASM file: Missing magic number..."
+- ✅ File validation passes: "✅ WASM validation passed"
+
+### Expected Results - Auto-Optimization Phase
+- ✅ System automatically optimizes WASM: "🔧 Optimizing WASM for Soroban..."
+- ✅ Tries stellar-cli first, falls back to wasm-opt if unavailable
+- ✅ Shows optimization results: "Original: X KB → Optimized: Y KB (Z% reduction)"
+- ✅ If already optimized: "Already optimized" message shown
+- ✅ If optimization unavailable: Uses original with warning
+
+### Expected Results - Installation Phase
+- ✅ AI shows installation action card with optimized WASM details
+- ✅ Action card shows: 
+  - Original size vs final size
+  - Optimization method used (stellar-cli/wasm-opt/none)
+  - Uploader address, network, estimated fee
+- ✅ User signs transaction via Freighter
+- ✅ WASM uploaded to Stellar network
+- ✅ WASM hash returned and displayed
+- ✅ Success message: "✅ WASM Installed Successfully! WASM Hash: `[hash]`"
+- ✅ Shows optimization stats in success message
+
+### Expected Results - Deployment Phase
+- ✅ User can copy WASM hash or use it in chat
+- ✅ AI processes deploy command with hash
 - ✅ Action card with deployment details
-- ✅ User signs
-- ✅ Contract deployed
+- ✅ Shows: WASM hash (truncated), deployer, network, fee
+- ✅ User signs deployment via Freighter
+- ✅ Contract deployed successfully
 - ✅ Contract ID returned
-- ✅ Success message with ID
+- ✅ Success message with Contract ID and Stellar Expert link
+- ✅ Link to view transaction on Stellar Expert
+
+### Alternative Flow (Hash Already Known)
+1. Type: "Deploy a contract with WASM hash [existing_hash]"
+2. Sign deployment transaction
+3. Get Contract ID immediately
+
+### Error Handling
+- ✅ Invalid file type shows error: "❌ Please upload a valid .wasm file"
+- ✅ Corrupted WASM shows: "❌ Invalid WASM file: Missing magic number. File may be corrupted."
+- ✅ Wrong WASM version shows: "❌ Unsupported WASM version: X. Expected version 1."
+- ✅ Wallet not connected shows: "❌ Wallet must be connected to upload WASM"
+- ✅ Upload failure shows clear error message with retry option
+- ✅ Deployment with invalid hash shows: "❌ Invalid WASM hash or WASM not found"
+- ✅ Parsing errors from network show helpful messages with troubleshooting steps
+
+### Optimization Scenarios
+**Scenario 1: Unoptimized WASM (>200KB with debug info)**
+- System detects unoptimized state
+- Runs stellar contract optimize
+- Shows significant size reduction (typically 30-70%)
+- User sees: "🔧 Optimized: 450 KB → 120 KB (73% reduction using stellar-cli)"
+
+**Scenario 2: Already Optimized WASM (<100KB, no debug)**
+- System detects optimization not needed
+- Skips optimization step
+- User sees: "Already optimized"
+- Proceeds directly to installation
+
+**Scenario 3: Optimization Tools Unavailable**
+- stellar-cli not installed or fails
+- wasm-opt not available or fails
+- System falls back to original WASM with warning
+- User sees: "⚠️ Optimization unavailable - using original"
+- Installation still proceeds if WASM is valid
 
 ---
 

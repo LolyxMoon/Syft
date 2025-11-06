@@ -67,15 +67,6 @@ const TERMINAL_FUNCTIONS = [
       },
     },
   },
-  {
-    name: 'export_secret_key',
-    description: 'Export secret key with security warnings. Use for backup purposes only. This shows the connected wallet\'s secret key (if available) along with critical security warnings.',
-    parameters: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-  },
 
   // ASSET FUNCTIONS
   {
@@ -188,106 +179,6 @@ const TERMINAL_FUNCTIONS = [
         },
       },
       required: ['assetCode', 'issuer'],
-    },
-  },
-
-  // SMART CONTRACT FUNCTIONS
-  {
-    name: 'deploy_contract',
-    description: 'Deploy a smart contract from WASM hash.',
-    parameters: {
-      type: 'object',
-      properties: {
-        wasmHash: {
-          type: 'string',
-          description: 'WASM hash of the contract',
-        },
-        contractId: {
-          type: 'string',
-          description: 'Optional contract ID',
-        },
-      },
-      required: ['wasmHash'],
-    },
-  },
-  {
-    name: 'invoke_contract',
-    description: 'Invoke a contract method with arguments.',
-    parameters: {
-      type: 'object',
-      properties: {
-        contractId: {
-          type: 'string',
-          description: 'Contract ID',
-        },
-        method: {
-          type: 'string',
-          description: 'Method name to invoke',
-        },
-        args: {
-          type: 'array',
-          description: 'Method arguments',
-          items: {
-            type: 'string',
-          },
-        },
-      },
-      required: ['contractId', 'method'],
-    },
-  },
-  {
-    name: 'read_contract',
-    description: 'Read contract state (view-only, no fees).',
-    parameters: {
-      type: 'object',
-      properties: {
-        contractId: {
-          type: 'string',
-          description: 'Contract ID',
-        },
-        method: {
-          type: 'string',
-          description: 'View method name',
-        },
-      },
-      required: ['contractId', 'method'],
-    },
-  },
-  {
-    name: 'upgrade_contract',
-    description: 'Upgrade contract to new WASM version.',
-    parameters: {
-      type: 'object',
-      properties: {
-        contractId: {
-          type: 'string',
-          description: 'Contract ID',
-        },
-        newWasmHash: {
-          type: 'string',
-          description: 'New WASM hash',
-        },
-      },
-      required: ['contractId', 'newWasmHash'],
-    },
-  },
-  {
-    name: 'stream_events',
-    description: 'Stream contract events in real-time.',
-    parameters: {
-      type: 'object',
-      properties: {
-        contractId: {
-          type: 'string',
-          description: 'Contract ID',
-        },
-        minutes: {
-          type: 'number',
-          description: 'Duration to stream (minutes)',
-          default: 10,
-        },
-      },
-      required: ['contractId'],
     },
   },
 
@@ -615,7 +506,6 @@ Key capabilities:
 - Wallet management (fund, check balances)
 - Asset operations (create, transfer, batch transfers)
 - Trustlines (setup, revoke)
-- Smart contracts (deploy, invoke, read, upgrade)
 - DEX operations (swap, add/remove liquidity, analytics)
 - NFTs (mint, transfer, burn, list)
 - Transaction management (simulate, history, explorer)
@@ -671,7 +561,6 @@ When a user clearly requests a blockchain operation (transfer, swap, deploy, etc
 Examples of direct execution:
 - "Transfer 100 XLM to GABC..." → Immediately call transfer_asset function
 - "Swap 50 XLM for USDC" → Immediately call swap_assets function
-- "Deploy contract with hash XYZ" → Immediately call deploy_contract function
 
 IMPORTANT - Handling Percentage/Relative Amounts (MULTI-STEP OPERATIONS):
 When users say "swap half of my XLM" or "transfer 50% of my balance", you MUST perform BOTH steps:
@@ -1107,8 +996,6 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           return await service.getBalance(args.publicKey);
         case 'create_account':
           return await service.createAccount(args.seedAmount);
-        case 'export_secret_key':
-          return await service.exportSecretKey(sessionId);
 
         // Asset operations
         case 'create_asset':
@@ -1139,27 +1026,6 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
           );
         case 'revoke_trustline':
           return await service.revokeTrustline(sessionId, args.assetCode, args.issuer);
-
-        // Contract operations
-        case 'deploy_contract':
-          return await service.deployContract(sessionId, args.wasmHash, args.contractId);
-        case 'invoke_contract':
-          return await service.invokeContract(
-            sessionId,
-            args.contractId,
-            args.method,
-            args.args || []
-          );
-        case 'read_contract':
-          return await service.readContract(args.contractId, args.method);
-        case 'upgrade_contract':
-          return await service.upgradeContract(
-            sessionId,
-            args.contractId,
-            args.newWasmHash
-          );
-        case 'stream_events':
-          return await service.streamEvents(args.contractId, args.minutes);
 
         // DEX operations
         case 'swap_assets':
@@ -1396,6 +1262,111 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         error: error.message,
         message: `Failed to execute swap: ${error.message}`,
         functionCalled: 'swap_assets',
+        functionResult: { success: false, error: error.message },
+        type: 'function_call',
+      };
+    }
+  }
+
+  /**
+   * Install WASM to Stellar network (wrapper for direct file upload)
+   */
+  async installWasm(
+    sessionId: string,
+    walletAddress: string,
+    wasmBuffer: Buffer
+  ): Promise<any> {
+    try {
+      console.log('[Terminal AI] Installing WASM:', { sessionId, walletAddress, size: wasmBuffer.length });
+      
+      const service = stellarTerminalService;
+      
+      // Ensure wallet is connected in session
+      const session = (service as any).sessions?.get(sessionId);
+      if (!session || session.publicKey !== walletAddress) {
+        // Connect wallet if not already connected
+        await service.connectWallet(sessionId, walletAddress);
+      }
+      
+      const result = await service.installWasm(sessionId, wasmBuffer);
+
+      console.log('[Terminal AI] WASM install result:', JSON.stringify(result, null, 2));
+
+      // Add to conversation history
+      const context = this.conversationHistory.get(sessionId);
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `Executed install_wasm function for WASM file (${wasmBuffer.length} bytes)`,
+        });
+        
+        context.messages.push({
+          role: 'tool',
+          content: JSON.stringify(result),
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+
+      // Format response
+      if (result.action) {
+        const responseMessage = `📤 **WASM Ready to Install**\n\nSize: ${(wasmBuffer.length / 1024).toFixed(2)} KB\n\nPlease sign the transaction with your wallet to upload the WASM to Stellar.`;
+        
+        if (context) {
+          context.messages.push({
+            role: 'assistant',
+            content: responseMessage,
+          });
+          context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+        }
+        
+        return {
+          success: true,
+          message: responseMessage,
+          functionCalled: 'install_wasm',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      if (!result.success) {
+        const errorMsg = result.error || 'WASM installation failed';
+        console.error('[Terminal AI] WASM install failed:', errorMsg);
+        
+        return {
+          success: false,
+          error: errorMsg,
+          message: errorMsg,
+          functionCalled: 'install_wasm',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      const responseMessage = result.message || 'WASM installed successfully';
+      
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: responseMessage,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+
+      return {
+        success: true,
+        message: responseMessage,
+        functionCalled: 'install_wasm',
+        functionResult: result,
+        type: 'function_call',
+      };
+    } catch (error: any) {
+      console.error('[Terminal AI] WASM install error:', error);
+      
+      return {
+        success: false,
+        error: error.message,
+        message: `Failed to install WASM: ${error.message}`,
+        functionCalled: 'install_wasm',
         functionResult: { success: false, error: error.message },
         type: 'function_call',
       };

@@ -137,7 +137,7 @@ The Wallet Kit integration is utilized across all major features:
 ### Why Syft?
 
 - **🎨 Three Ways to Build**: Visual canvas, AI chat, or voice commands
-- **💻 Terminal AI Command Center**: Execute any blockchain operation with natural language (deploy contracts, swap assets, mint NFTs, manage liquidity, and more)
+- **💻 Terminal AI Command Center**: Execute any blockchain operation with natural language (swap assets, mint NFTs, manage liquidity, and more)
 - **🤖 GPT-5 Nano Powered**: Advanced AI model (gpt-5-nano-2025-08-07) for intelligent strategy creation
 - **🖼️ NFT Marketplace**: Monetize your strategies by minting and selling vault NFTs
 - **📊 Comprehensive Analytics**: Real-time monitoring, backtesting, and performance tracking
@@ -373,7 +373,6 @@ The Terminal AI is a powerful natural language interface that transforms how you
    - Fund account from Friendbot faucet
    - Check XLM and custom asset balances
    - Create new accounts
-   - Export secret key (with security warnings)
 
 2. **Asset Operations** 💰
    - Create custom assets (e.g., MYCATTY, SYFT)
@@ -386,55 +385,48 @@ The Terminal AI is a powerful natural language interface that transforms how you
    - Revoke existing trustlines
    - Manage asset permissions
 
-4. **Smart Contracts** 📜
-   - Deploy Soroban contracts
-   - Invoke contract functions
-   - Read contract state (view functions)
-   - Upgrade existing contracts
-   - Stream contract events
-
-5. **DEX & Liquidity** 💱
+4. **DEX & Liquidity** 💱
    - Swap assets on Stellar DEX
    - Add liquidity to pools
    - Remove liquidity
    - View pool analytics and prices
 
-6. **NFTs** 🎨
+5. **NFTs** 🎨
    - Mint NFTs with AI-generated artwork
    - Transfer NFT ownership
    - Burn NFTs
    - List and view owned NFTs
 
-7. **Transaction Management** 📋
+6. **Transaction Management** 📋
    - Simulate transactions before submission
    - View transaction history
    - Search transactions on Stellar Explorer
    - Batch operations
 
-8. **Network Analytics** 📊
+7. **Network Analytics** 📊
    - Get network statistics
    - Query price oracles
    - Check protocol yields
    - Monitor gas fees
 
-9. **Web Search & Data Retrieval** 🔍
+8. **Web Search & Data Retrieval** 🔍
    - Real-time info via **Tavily API**
    - Look up asset issuers
    - Find contract addresses
    - Fetch documentation
    - Get market data
 
-10. **Federated Addresses** 🌐
-    - Resolve federated addresses (user*domain)
-    - Convert to Stellar public keys
+9. **Federated Addresses** 🌐
+   - Resolve federated addresses (user*domain)
+   - Convert to Stellar public keys
 
-11. **Advanced Multi-Step Actions** 🎯
+10. **Advanced Multi-Step Actions** 🎯
     - Balance-based operations (e.g., "swap half my XLM")
     - Automatic balance checks
     - Sequential execution
     - Error handling and retries
 
-12. **Batch Workflows** ⚡
+11. **Batch Workflows** ⚡
     - Execute multiple transfers in one operation
     - Coordinate complex multi-step actions
     - Optimize gas costs
@@ -459,7 +451,6 @@ The Terminal AI is a powerful natural language interface that transforms how you
 "Transfer 100 XLM to GDSAMPLE..."
 "Swap 50% of my XLM for USDC"
 "What's the current XLM price?"
-"Deploy my vault contract"
 "List my NFTs"
 ```
 

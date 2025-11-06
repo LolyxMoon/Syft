@@ -56,8 +56,7 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 ✨ **Wallet Operations:** Check balances, fund from faucet
 💰 **Asset Management:** Create assets, transfer funds, batch transactions
 🔗 **Trustlines:** Setup and manage asset trustlines
-📜 **Smart Contracts:** Deploy, invoke, and upgrade Soroban contracts
-💱 **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
+ **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
 🎨 **NFTs:** Mint, transfer, burn, and list NFTs with AI-generated artwork
 📊 **Analytics:** Transaction history, network stats, price oracles
 🔍 **Explorer:** Search transactions and accounts
@@ -139,8 +138,7 @@ I'm your intelligent blockchain assistant for the Stellar testnet. I can help yo
 ✨ **Wallet Operations:** Check balances, fund from faucet
 💰 **Asset Management:** Create assets, transfer funds, batch transactions
 🔗 **Trustlines:** Setup and manage asset trustlines
-📜 **Smart Contracts:** Deploy, invoke, and upgrade Soroban contracts
-💱 **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
+ **DEX Trading:** Swap assets, add/remove liquidity, check pool analytics
 🎨 **NFTs:** Mint, transfer, burn, and list NFTs with AI-generated artwork
 📊 **Analytics:** Transaction history, network stats, price oracles
 🔍 **Explorer:** Search transactions and accounts

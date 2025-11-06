@@ -201,6 +201,96 @@ async function processDirectSwap(
 }
 
 /**
+ * POST /api/terminal/upload-wasm
+ * Upload WASM file and install it to Stellar network
+ */
+router.post('/upload-wasm', express.raw({ type: 'multipart/form-data', limit: '10mb' }), async (req, res): Promise<void> => {
+  try {
+    // Note: For production, you should use multer for proper multipart form handling
+    // This is a simplified implementation that expects base64-encoded WASM
+    const contentType = req.headers['content-type'] || '';
+    
+    if (!contentType.includes('multipart/form-data')) {
+      res.status(400).json({ error: 'Content-Type must be multipart/form-data' });
+      return;
+    }
+
+    // Parse multipart form data manually (simplified)
+    // In production, use multer middleware
+    const body = req.body.toString();
+    const sessionIdMatch = body.match(/name="sessionId"\r?\n\r?\n([^\r\n]+)/);
+    const walletMatch = body.match(/name="walletAddress"\r?\n\r?\n([^\r\n]+)/);
+    
+    const sessionId = sessionIdMatch ? sessionIdMatch[1] : null;
+    const walletAddress = walletMatch ? walletMatch[1] : null;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required' });
+      return;
+    }
+
+    if (!walletAddress) {
+      res.status(400).json({ error: 'Wallet must be connected to upload WASM' });
+      return;
+    }
+
+    // Extract WASM file from multipart
+    const fileMatch = body.match(/Content-Type: application\/wasm\r?\n\r?\n([\s\S]+?)\r?\n--/);
+    if (!fileMatch) {
+      res.status(400).json({ error: 'No WASM file found in upload' });
+      return;
+    }
+
+    const wasmBuffer = Buffer.from(fileMatch[1], 'binary');
+
+    // Create a job ID for this upload
+    const jobId = `wasm_upload_${sessionId}_${Date.now()}`;
+    
+    // Create the job
+    jobQueue.createJob(jobId);
+
+    // Start processing in background
+    processWasmUpload(jobId, sessionId, walletAddress, wasmBuffer);
+
+    // Return job ID immediately
+    res.json({
+      success: true,
+      jobId,
+      status: 'processing',
+      message: 'WASM upload is being processed',
+    });
+  } catch (error: any) {
+    console.error('WASM upload error:', error);
+    res.status(500).json({
+      error: 'Failed to process WASM upload',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Background processing for WASM upload
+ */
+async function processWasmUpload(
+  jobId: string,
+  sessionId: string,
+  walletAddress: string,
+  wasmBuffer: Buffer
+) {
+  try {
+    jobQueue.markProcessing(jobId);
+
+    // Call the install_wasm function via terminalAIService
+    const response = await terminalAIService.installWasm(sessionId, walletAddress, wasmBuffer);
+
+    jobQueue.completeJob(jobId, response);
+  } catch (error: any) {
+    console.error('WASM upload processing error:', error);
+    jobQueue.failJob(jobId, error.message);
+  }
+}
+
+/**
  * POST /api/terminal/clear
  * Clear conversation history for a session
  */
