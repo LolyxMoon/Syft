@@ -1201,7 +1201,6 @@ const VaultBuilder = () => {
                   >
                     <TrendingUp className="w-4 h-4" />
                     <span>Yields</span>
-                    <Sparkles className="w-3 h-3 text-primary-400" />
                   </button>
                 </div>
 
