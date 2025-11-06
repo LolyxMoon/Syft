@@ -29,15 +29,14 @@ export async function syncVaultState(vaultId: string): Promise<boolean> {
     }
 
     // Update vault in database
-    // Update both current_state column and config.current_state for compatibility
+    // Store state in config.current_state (config is JSONB column)
     const { error: updateError } = await supabase
       .from('vaults')
       .update({
         updated_at: new Date().toISOString(),
-        current_state: state, // Direct column update
         config: {
           ...vault.config,
-          current_state: state, // Nested config update
+          current_state: state,
         },
       })
       .eq('vault_id', vaultId);
