@@ -630,6 +630,115 @@ export async function getVaultAnalytics(vaultId: string): Promise<VaultAnalytics
 }
 
 /**
+ * OPTIMIZED: Get vault analytics for multiple vaults in a single bulk query
+ * This reduces database round trips from N queries to 1 query
+ */
+async function getBulkVaultAnalytics(vaultIds: string[]): Promise<Map<string, VaultAnalytics>> {
+  const result = new Map<string, VaultAnalytics>();
+  
+  if (vaultIds.length === 0) return result;
+
+  try {
+    console.log(`[getBulkVaultAnalytics] Fetching analytics for ${vaultIds.length} vaults in bulk`);
+    const startTime = Date.now();
+
+    // Get all vaults first
+    const { data: vaults } = await supabase
+      .from('vaults')
+      .select('id, vault_id, contract_address, network, config')
+      .in('vault_id', vaultIds);
+
+    if (!vaults || vaults.length === 0) {
+      console.warn('[getBulkVaultAnalytics] No vaults found');
+      return result;
+    }
+
+    console.log(`[getBulkVaultAnalytics] Found ${vaults.length} vaults`);
+
+    // Get vault UUIDs for performance lookup
+    const vaultUUIDs = vaults.map(v => v.id);
+
+    // Get latest performance snapshot for each vault in ONE query
+    const { data: allSnapshots } = await supabase
+      .from('vault_performance')
+      .select('*')
+      .in('vault_id', vaultUUIDs)
+      .order('timestamp', { ascending: false });
+
+    // Group snapshots by vault and get the latest one for each
+    const latestSnapshots = new Map<string, any>();
+    if (allSnapshots) {
+      for (const snapshot of allSnapshots) {
+        // Map by vault UUID to vault_id
+        const vault = vaults.find(v => v.id === snapshot.vault_id);
+        if (vault && !latestSnapshots.has(vault.vault_id)) {
+          latestSnapshots.set(vault.vault_id, snapshot);
+        }
+      }
+    }
+
+    console.log(`[getBulkVaultAnalytics] Found snapshots for ${latestSnapshots.size} vaults`);
+
+    // Process each vault
+    for (const vault of vaults) {
+      try {
+        const snapshot = latestSnapshots.get(vault.vault_id);
+        
+        // Get TVL - prioritize snapshot, fallback to current_state
+        let tvl = snapshot?.total_value || 0;
+        if (tvl === 0 && vault.config?.current_state?.totalValue) {
+          const { stroopsToUSD } = await import('./priceService.js');
+          const stroopsValue = parseFloat(vault.config.current_state.totalValue);
+          tvl = await stroopsToUSD(stroopsValue);
+          console.log(`[getBulkVaultAnalytics] ${vault.vault_id} - Using live TVL: $${tvl.toFixed(2)}`);
+        }
+        
+        // Use pre-calculated APY from snapshot if available, otherwise calculate it
+        const apy = snapshot?.apy_current || 0;
+
+        // Get transaction totals
+        const { totalDeposits, totalWithdrawals } = await getTransactionTotals(vault.vault_id, tvl);
+        const netDeposits = totalDeposits - totalWithdrawals;
+        
+        let totalEarnings = tvl - netDeposits;
+        if (totalEarnings < -tvl) totalEarnings = 0;
+        if (totalEarnings < 0 && Math.abs(totalEarnings) < tvl * 0.01 && totalDeposits === totalWithdrawals) {
+          totalEarnings = 0;
+        }
+
+        const earningsPercentage = netDeposits > 0 ? (totalEarnings / netDeposits) * 100 : 0;
+        const totalShares = vault.config?.current_state?.totalShares || '0';
+        const sharePrice = Number(totalShares) > 0 ? tvl / Number(totalShares) : 1.0;
+
+        result.set(vault.vault_id, {
+          vaultId: vault.vault_id,
+          tvl,
+          tvlChange24h: snapshot?.returns_24h || 0,
+          tvlChange7d: snapshot?.returns_7d || 0,
+          apy,
+          totalDeposits,
+          totalWithdrawals,
+          netDeposits,
+          totalEarnings,
+          earningsPercentage,
+          sharePrice,
+          totalShares,
+          lastUpdated: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error(`[getBulkVaultAnalytics] Error processing vault ${vault.vault_id}:`, err);
+      }
+    }
+
+    console.log(`[getBulkVaultAnalytics] Completed in ${Date.now() - startTime}ms`);
+    return result;
+  } catch (error) {
+    console.error('[getBulkVaultAnalytics] Error:', error);
+    return result;
+  }
+}
+
+/**
  * Calculate asset correlations based on portfolio allocation data
  */
 async function calculateAssetCorrelations(
@@ -958,10 +1067,10 @@ export async function getPortfolioAnalytics(
       };
     }
 
-    // Get analytics for each vault
-    const vaultAnalytics = await Promise.all(
-      vaults.map(v => getVaultAnalytics(v.vault_id))
-    );
+    // OPTIMIZED: Get analytics for all vaults in one bulk query
+    const vaultIds = vaults.map(v => v.vault_id);
+    const bulkAnalytics = await getBulkVaultAnalytics(vaultIds);
+    const vaultAnalytics = Array.from(bulkAnalytics.values());
 
     // Calculate portfolio totals
     const totalTVL = vaultAnalytics.reduce((sum, va) => sum + va.tvl, 0);
@@ -1264,27 +1373,30 @@ export async function getPortfolioAllocation(
 
     if (!vaults || vaults.length === 0) return [];
 
-    // Get analytics for each vault to get TVL
-    const vaultAnalytics = await Promise.all(
-      vaults.map(v => getVaultAnalytics(v.vault_id))
-    );
+    // OPTIMIZED: Get analytics for all vaults in one bulk query
+    const vaultIds = vaults.map(v => v.vault_id);
+    const bulkAnalytics = await getBulkVaultAnalytics(vaultIds);
 
-    const totalTVL = vaultAnalytics.reduce((sum, va) => sum + va.tvl, 0);
+    const totalTVL = Array.from(bulkAnalytics.values()).reduce((sum, va) => sum + va.tvl, 0);
 
     if (totalTVL === 0) return [];
 
     // Calculate asset allocation based on ACTUAL on-chain balances, not configured allocations
     const assetMap = new Map<string, number>();
 
-    for (let i = 0; i < vaults.length; i++) {
-      const vault = vaults[i];
-      
+    for (const vault of vaults) {
       console.log(`[getPortfolioAllocation] Processing vault ${vault.vault_id}`);
+      
+      // Get analytics for this specific vault from the bulk results
+      const analytics = bulkAnalytics.get(vault.vault_id);
+      if (!analytics) {
+        console.warn(`[getPortfolioAllocation] No analytics found for vault ${vault.vault_id}`);
+        continue;
+      }
       
       // Skip vaults with null or missing contract addresses
       if (!vault.contract_address) {
         console.warn(`[getPortfolioAllocation] Vault ${vault.vault_id} has no contract address, using configured allocations`);
-        const analytics = vaultAnalytics[i];
         const vaultTVL = analytics.tvl;
         const assets = vault.config?.assets || [];
 
@@ -1340,7 +1452,6 @@ export async function getPortfolioAllocation(
           // Fallback: use configured allocations if we can't get actual balances
           console.warn(`[getPortfolioAllocation] No asset balances from contract, falling back to configured allocations`);
           
-          const analytics = vaultAnalytics[i];
           const vaultTVL = analytics.tvl;
           const assets = vault.config?.assets || [];
 
@@ -1378,7 +1489,7 @@ export async function getPortfolioAllocation(
     const totalAssetValue = Array.from(assetMap.values()).reduce((sum, val) => sum + val, 0);
     
     // Calculate total earnings from all vaults (avoid circular dependency)
-    const totalEarnings = vaultAnalytics.reduce((sum, va) => sum + va.totalEarnings, 0);
+    const totalEarnings = Array.from(bulkAnalytics.values()).reduce((sum, va) => sum + va.totalEarnings, 0);
     
     const allocation = Array.from(assetMap.entries())
       .map(([asset, value]) => {
@@ -1658,10 +1769,19 @@ export async function getVaultBreakdown(userAddress: string, network: string = '
 
     if (!vaults || vaults.length === 0) return [];
 
+    // OPTIMIZED: Get analytics for all vaults in one bulk query
+    const vaultIds = vaults.map(v => v.vault_id);
+    const bulkAnalytics = await getBulkVaultAnalytics(vaultIds);
+
     // Get analytics for each vault
     const vaultAnalytics = await Promise.all(
       vaults.map(async (vault) => {
-        const analytics = await getVaultAnalytics(vault.vault_id);
+        const analytics = bulkAnalytics.get(vault.vault_id);
+        if (!analytics) {
+          console.warn(`[getVaultBreakdown] No analytics for vault ${vault.vault_id}`);
+          return null;
+        }
+
         const [sharpeRatio, maxDrawdown, volatility] = await Promise.all([
           calculateSharpeRatio(vault.vault_id),
           calculateMaxDrawdown(vault.vault_id),
@@ -1700,7 +1820,9 @@ export async function getVaultBreakdown(userAddress: string, network: string = '
       })
     );
 
-    return vaultAnalytics.sort((a, b) => b.tvl - a.tvl);
+    return vaultAnalytics
+      .filter((v): v is NonNullable<typeof v> => v !== null)
+      .sort((a, b) => b.tvl - a.tvl);
   } catch (error) {
     console.error('[getVaultBreakdown] Error:', error);
     throw error;
