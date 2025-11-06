@@ -213,7 +213,7 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
           {/* Contract Address with Validation */}
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1 flex items-center justify-between">
-              <span>Contract Address (Soroban) or Issuer (Classic)</span>
+              <span>Soroban Contract Address</span>
               {isValidating && <span className="text-[10px] text-yellow-500">Validating...</span>}
               {isValid === true && <CheckCircle className="w-3 h-3 text-green-500" />}
               {isValid === false && <span className="text-[10px] text-red-500">Invalid</span>}
@@ -222,7 +222,7 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
               type="text"
               value={localAssetIssuer}
               onChange={(e) => handleAssetIssuerChange(e.target.value)}
-              placeholder="C... (56 chars) or G... (Classic)"
+              placeholder="C... (56 chars, Soroban only)"
               className={`w-full px-2 py-1 text-xs bg-gray-50 dark:bg-gray-900 border rounded focus:outline-none focus:ring-2 text-gray-900 dark:text-white font-mono ${
                 isValid === false 
                   ? 'border-red-500 focus:ring-red-500' 
@@ -232,7 +232,7 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
               }`}
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              💡 Use 'C' address for Soroban tokens
+              ⚠️ Only Soroban tokens (C address) are supported
             </p>
           </div>
         </div>

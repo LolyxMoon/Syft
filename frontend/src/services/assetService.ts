@@ -20,6 +20,7 @@ export interface TokenValidationResult {
 
 /**
  * Fetch popular/known tokens for a given network
+ * IMPORTANT: Only returns Soroban tokens (addresses starting with 'C')
  */
 export async function fetchPopularTokens(network: Network = 'testnet'): Promise<TokenInfo[]> {
   try {
@@ -28,7 +29,10 @@ export async function fetchPopularTokens(network: Network = 'testnet'): Promise<
     const data = await response.json();
 
     if (data.success) {
-      return data.tokens;
+      // Filter to only show Soroban tokens (addresses starting with 'C')
+      return data.tokens.filter((token: TokenInfo) => 
+        token.address && token.address.startsWith('C')
+      );
     }
 
     throw new Error(data.error || 'Failed to fetch popular tokens');
@@ -41,17 +45,26 @@ export async function fetchPopularTokens(network: Network = 'testnet'): Promise<
 
 /**
  * Validate a custom token contract address
+ * IMPORTANT: Only accepts Soroban contract addresses (starting with 'C')
+ * Classic Stellar issuers (starting with 'G') are not supported
  */
 export async function validateTokenContract(
   address: string,
   network: Network = 'testnet'
 ): Promise<TokenValidationResult> {
   try {
-    // Basic validation
-    if (!address.startsWith('C') || address.length !== 56) {
+    // Basic validation - MUST be a Soroban contract address (C prefix)
+    if (!address.startsWith('C')) {
       return {
         valid: false,
-        error: 'Invalid contract address format. Must start with C and be 56 characters.',
+        error: 'Only Soroban contract addresses are supported. Address must start with C (not G).',
+      };
+    }
+    
+    if (address.length !== 56) {
+      return {
+        valid: false,
+        error: 'Invalid Soroban contract address length. Must be exactly 56 characters.',
       };
     }
 
@@ -89,19 +102,24 @@ export async function validateTokenContract(
 
 /**
  * Search tokens by symbol or name
+ * IMPORTANT: Only returns Soroban tokens (addresses starting with 'C')
+ * Classic Stellar assets (G issuers) are filtered out
  */
 export async function searchTokens(
   query: string,
   network: Network = 'testnet'
 ): Promise<TokenInfo[]> {
   try {
-    // First try server-side search (will query Horizon API by asset_code)
+    // First try server-side search (will query Soroswap API for Soroban tokens only)
     const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
     const response = await fetch(`${backendUrl}/api/tokens/popular?network=${network}&search=${encodeURIComponent(query)}`);
     const data = await response.json();
 
     if (data.success && data.tokens && data.tokens.length > 0) {
-      return data.tokens;
+      // Filter to only show Soroban tokens (addresses starting with 'C')
+      return data.tokens.filter((token: TokenInfo) => 
+        token.address && token.address.startsWith('C')
+      );
     }
   } catch (error) {
     console.warn('Server-side search failed, falling back to client-side filter:', error);
@@ -110,10 +128,14 @@ export async function searchTokens(
   // Fallback to client-side filtering of cached popular tokens
   const popularTokens = await fetchPopularTokens(network);
   const queryLower = query.toLowerCase();
+  
+  // Filter to only show Soroban tokens (addresses starting with 'C')
   return popularTokens.filter(
     (token) =>
-      token.symbol.toLowerCase().includes(queryLower) ||
-      token.name.toLowerCase().includes(queryLower)
+      (token.symbol.toLowerCase().includes(queryLower) ||
+       token.name.toLowerCase().includes(queryLower)) &&
+      token.address &&
+      token.address.startsWith('C')
   );
 }
 

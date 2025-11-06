@@ -7,6 +7,7 @@ const router = Router();
 /**
  * GET /api/tokens/validate/:address
  * Validate if a token contract exists and implements SEP-41 standard
+ * ⚠️ TESTNET ONLY - Only validates tokens on testnet
  */
 router.get('/validate/:address', async (req: Request, res: Response) => {
   try {
@@ -21,7 +22,9 @@ router.get('/validate/:address', async (req: Request, res: Response) => {
       });
     }
 
-    const userNetwork = (network as string) || 'testnet';
+    // FORCE TESTNET ONLY - ignore user's network parameter
+    const userNetwork = 'testnet';
+    console.log(`[Tokens API] Forcing testnet validation only. Original request: ${network}, Using: ${userNetwork}`);
     const servers = getNetworkServers(userNetwork);
 
     // Try to get token metadata
@@ -149,23 +152,26 @@ router.get('/validate/:address', async (req: Request, res: Response) => {
  */
 router.get('/popular', async (req: Request, res: Response) => {
   try {
-    const { network, limit, search } = req.query;
-    const userNetwork = (network as string) || 'testnet';
+    const { network, limit } = req.query;
+    // FORCE TESTNET ONLY - ignore user's network parameter
+    const userNetwork = 'testnet';
     const resultLimit = parseInt(limit as string) || 100; // Default to 100 tokens
-    const searchQuery = (search as string)?.toUpperCase() || '';
+    
+    console.log(`[Tokens API] Forcing testnet network only. Original request: ${network}, Using: ${userNetwork}`);
     
     try {
-      // Strategy: Fetch from both Soroswap (curated, high-quality) and Horizon (comprehensive)
+      // Strategy: Fetch only from Soroswap testnet (curated, high-quality Soroban tokens)
       const tokens: any[] = [];
       
-      // 1. First get curated tokens from Soroswap
+      // 1. Get curated tokens from Soroswap - TESTNET ONLY
       try {
         const soroswapUrl = 'https://api.soroswap.finance/api/tokens';
         const soroswapResponse = await fetch(soroswapUrl);
         
         if (soroswapResponse.ok) {
           const soroswapData = await soroswapResponse.json() as any;
-          const networkData = soroswapData.find((n: any) => n.network === userNetwork.toLowerCase());
+          // FORCE testnet network search
+          const networkData = soroswapData.find((n: any) => n.network === 'testnet');
           
           if (networkData && networkData.assets) {
             networkData.assets.forEach((asset: any) => {
@@ -195,6 +201,13 @@ router.get('/popular', async (req: Request, res: Response) => {
       }
       
       // 2. Then get comprehensive list from Stellar Horizon (Classic assets)
+      // NOTE: We SKIP Horizon API entirely because custom asset nodes should only show Soroban tokens (C addresses)
+      // Classic assets (G issuers) are not compatible with Soroban vault contracts
+      // If users need Classic assets, they must be wrapped to Soroban first
+      console.log(`[Tokens API] Skipping Horizon Classic assets - only Soroban tokens (C addresses) are supported`);
+      
+      // We intentionally comment out the Horizon API call to prevent Classic assets from appearing
+      /*
       try {
         const horizonUrls: { [key: string]: string } = {
           testnet: 'https://horizon-testnet.stellar.org',
@@ -245,6 +258,7 @@ router.get('/popular', async (req: Request, res: Response) => {
       } catch (err) {
         console.warn('Failed to fetch from Horizon:', err);
       }
+      */
       
       // Sort: Verified (Soroswap) first, then by number of accounts
       tokens.sort((a, b) => {
@@ -255,15 +269,15 @@ router.get('/popular', async (req: Request, res: Response) => {
       
       return res.json({
         success: true,
-        network: userNetwork,
+        network: 'testnet',
         tokens: tokens.slice(0, resultLimit),
         total: tokens.length,
-        sources: ['soroswap', 'horizon'],
-        note: 'Token list includes both Soroban (Soroswap) and Stellar Classic assets (Horizon)',
+        sources: ['soroswap-testnet'],
+        note: '⚠️ TESTNET ONLY: Token list includes only Soroban testnet tokens (contract addresses starting with C). Classic Stellar assets are not supported.',
       });
     } catch (fetchError) {
-      // Fallback to hardcoded minimal list if API fails
-      console.warn('Failed to fetch from Soroswap API, using fallback:', fetchError);
+      // Fallback to hardcoded testnet list if API fails
+      console.warn('Failed to fetch from Soroswap API, using testnet fallback:', fetchError);
       
       const fallbackTokens: { [key: string]: any[] } = {
         testnet: [
@@ -302,14 +316,15 @@ router.get('/popular', async (req: Request, res: Response) => {
         ],
       };
       
-      const tokens = fallbackTokens[userNetwork.toLowerCase()] || fallbackTokens.testnet;
+      // FORCE testnet fallback only
+      const tokens = fallbackTokens.testnet;
       
       return res.json({
         success: true,
-        network: userNetwork,
+        network: 'testnet',
         tokens,
-        source: 'fallback',
-        note: 'Using fallback token list. Soroswap API unavailable.',
+        source: 'fallback-testnet',
+        note: '⚠️ TESTNET ONLY: Using fallback testnet token list. Soroswap API unavailable.',
       });
     }
   } catch (error) {

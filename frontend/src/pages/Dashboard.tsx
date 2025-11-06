@@ -529,10 +529,11 @@ const Dashboard = () => {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: '#16181a',
-                          border: '1px solid rgba(255,255,255,0.06)',
+                          backgroundColor: '#2a2d31',
+                          border: '1px solid rgba(255,255,255,0.2)',
                           borderRadius: '6px',
                           fontSize: '12px',
+                          color: '#ffffff',
                         }}
                         formatter={(value: number, _name: string, props: any) => [
                           `$${value.toFixed(2)} (${props.payload.percentage.toFixed(1)}%)`,

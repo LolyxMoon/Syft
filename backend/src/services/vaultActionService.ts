@@ -226,11 +226,7 @@ export async function buildDepositTransaction(
         throw new Error(
           `No liquidity pool found between your deposit token and ${baseTokenInfo}.\n\n` +
           `This vault's base token is ${baseTokenInfo}, but you're trying to deposit a different token. ` +
-          `Most token pairs don't have liquidity pools on testnet yet.\n\n` +
-          `To deposit successfully:\n` +
-          `1. Deposit ${baseTokenInfo} directly (recommended)\n` +
-          `2. Swap your tokens to ${baseTokenInfo} on Soroswap first\n` +
-          `3. Create a vault with XLM as the base token (XLM has the most liquidity pools)`
+          `Most token pairs don't have liquidity pools on testnet yet.\n\n`
         );
       }
       
@@ -261,11 +257,7 @@ export async function buildDepositTransaction(
         throw new Error(
           `No liquidity pool found between your deposit token and ${baseTokenInfo}.\n\n` +
           `This vault's base token is ${baseTokenInfo}, but you're trying to deposit a different token. ` +
-          `Most token pairs don't have liquidity pools on testnet yet.\n\n` +
-          `To deposit successfully:\n` +
-          `1. Deposit ${baseTokenInfo} directly (recommended)\n` +
-          `2. Swap your tokens to ${baseTokenInfo} on Soroswap first\n` +
-          `3. Create a vault with XLM as the base token (XLM has the most liquidity pools)`
+          `Most token pairs don't have liquidity pools on testnet yet.\n\n`
         );
       }
 
