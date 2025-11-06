@@ -22,7 +22,9 @@ export class BlockValidator {
     if (source.type === 'asset' && target.type !== 'condition') {
       return {
         valid: false,
-        message: 'Assets can only connect to Conditions',
+        message: target.type === 'action' 
+          ? 'Assets cannot connect directly to Actions. You need a Condition in between.\n\nCorrect flow: Asset → Condition → Action'
+          : 'Assets can only connect to Conditions',
       };
     }
 
@@ -30,7 +32,7 @@ export class BlockValidator {
     if (source.type === 'condition' && target.type === 'asset') {
       return {
         valid: false,
-        message: 'Conditions cannot connect back to Assets',
+        message: 'Conditions cannot connect back to Assets.\n\nConditions should flow forward to Actions or other Conditions.',
       };
     }
 

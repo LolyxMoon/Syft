@@ -107,16 +107,19 @@
 **Precondition**: Multiple blocks on canvas
 
 ### Test Steps
-1. Try connecting Asset → Condition → Action
-2. Try invalid connections
+1. Try connecting Asset → Condition → Action (valid flow)
+2. Try connecting Asset → Action directly
+3. Try connecting Condition → Asset (backward)
+4. Try connecting Action → anything (terminal block)
 
 ### Expected Results
-- ✅ Valid flow: Asset → Condition → Action
-- ✅ Cannot connect Action → Asset (wrong direction)
-- ✅ Cannot connect Asset → Action (missing condition)
-- ✅ Visual feedback for invalid connections (red line/X)
-- ✅ Snapping effect for valid connections
-- ✅ Can disconnect by clicking connection line
+- ✅ Valid flow: Asset → Condition → Action works
+- ✅ Cannot connect Asset → Action: Error message "Assets cannot connect directly to Actions. You need a Condition in between. Correct flow: Asset → Condition → Action"
+- ✅ Cannot connect Condition → Asset: Error message "Conditions cannot connect back to Assets. Conditions should flow forward to Actions or other Conditions."
+- ✅ Cannot connect Action → anything: Error message "Actions are terminal blocks and cannot have outputs"
+- ✅ Error modal appears with title "Connection Not Allowed"
+- ✅ Invalid connection is prevented (not added to canvas)
+- ✅ Can disconnect by selecting and deleting connection line
 
 ---
 

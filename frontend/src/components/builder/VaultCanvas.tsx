@@ -19,6 +19,8 @@ import AssetBlock from './blocks/AssetBlock';
 import ConditionBlock from './blocks/ConditionBlock';
 import ActionBlock from './blocks/ActionBlock';
 import type { PaletteItem } from '../../types/blocks';
+import { BlockValidator } from '../../lib/blockValidator';
+import { useModal } from '../ui/Modal/useModal';
 
 interface VaultCanvasProps {
   initialNodes?: Node[];
@@ -52,6 +54,7 @@ const VaultCanvas = ({ initialNodes = [], initialEdges = [], onNodesChange, onEd
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState<Edge>(initialEdges);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [nodeId, setNodeId] = useState(0);
+  const modal = useModal();
 
   // Track if we're currently syncing from parent to avoid loops
   const isSyncingFromParent = useRef(false);
@@ -88,9 +91,37 @@ const VaultCanvas = ({ initialNodes = [], initialEdges = [], onNodesChange, onEd
 
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
+      // Find source and target nodes
+      const sourceNode = nodes.find(n => n.id === connection.source);
+      const targetNode = nodes.find(n => n.id === connection.target);
+
+      if (!sourceNode || !targetNode) {
+        modal.message('Cannot create connection: Source or target node not found', 'Connection Error', 'error');
+        return;
+      }
+
+      // Validate the connection
+      const validation = BlockValidator.isValidConnection(
+        sourceNode,
+        targetNode,
+        connection.sourceHandle || undefined,
+        connection.targetHandle || undefined
+      );
+
+      if (!validation.valid) {
+        // Show error message to user
+        modal.message(
+          validation.message || 'Invalid connection',
+          'Connection Not Allowed',
+          'error'
+        );
+        return;
+      }
+
+      // Connection is valid, add it
       setEdges((eds) => addEdge({ ...connection, animated: true } as Edge, eds));
     },
-    [setEdges]
+    [setEdges, nodes, modal]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
