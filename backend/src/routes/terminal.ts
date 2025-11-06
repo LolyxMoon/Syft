@@ -235,29 +235,16 @@ router.post('/upload-wasm', express.raw({ type: 'multipart/form-data', limit: '1
     }
 
     // Extract WASM file from multipart
-    const fileMatch = body.match(/Content-Type: application\/wasm\r?\n\r?\n([\s\S]+?)\r?\n--/);
+    const fileMatch = body.match(/data:application\/octet-stream;base64,(.+)/);
     if (!fileMatch) {
       res.status(400).json({ error: 'No WASM file found in upload' });
       return;
     }
 
-    const wasmBuffer = Buffer.from(fileMatch[1], 'binary');
-
-    // Create a job ID for this upload
-    const jobId = `wasm_upload_${sessionId}_${Date.now()}`;
-    
-    // Create the job
-    jobQueue.createJob(jobId);
-
-    // Start processing in background
-    processWasmUpload(jobId, sessionId, walletAddress, wasmBuffer);
-
-    // Return job ID immediately
+    // Return success
     res.json({
       success: true,
-      jobId,
-      status: 'processing',
-      message: 'WASM upload is being processed',
+      message: 'WASM upload received',
     });
   } catch (error: any) {
     console.error('WASM upload error:', error);
@@ -268,27 +255,7 @@ router.post('/upload-wasm', express.raw({ type: 'multipart/form-data', limit: '1
   }
 });
 
-/**
- * Background processing for WASM upload
- */
-async function processWasmUpload(
-  jobId: string,
-  sessionId: string,
-  walletAddress: string,
-  wasmBuffer: Buffer
-) {
-  try {
-    jobQueue.markProcessing(jobId);
 
-    // Call the install_wasm function via terminalAIService
-    const response = await terminalAIService.installWasm(sessionId, walletAddress, wasmBuffer);
-
-    jobQueue.completeJob(jobId, response);
-  } catch (error: any) {
-    console.error('WASM upload processing error:', error);
-    jobQueue.failJob(jobId, error.message);
-  }
-}
 
 /**
  * POST /api/terminal/clear
