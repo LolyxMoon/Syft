@@ -77,7 +77,7 @@ export async function evaluateVaultRules(vaultId: string): Promise<RuleTrigger[]
       
       // Check if rule was recently triggered (cooldown period)
       const lastTrigger = vault.metadata?.lastRuleTrigger?.[i];
-      const cooldownMinutes = 5; // 5 minute cooldown between triggers
+      const cooldownMinutes = 1; // 5 minute cooldown between triggers
       
       if (lastTrigger && (Date.now() - lastTrigger) < cooldownMinutes * 60 * 1000) {
         const remainingCooldown = Math.ceil((cooldownMinutes * 60 * 1000 - (Date.now() - lastTrigger)) / 60000);
