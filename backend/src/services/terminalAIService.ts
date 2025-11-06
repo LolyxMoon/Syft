@@ -437,6 +437,134 @@ const TERMINAL_FUNCTIONS = [
     },
   },
 
+  // BLEND PROTOCOL - LENDING & BORROWING
+  {
+    name: 'lend_to_pool',
+    description: 'Supply (lend) assets to a Blend lending pool to earn interest. Your supplied assets become available for others to borrow, and you receive bTokens representing your position. You earn interest over time from borrowers.',
+    parameters: {
+      type: 'object',
+      properties: {
+        poolAddress: {
+          type: 'string',
+          description: 'Blend pool contract address. Use "default" for the main USDC/XLM pool on testnet.',
+          default: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65',
+        },
+        asset: {
+          type: 'string',
+          description: 'Asset to supply (e.g., "XLM", "USDC", or "CODE:ISSUER" format)',
+        },
+        amount: {
+          type: 'string',
+          description: 'Amount to supply to the pool',
+        },
+      },
+      required: ['asset', 'amount'],
+    },
+  },
+  {
+    name: 'borrow_from_pool',
+    description: 'Borrow assets from a Blend lending pool against your supplied collateral. You must have sufficient collateral supplied to the pool first. Interest accrues on borrowed amounts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        poolAddress: {
+          type: 'string',
+          description: 'Blend pool contract address. Use "default" for the main USDC/XLM pool on testnet.',
+          default: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65',
+        },
+        asset: {
+          type: 'string',
+          description: 'Asset to borrow (e.g., "XLM", "USDC", or "CODE:ISSUER" format)',
+        },
+        amount: {
+          type: 'string',
+          description: 'Amount to borrow from the pool',
+        },
+      },
+      required: ['asset', 'amount'],
+    },
+  },
+  {
+    name: 'repay_loan',
+    description: 'Repay borrowed assets to a Blend lending pool. This reduces your debt and frees up your collateral. You can repay partial or full amounts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        poolAddress: {
+          type: 'string',
+          description: 'Blend pool contract address. Use "default" for the main USDC/XLM pool on testnet.',
+          default: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65',
+        },
+        asset: {
+          type: 'string',
+          description: 'Asset to repay (e.g., "XLM", "USDC", or "CODE:ISSUER" format)',
+        },
+        amount: {
+          type: 'string',
+          description: 'Amount to repay. Use "max" to repay full debt.',
+        },
+      },
+      required: ['asset', 'amount'],
+    },
+  },
+  {
+    name: 'withdraw_lended',
+    description: 'Withdraw your supplied (lent) assets from a Blend pool. This burns your bTokens and returns the underlying asset plus accrued interest. You can only withdraw up to your available balance (minus any amount being used as collateral for borrows).',
+    parameters: {
+      type: 'object',
+      properties: {
+        poolAddress: {
+          type: 'string',
+          description: 'Blend pool contract address. Use "default" for the main USDC/XLM pool on testnet.',
+          default: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65',
+        },
+        asset: {
+          type: 'string',
+          description: 'Asset to withdraw (e.g., "XLM", "USDC", or "CODE:ISSUER" format)',
+        },
+        amount: {
+          type: 'string',
+          description: 'Amount to withdraw. Use "max" to withdraw all available (not locked as collateral).',
+        },
+      },
+      required: ['asset', 'amount'],
+    },
+  },
+  {
+    name: 'get_blend_position',
+    description: 'Check your lending and borrowing position in a Blend pool. Shows supplied amounts, borrowed amounts, available to borrow, health factor, and interest rates.',
+    parameters: {
+      type: 'object',
+      properties: {
+        poolAddress: {
+          type: 'string',
+          description: 'Blend pool contract address. Use "default" for the main USDC/XLM pool on testnet.',
+          default: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65',
+        },
+        address: {
+          type: 'string',
+          description: 'INTERNAL USE ONLY - automatically populated with connected wallet. DO NOT provide this parameter.',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_pool_info',
+    description: 'Get detailed information about a Blend lending pool including available liquidity, total supplied, total borrowed, utilization rate, and current APYs for each asset.',
+    parameters: {
+      type: 'object',
+      properties: {
+        poolAddress: {
+          type: 'string',
+          description: 'Blend pool contract address. Use "default" for the main USDC/XLM pool on testnet.',
+          default: 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65',
+        },
+      },
+      required: [],
+    },
+  },
+
   // UTILITY FUNCTIONS
   {
     name: 'resolve_federated_address',
@@ -526,6 +654,7 @@ Key capabilities:
 - Asset operations (create, transfer, batch transfers)
 - Trustlines (setup, revoke)
 - DEX operations (swap, add/remove liquidity, analytics)
+- Blend Protocol (lend, borrow, repay, withdraw, position tracking)
 - NFTs (mint, transfer, burn, list)
 - Transaction management (simulate, history, explorer)
 - Network analytics and price oracles
@@ -566,6 +695,36 @@ Before adding liquidity to ANY pool, you MUST establish a trustline for the pool
 Without step 1, the add_liquidity transaction will FAIL with "tx_failed" error!
 
 The updated addLiquidity function now automatically includes trustline operations, but it's still good practice to inform users about this two-step process.
+
+IMPORTANT - Blend Protocol Lending & Borrowing:
+Blend is a decentralized lending protocol on Stellar where users can:
+1. LEND (Supply): Deposit assets to earn interest. Blend automatically mints bTokens (receipt tokens) to your wallet.
+2. BORROW: Take loans against your supplied collateral. Interest accrues on borrowed amounts.
+3. REPAY: Pay back borrowed assets to reduce debt and free up collateral.
+4. WITHDRAW: Withdraw supplied assets plus earned interest (only available amounts, not locked as collateral).
+
+Key Concepts:
+- Health Factor: Ratio of collateral value to borrowed value. Must stay above 1.0 to avoid liquidation.
+- Collateral Factor: Percentage of supplied asset value that can be borrowed against (e.g., 75% for XLM).
+- APY: Annual percentage yield - interest earned on supplied assets or paid on borrowed assets.
+- Utilization Rate: Percentage of supplied assets currently borrowed (affects interest rates).
+- bTokens: Receipt tokens automatically minted when you supply assets (e.g., bUSDC when supplying USDC).
+
+IMPORTANT - Automatic Trustline Management (Two-Step Process):
+- When BORROWING an asset you don't have approved, the system returns a trustline/approval transaction FIRST, then the borrow transaction (2 separate signatures required).
+- This is a 2-step process like add_liquidity: Step 1 = Approve asset, Step 2 = Borrow operation.
+- When LENDING/SUPPLYING assets, Blend automatically handles bToken minting via Soroban contracts (no manual trustline needed - single transaction).
+- The AI should NOT manually call borrow_from_pool twice - the system handles the continuation automatically after trustline is signed.
+
+Testnet Default Pool: CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65 (supports USDC, XLM, wETH, wBTC)
+
+Example Workflow:
+1. User: "Lend 1000 USDC to Blend" → Call lend_to_pool(asset: "USDC", amount: "1000")
+   - If first time: Blend mints bUSDC tokens to your wallet automatically
+2. User: "Borrow 500 XLM from Blend" → Call borrow_from_pool(asset: "XLM", amount: "500")
+   - If you don't have XLM trustline: Automatically sets it up first, then borrows
+3. User: "Check my Blend position" → Call get_blend_position()
+4. User: "Repay my XLM loan" → Call repay_loan(asset: "XLM", amount: "max")
 
 CRITICAL: Do NOT show web search results in your response! Web search is a SILENT helper tool. Only show the final blockchain operation (swap, transfer, trustline) to the user. Your reasoning is internal - just present the final action.
 
@@ -1127,6 +1286,45 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         case 'get_price_oracle':
           return await service.getPriceOracle(args.assetPair);
 
+        // Blend Protocol - Lending & Borrowing
+        case 'lend_to_pool':
+          return await service.lendToPool(
+            sessionId,
+            args.asset,
+            args.amount,
+            args.poolAddress || 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65'
+          );
+        case 'borrow_from_pool':
+          return await service.borrowFromPool(
+            sessionId,
+            args.asset,
+            args.amount,
+            args.poolAddress || 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65'
+          );
+        case 'repay_loan':
+          return await service.repayLoan(
+            sessionId,
+            args.asset,
+            args.amount,
+            args.poolAddress || 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65'
+          );
+        case 'withdraw_lended':
+          return await service.withdrawLended(
+            sessionId,
+            args.asset,
+            args.amount,
+            args.poolAddress || 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65'
+          );
+        case 'get_blend_position':
+          return await service.getBlendPosition(
+            args.address || connectedWallet,
+            args.poolAddress || 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65'
+          );
+        case 'get_pool_info':
+          return await service.getPoolInfo(
+            args.poolAddress || 'CDDG7DLOWSHRYQ2HWGZEZ4UTR7LPTKFFHN3QUCSZEXOWOPARMONX6T65'
+          );
+
         // Utilities
         case 'resolve_federated_address':
           return await service.resolveFederatedAddress(args.address);
@@ -1440,6 +1638,133 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         error: error.message,
         message: `Failed to execute add liquidity: ${error.message}`,
         functionCalled: 'add_liquidity',
+        functionResult: { success: false, error: error.message },
+        type: 'function_call',
+      };
+    }
+  }
+
+  /**
+   * Execute a direct borrow operation (called after asset approval trustline is set up)
+   */
+  async executeBorrow(
+    sessionId: string,
+    asset: string,
+    amount: string,
+    poolAddress?: string
+  ): Promise<any> {
+    try {
+      console.log('[Terminal AI] Direct borrow execution:', { 
+        sessionId, asset, amount, poolAddress 
+      });
+      
+      // Get conversation context to maintain history
+      const context = this.conversationHistory.get(sessionId);
+      
+      // Add system message about auto-continuation
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `[Auto-continuing after asset approval] Now executing borrow: ${amount} ${asset} from Blend pool`,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+      
+      const service = stellarTerminalService;
+      const result = await service.borrowFromPool(
+        sessionId, 
+        asset, 
+        amount, 
+        poolAddress || 'default'
+      );
+
+      console.log('[Terminal AI] Borrow result:', JSON.stringify(result, null, 2));
+
+      // Add the execution to conversation history
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `Executed borrow_from_pool function with parameters: asset=${asset}, amount=${amount}, poolAddress=${poolAddress || 'default'}`,
+        });
+        
+        context.messages.push({
+          role: 'tool',
+          content: JSON.stringify(result),
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+
+      // Format response similar to chat responses
+      if (result.action) {
+        const responseMessage = result.message || `✅ Ready to borrow ${amount} ${asset} from Blend pool. Sign the transaction in Freighter.`;
+        
+        if (context) {
+          context.messages.push({
+            role: 'assistant',
+            content: responseMessage,
+          });
+          context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+        }
+        
+        return {
+          success: true,
+          message: responseMessage,
+          functionCalled: 'borrow_from_pool',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      // Check if the result indicates failure
+      if (!result.success) {
+        const errorMsg = result.error || 'Borrow failed';
+        console.error('[Terminal AI] Borrow failed:', errorMsg);
+        
+        return {
+          success: false,
+          error: errorMsg,
+          message: errorMsg,
+          functionCalled: 'borrow_from_pool',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      const responseMessage = result.message || `Successfully borrowed ${amount} ${asset} from Blend pool`;
+      
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: responseMessage,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+
+      return {
+        success: true,
+        message: responseMessage,
+        functionCalled: 'borrow_from_pool',
+        functionResult: result,
+        type: 'function_call',
+      };
+    } catch (error: any) {
+      console.error('[Terminal AI] Direct borrow error:', error);
+      
+      // Add error to conversation history
+      const context = this.conversationHistory.get(sessionId);
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `Error executing auto borrow: ${error.message}`,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        message: `Failed to execute borrow: ${error.message}`,
+        functionCalled: 'borrow_from_pool',
         functionResult: { success: false, error: error.message },
         type: 'function_call',
       };

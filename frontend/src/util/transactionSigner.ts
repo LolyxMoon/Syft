@@ -82,6 +82,13 @@ export async function signAndSubmitTransaction(
     if (!response.ok) {
       const error = await response.json();
       const errorCode = error.extras?.result_codes?.transaction;
+      const operationErrors = error.extras?.result_codes?.operations;
+      
+      console.error('[TransactionSigner] Transaction failed:', {
+        errorCode,
+        operationErrors,
+        fullError: error
+      });
       
       // Provide user-friendly error messages
       if (errorCode === 'tx_too_late') {
@@ -90,6 +97,25 @@ export async function signAndSubmitTransaction(
         throw new Error('Insufficient balance to complete this transaction.');
       } else if (errorCode === 'tx_bad_auth') {
         throw new Error('Invalid signature. Please try signing again.');
+      } else if (errorCode === 'tx_failed' && operationErrors) {
+        // Extract detailed operation errors
+        const opErrorMessages = operationErrors
+          .map((opErr: string, idx: number) => 
+            opErr !== 'op_success' ? `Operation ${idx + 1}: ${opErr}` : null
+          )
+          .filter(Boolean)
+          .join(', ');
+        
+        // Provide specific error messages for common operation errors
+        if (opErrorMessages.includes('op_underfunded')) {
+          throw new Error(`Insufficient balance. You don't have enough XLM to complete all transfers. ${opErrorMessages}`);
+        } else if (opErrorMessages.includes('op_no_destination')) {
+          throw new Error(`Invalid destination address. One or more addresses don't exist on the network. ${opErrorMessages}`);
+        } else if (opErrorMessages.includes('op_line_full')) {
+          throw new Error(`Destination account would exceed limit. ${opErrorMessages}`);
+        } else {
+          throw new Error(`Transaction failed: ${opErrorMessages || errorCode}`);
+        }
       } else {
         throw new Error(errorCode || 'Transaction submission failed');
       }

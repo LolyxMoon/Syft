@@ -652,6 +652,62 @@ Let's build on Stellar! 🌟`,
                           } finally {
                             setIsLoading(false);
                           }
+                        } else if (nextAction.type === 'borrow_from_pool') {
+                          // Automatically trigger the borrow operation now that asset approval is done
+                          const nextStepMessage: Message = {
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
+                            content: `✅ **Asset approved!** Now proceeding with borrow operation...`,
+                            timestamp: new Date(),
+                          };
+                          setMessages((prev) => [...prev, nextStepMessage]);
+
+                          // Trigger the borrow function directly
+                          setIsLoading(true);
+                          try {
+                            const { asset, amount, poolAddress } = nextAction;
+                            
+                            const borrowResponse = await axios.post(`${API_BASE_URL}/api/terminal/borrow`, {
+                              sessionId,
+                              asset,
+                              amount,
+                              poolAddress,
+                            });
+
+                            if (!borrowResponse.data.success || !borrowResponse.data.jobId) {
+                              throw new Error('Failed to start borrow operation');
+                            }
+
+                            const borrowResult = await pollJobStatus(borrowResponse.data.jobId);
+
+                            console.log('[Terminal] Auto-borrow result:', borrowResult);
+
+                            if (borrowResult.success) {
+                              const borrowResponseMessage: Message = {
+                                id: (Date.now() + 2).toString(),
+                                role: 'assistant',
+                                content: borrowResult.message || `✅ Successfully borrowed ${amount} ${asset}!`,
+                                timestamp: new Date(),
+                                functionCalled: borrowResult.functionCalled,
+                                functionResult: borrowResult.functionResult,
+                                type: borrowResult.type,
+                                action: borrowResult.functionResult?.action,
+                              };
+                              setMessages((prev) => [...prev, borrowResponseMessage]);
+                            } else {
+                              throw new Error(borrowResult.error || borrowResult.message || 'Borrow operation failed');
+                            }
+                          } catch (error: any) {
+                            const errorMessage: Message = {
+                              id: (Date.now() + 2).toString(),
+                              role: 'assistant',
+                              content: `❌ Auto-borrow failed: ${error.message}. Please try your borrow command again manually.`,
+                              timestamp: new Date(),
+                            };
+                            setMessages((prev) => [...prev, errorMessage]);
+                          } finally {
+                            setIsLoading(false);
+                          }
                         }
                       }
 

@@ -276,6 +276,79 @@ async function processDirectAddLiquidity(
 }
 
 /**
+ * POST /api/terminal/borrow
+ * Direct borrow function call (used for follow-up after asset approval)
+ */
+router.post('/borrow', async (req, res): Promise<void> => {
+  try {
+    const { sessionId, asset, amount, poolAddress } = req.body;
+
+    console.log('[Terminal Route] Direct borrow request:', {
+      sessionId,
+      asset,
+      amount,
+      poolAddress,
+    });
+
+    if (!sessionId || !asset || !amount) {
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
+    }
+
+    // Create a job ID for this borrow request
+    const jobId = `borrow_${sessionId}_${Date.now()}`;
+    
+    // Create the job
+    jobQueue.createJob(jobId);
+
+    // Start processing in background
+    processDirectBorrow(jobId, sessionId, asset, amount, poolAddress);
+
+    // Return job ID immediately
+    res.json({
+      success: true,
+      jobId,
+      status: 'processing',
+      message: 'Borrow is being processed',
+    });
+  } catch (error: any) {
+    console.error('Terminal borrow error:', error);
+    res.status(500).json({
+      error: 'Failed to process borrow',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Background processing for direct borrow
+ */
+async function processDirectBorrow(
+  jobId: string,
+  sessionId: string,
+  asset: string,
+  amount: string,
+  poolAddress?: string
+) {
+  try {
+    jobQueue.markProcessing(jobId);
+
+    // Call the borrow function directly via terminalAIService
+    const response = await terminalAIService.executeBorrow(
+      sessionId,
+      asset,
+      amount,
+      poolAddress
+    );
+
+    jobQueue.completeJob(jobId, response);
+  } catch (error: any) {
+    console.error('Direct borrow processing error:', error);
+    jobQueue.failJob(jobId, error.message);
+  }
+}
+
+/**
  * POST /api/terminal/upload-wasm
  * Upload WASM file and install it to Stellar network
  */

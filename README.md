@@ -391,42 +391,52 @@ The Terminal AI is a powerful natural language interface that transforms how you
    - Remove liquidity
    - View pool analytics and prices
 
-5. **NFTs** 🎨
+5. **Blend Protocol - Lending & Borrowing** 🏦
+   - **Lend/Supply**: Deposit assets to earn interest automatically
+   - **Borrow**: Take loans against supplied collateral
+   - **Repay**: Pay back borrowed assets to reduce debt
+   - **Withdraw**: Withdraw supplied assets plus earned interest
+   - **Position Tracking**: Monitor health factor, collateral, and borrowed amounts
+   - **Pool Analytics**: Check interest rates, utilization, and APY
+   - **Automatic bToken Minting**: Receive receipt tokens for supplied assets
+   - **Collateral Management**: Track borrowing power and liquidation risk
+
+6. **NFTs** 🎨
    - Mint NFTs with AI-generated artwork
    - Transfer NFT ownership
    - Burn NFTs
    - List and view owned NFTs
 
-6. **Transaction Management** 📋
+7. **Transaction Management** 📋
    - Simulate transactions before submission
    - View transaction history
    - Search transactions on Stellar Explorer
    - Batch operations
 
-7. **Network Analytics** 📊
+8. **Network Analytics** 📊
    - Get network statistics
    - Query price oracles
    - Check protocol yields
    - Monitor gas fees
 
-8. **Web Search & Data Retrieval** 🔍
+9. **Web Search & Data Retrieval** 🔍
    - Real-time info via **Tavily API**
    - Look up asset issuers
    - Find contract addresses
    - Fetch documentation
    - Get market data
 
-9. **Federated Addresses** 🌐
+10. **Federated Addresses** 🌐
    - Resolve federated addresses (user*domain)
    - Convert to Stellar public keys
 
-10. **Advanced Multi-Step Actions** 🎯
+11. **Advanced Multi-Step Actions** 🎯
     - Balance-based operations (e.g., "swap half my XLM")
     - Automatic balance checks
     - Sequential execution
     - Error handling and retries
 
-11. **Batch Workflows** ⚡
+12. **Batch Workflows** ⚡
     - Execute multiple transfers in one operation
     - Coordinate complex multi-step actions
     - Optimize gas costs
@@ -452,6 +462,11 @@ The Terminal AI is a powerful natural language interface that transforms how you
 "Swap 50% of my XLM for USDC"
 "What's the current XLM price?"
 "List my NFTs"
+"Lend 1000 USDC to Blend"
+"Borrow 500 XLM from Blend"
+"Check my Blend position"
+"Repay my XLM loan"
+"What's the current APY on USDC in Blend?"
 ```
 
 ---
