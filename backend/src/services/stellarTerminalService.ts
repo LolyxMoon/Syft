@@ -145,8 +145,11 @@ export class StellarTerminalService {
             limit: 'N/A',
           };
         }
+        const issuerDisplay = balance.asset_issuer 
+          ? `${balance.asset_issuer.substring(0, 8)}...` 
+          : 'Unknown';
         return {
-          asset: `${balance.asset_code}:${balance.asset_issuer.substring(0, 8)}...`,
+          asset: `${balance.asset_code}:${issuerDisplay}`,
           balance: balance.balance,
           limit: balance.limit,
         };
