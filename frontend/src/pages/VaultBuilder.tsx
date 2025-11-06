@@ -74,31 +74,73 @@ const VaultBuilder = () => {
 
   // Handle undo action
   const handleUndo = useCallback(() => {
+    console.log('[VaultBuilder] Undo requested, canUndo:', canUndo);
     const previousState = undo();
     if (previousState) {
+      console.log('[VaultBuilder] Undoing to state:', {
+        nodes: previousState.nodes.length,
+        edges: previousState.edges.length
+      });
       isApplyingHistoryRef.current = true;
       setNodes(previousState.nodes);
       setEdges(previousState.edges);
-      // Reset after state updates
+      // Reset after debounce period to prevent pushState from being called
       setTimeout(() => {
         isApplyingHistoryRef.current = false;
-      }, 0);
+        console.log('[VaultBuilder] Undo complete, history flag reset');
+      }, 600); // Must be > 500ms debounce period
+    } else {
+      console.log('[VaultBuilder] Undo failed - no previous state available');
     }
-  }, [undo]);
+  }, [undo, setNodes, setEdges, canUndo]);
 
   // Handle redo action
   const handleRedo = useCallback(() => {
+    console.log('[VaultBuilder] Redo requested, canRedo:', canRedo);
     const nextState = redo();
     if (nextState) {
+      console.log('[VaultBuilder] Redoing to state:', {
+        nodes: nextState.nodes.length,
+        edges: nextState.edges.length
+      });
       isApplyingHistoryRef.current = true;
       setNodes(nextState.nodes);
       setEdges(nextState.edges);
-      // Reset after state updates
+      // Reset after debounce period to prevent pushState from being called
       setTimeout(() => {
         isApplyingHistoryRef.current = false;
-      }, 0);
+        console.log('[VaultBuilder] Redo complete, history flag reset');
+      }, 600); // Must be > 500ms debounce period
+    } else {
+      console.log('[VaultBuilder] Redo failed - no next state available');
     }
-  }, [redo]);
+  }, [redo, setNodes, setEdges, canRedo]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z or Cmd+Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          handleUndo();
+        }
+      }
+      // Ctrl+Y or Cmd+Y or Ctrl+Shift+Z for redo
+      else if (
+        ((e.ctrlKey || e.metaKey) && e.key === 'y') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')
+      ) {
+        e.preventDefault();
+        if (canRedo) {
+          handleRedo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canUndo, canRedo, handleUndo, handleRedo]);
 
   // Load user's saved vaults when component mounts
   useEffect(() => {
@@ -290,11 +332,16 @@ const VaultBuilder = () => {
   useEffect(() => {
     // Don't push state if we're applying history (undo/redo)
     if (isApplyingHistoryRef.current) {
+      console.log('[VaultBuilder] Skipping pushState - applying history');
       return;
     }
 
     const timer = setTimeout(() => {
       if ((nodes.length > 0 || edges.length > 0) && !isApplyingHistoryRef.current) {
+        console.log('[VaultBuilder] Pushing state to history:', {
+          nodes: nodes.length,
+          edges: edges.length
+        });
         pushState(nodes, edges);
       }
     }, 500); // 500ms debounce
