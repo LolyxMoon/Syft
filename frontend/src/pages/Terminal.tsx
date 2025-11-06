@@ -6,7 +6,7 @@ import { useWallet } from '../providers/WalletProvider';
 import { TerminalActionCard, TransactionAction } from '../components/TerminalActionCard';
 
 // Backend API URL configuration
-const API_BASE_URL = import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
 interface Message {
   id: string;

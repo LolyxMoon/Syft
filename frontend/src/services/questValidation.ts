@@ -1,6 +1,6 @@
 // Quest validation service - tracks user actions and validates quest completion
 
-const API_URL = `${import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api`;
+const API_URL = `${import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com'}/api`;
 
 class QuestValidationService {
   private walletAddress: string | null = null;

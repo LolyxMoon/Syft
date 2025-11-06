@@ -38,7 +38,7 @@ export function ProfitDistribution({ walletAddress, nftId }: ProfitDistributionP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const backendUrl = import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 
+  const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 
                      'https://syft-f6ad696f49ee.herokuapp.com';
 
   useEffect(() => {

@@ -15,7 +15,7 @@ import type { QuestWithProgress, QuestStatsResponse } from '../../../shared/type
 import { questHints } from '../services/questHints';
 import { showToast } from '../components/ui/Toast';
 
-const API_URL = `${import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api`;
+const API_URL = `${import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com'}/api`;
 
 const categoryIcons: Record<string, any> = {
   basics: Sparkles,

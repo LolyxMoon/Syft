@@ -1,6 +1,6 @@
 // Activity Tracking Service - Track user actions for quest completion
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
 /**
  * Track a page visit for quest validation

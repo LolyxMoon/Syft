@@ -79,7 +79,7 @@ const Vaults = () => {
 
   const fetchXLMPrice = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const response = await fetch(`${backendUrl}/api/price/xlm`);
       if (response.ok) {
         const data = await response.json();
@@ -100,7 +100,7 @@ const Vaults = () => {
 
     try {
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-      const backendUrl = import.meta.env.VITE_VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
 
       // Fetch owned vaults
       const ownedResponse = await fetch(
