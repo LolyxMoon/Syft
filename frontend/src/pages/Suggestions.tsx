@@ -553,6 +553,7 @@ const Suggestions = () => {
                       // Fallback
                       const fallback = vault.config?.assets
                         ?.map((a: any) => {
+                          if (!a) return 'Unknown';
                           if (typeof a === 'string') {
                             return a.startsWith('C') && a.length > 20 ? `${a.slice(0, 8)}...` : a;
                           }

@@ -387,32 +387,38 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4 border-t border-default">
             <div>
               <div className="text-xs text-neutral-500 mb-1">Contract Address</div>
-              <div className="flex items-center gap-2">
-                <code className="text-xs font-mono text-neutral-300 bg-neutral-900 px-2 py-1 rounded">
-                  {truncateAddress(vault.contractAddress)}
+              {vault.contractAddress ? (
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono text-neutral-300 bg-neutral-900 px-2 py-1 rounded">
+                    {truncateAddress(vault.contractAddress)}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(vault.contractAddress)}
+                    className="p-1 hover:bg-neutral-900 rounded transition-colors"
+                    title="Copy address"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-neutral-400" />
+                  </button>
+                  <a
+                    href={`https://stellar.expert/explorer/testnet/contract/${vault.contractAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 hover:bg-neutral-900 rounded transition-colors"
+                    title="View on Stellar Expert"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                  </a>
+                </div>
+              ) : (
+                <code className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded inline-block">
+                  Not deployed yet
                 </code>
-                <button
-                  onClick={() => copyToClipboard(vault.contractAddress)}
-                  className="p-1 hover:bg-neutral-900 rounded transition-colors"
-                  title="Copy address"
-                >
-                  <Copy className="w-3.5 h-3.5 text-neutral-400" />
-                </button>
-                <a
-                  href={`https://stellar.expert/explorer/testnet/contract/${vault.contractAddress}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1 hover:bg-neutral-900 rounded transition-colors"
-                  title="View on Stellar Expert"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
-                </a>
-              </div>
+              )}
             </div>
             <div>
               <div className="text-xs text-neutral-500 mb-1">Vault ID</div>
               <code className="text-xs font-mono text-neutral-300 bg-neutral-900 px-2 py-1 rounded inline-block">
-                {vault.vaultId.slice(0, 16)}...
+                {vault.vaultId ? `${vault.vaultId.slice(0, 16)}...` : 'Draft (Not Deployed)'}
               </code>
             </div>
           </div>
@@ -755,26 +761,47 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
       </motion.div>
 
       {/* Vault Actions - Deposit/Withdraw */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <VaultActions 
-          vaultId={vaultId}
-          contractAddress={vault.contractAddress}
-          vaultConfig={vault.config}
-          onActionComplete={(action) => {
-            console.log(`${action} completed, reloading vault...`);
-            loadVaultDetails(false); // Update without showing loading state
-            fetchVaultAnalytics(); // Refresh analytics too
-            fetchUserPosition(); // Refresh user position
-          }}
-        />
-      </motion.div>
+      {vault.contractAddress && vault.status === 'active' ? (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <VaultActions 
+            vaultId={vaultId}
+            contractAddress={vault.contractAddress}
+            vaultConfig={vault.config}
+            onActionComplete={(action) => {
+              console.log(`${action} completed, reloading vault...`);
+              loadVaultDetails(false); // Update without showing loading state
+              fetchVaultAnalytics(); // Refresh analytics too
+              fetchUserPosition(); // Refresh user position
+            }}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className="p-6 bg-card border border-default">
+            <div className="text-center py-8">
+              <Package className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-neutral-50 mb-2">Draft Vault</h3>
+              <p className="text-neutral-400 text-sm mb-4">
+                This vault is saved as a draft and hasn't been deployed yet.
+              </p>
+              <p className="text-neutral-500 text-xs">
+                Deploy this vault from the Vault Builder to start accepting deposits and trades.
+              </p>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Owner Actions - Mint NFT & List on Marketplace */}
-      {address && vault.owner === address && (
+      {address && vault.owner === address && vault.contractAddress && vault.status === 'active' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

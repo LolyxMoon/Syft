@@ -190,6 +190,7 @@ const Vaults = () => {
           console.error('Error resolving token names:', err);
           const fallback = vault.config.assets
             ?.map((a: any) => {
+              if (!a) return 'Unknown';
               if (typeof a === 'string') {
                 return a.startsWith('C') && a.length > 20 ? `${a.slice(0, 8)}...` : a;
               }
@@ -515,7 +516,7 @@ const Vaults = () => {
                                   </span>
                                 </div>
                                 <p className="text-sm text-neutral-400">{assets}</p>
-                                <p className="text-xs text-neutral-500 mt-1">ID: {vault.vault_id.slice(0, 12)}...</p>
+                                <p className="text-xs text-neutral-500 mt-1">ID: {vault.vault_id?.slice(0, 12) || 'N/A'}...</p>
                               </div>
                             </div>
 

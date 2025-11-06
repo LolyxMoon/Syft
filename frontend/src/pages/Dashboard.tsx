@@ -654,6 +654,7 @@ const Dashboard = () => {
                         // Fallback to showing addresses
                         const fallback = vault.config.assets
                           ?.map((a: any) => {
+                            if (!a) return 'Unknown';
                             if (typeof a === 'string') {
                               return a.startsWith('C') && a.length > 20 ? `${a.slice(0, 8)}...` : a;
                             }
@@ -695,7 +696,7 @@ const Dashboard = () => {
                                 Shares: {(parseFloat(userPositions[vault.vault_id].shares) / 10_000_000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 7 })}
                               </p>
                             )}
-                            <p className="text-xs text-neutral-500 mt-0.5">ID: {vault.vault_id.slice(0, 8)}...</p>
+                            <p className="text-xs text-neutral-500 mt-0.5">ID: {vault.vault_id?.slice(0, 8) || 'N/A'}...</p>
                           </div>
                           <div>
                             <div className="text-xs text-neutral-500 mb-0.5">TVL</div>

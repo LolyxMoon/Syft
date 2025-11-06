@@ -783,7 +783,7 @@ const Backtests = () => {
                                   <div className="flex items-start justify-between mb-2">
                                     <div className="flex-1">
                                       <h4 className="font-semibold text-neutral-50 mb-1">{vault.name || vault.config?.name || 'Unnamed Vault'}</h4>
-                                      <p className="text-xs text-neutral-500">ID: {vault.vault_id.slice(0, 12)}...</p>
+                                      <p className="text-xs text-neutral-500">ID: {vault.vault_id?.slice(0, 12) || 'N/A'}...</p>
                                     </div>
                                     {config.selectedVaultId === vault.vault_id && (
                                       <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
@@ -1807,7 +1807,7 @@ const Backtests = () => {
                                 {/* Mini Chart Preview */}
                                 <div className="h-32 w-full">
                                   <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={result.results.portfolioValueHistory.slice(0, 50).map(p => ({
+                                    <AreaChart data={(result.results.portfolioValueHistory || []).slice(0, 50).map(p => ({
                                       value: p.value,
                                     }))}>
                                       <defs>
