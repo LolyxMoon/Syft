@@ -141,15 +141,35 @@ export class StellarTerminalService {
         if (balance.asset_type === 'native') {
           return {
             asset: 'XLM (Native)',
+            asset_code: 'XLM',
+            asset_issuer: '',
             balance: balance.balance,
             limit: 'N/A',
           };
         }
-        const issuerDisplay = balance.asset_issuer 
-          ? `${balance.asset_issuer.substring(0, 8)}...` 
+        
+        // Handle liquidity pool shares
+        if (balance.asset_type === 'liquidity_pool_shares') {
+          const poolId = balance.liquidity_pool_id || 'Unknown';
+          return {
+            asset: `LP Token (Pool ${poolId.substring(0, 8)}...)`,
+            asset_code: 'LP',
+            liquidity_pool_id: poolId,
+            balance: balance.balance,
+            limit: balance.limit || 'N/A',
+          };
+        }
+        
+        // Handle regular assets
+        const assetCode = balance.asset_code || 'Unknown';
+        const assetIssuer = balance.asset_issuer || '';
+        const issuerDisplay = assetIssuer 
+          ? `${assetIssuer.substring(0, 8)}...` 
           : 'Unknown';
         return {
-          asset: `${balance.asset_code}:${issuerDisplay}`,
+          asset: `${assetCode}:${issuerDisplay}`,
+          asset_code: assetCode,
+          asset_issuer: assetIssuer,
           balance: balance.balance,
           limit: balance.limit,
         };
