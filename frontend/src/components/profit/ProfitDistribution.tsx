@@ -2,6 +2,7 @@
 // Shows profit distribution history and stats for NFT holders
 
 import { useState, useEffect } from 'react';
+import { Wallet, BarChart3 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 
@@ -142,7 +143,8 @@ export function ProfitDistribution({ walletAddress, nftId }: ProfitDistributionP
       {nftStats && (
         <Card className="p-6 bg-gradient-to-br from-primary-900/20 to-secondary-900/20 border-primary-500/30">
           <h3 className="text-xl font-semibold text-neutral-50 mb-4 flex items-center gap-2">
-            💰 Your NFT Profit Earnings
+            <Wallet className="w-5 h-5" />
+            Your NFT Profit Earnings
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -199,7 +201,7 @@ export function ProfitDistribution({ walletAddress, nftId }: ProfitDistributionP
 
         {distributions.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-4xl mb-3">📊</div>
+            <BarChart3 className="w-12 h-12 mx-auto mb-3 text-neutral-600" />
             <p className="text-neutral-400 mb-2">No profit distributions yet</p>
             <p className="text-sm text-neutral-500">
               You'll see your profit distributions here once vaults start generating profits
