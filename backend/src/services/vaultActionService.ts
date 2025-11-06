@@ -705,20 +705,28 @@ export async function executeRebalance(
     let txHash: string | undefined;
     
     // Check if vault has any balance before attempting rebalance
-    const vaultState = vault.current_state;
-    const totalValue = parseInt(vaultState?.totalValue || '0');
-    const totalShares = parseInt(vaultState?.totalShares || '0');
-    
-    console.log(`📊 Vault state - Total Value: ${totalValue}, Total Shares: ${totalShares}`);
-    
-    if (totalValue === 0 || totalShares === 0) {
-      console.warn(`⚠️  Vault ${vaultId} has zero balance (value: ${totalValue}, shares: ${totalShares})`);
-      console.warn(`⚠️  Skipping on-chain rebalance - vault needs deposits first`);
-      return {
-        success: false,
-        error: 'Vault has zero balance - deposits required before rebalancing',
-        timestamp: new Date().toISOString(),
-      };
+    // IMPORTANT: Query contract directly to get fresh state, don't rely on cached database state
+    try {
+      const { monitorVaultState } = await import('./vaultMonitorService.js');
+      const freshVaultState = await monitorVaultState(vault.contract_address);
+      
+      const totalValue = parseInt(freshVaultState?.totalValue || '0');
+      const totalShares = parseInt(freshVaultState?.totalShares || '0');
+      
+      console.log(`📊 Vault state (fresh from contract) - Total Value: ${totalValue}, Total Shares: ${totalShares}`);
+      
+      if (totalValue === 0 || totalShares === 0) {
+        console.warn(`⚠️  Vault ${vaultId} has zero balance (value: ${totalValue}, shares: ${totalShares})`);
+        console.warn(`⚠️  Skipping on-chain rebalance - vault needs deposits first`);
+        return {
+          success: false,
+          error: 'Vault has zero balance - deposits required before rebalancing',
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (stateError) {
+      console.error('Error checking vault state:', stateError);
+      // Continue with rebalance attempt - let the contract handle validation
     }
     
     // Execute on-chain rebalance if we have a keypair

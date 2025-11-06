@@ -74,6 +74,17 @@ export async function evaluateVaultRules(vaultId: string): Promise<RuleTrigger[]
     // Evaluate each rule
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i];
+      
+      // Check if rule was recently triggered (cooldown period)
+      const lastTrigger = vault.metadata?.lastRuleTrigger?.[i];
+      const cooldownMinutes = 5; // 5 minute cooldown between triggers
+      
+      if (lastTrigger && (Date.now() - lastTrigger) < cooldownMinutes * 60 * 1000) {
+        const remainingCooldown = Math.ceil((cooldownMinutes * 60 * 1000 - (Date.now() - lastTrigger)) / 60000);
+        console.log(`⏳ Rule ${i} for vault ${vaultId} in cooldown (${remainingCooldown}m remaining)`);
+        continue;
+      }
+      
       const triggered = await evaluateRule(rule, state, vault);
 
       if (triggered) {
@@ -86,6 +97,20 @@ export async function evaluateVaultRules(vaultId: string): Promise<RuleTrigger[]
         };
         
         triggers.push(triggerData);
+        
+        // Store trigger timestamp for cooldown
+        await supabase
+          .from('vaults')
+          .update({
+            metadata: {
+              ...(vault.metadata || {}),
+              lastRuleTrigger: {
+                ...(vault.metadata?.lastRuleTrigger || {}),
+                [i]: Date.now(),
+              }
+            }
+          })
+          .eq('vault_id', vaultId);
         
         // Broadcast rule trigger via WebSocket
         wsService.broadcastRuleTrigger(vaultId, i, {
@@ -342,17 +367,103 @@ async function evaluateRule(
       const { getTokenPrice } = await import('./priceService.js');
       
       // Get asset code from rule configuration
-      const assetCode = rule.asset_code || rule.asset || 'XLM';
+      const monitoredAsset = rule.monitored_asset || rule.asset_code || rule.asset || 'XLM';
+      const operator = rule.operator;
+      const percentage = rule.percentage;
       
       // Fetch current price
-      const currentPrice = await getTokenPrice(assetCode);
+      const currentPrice = await getTokenPrice(monitoredAsset);
       
       if (currentPrice === null) {
-        console.warn(`[RuleTrigger] Could not fetch price for ${assetCode}, skipping price-based rule`);
+        console.warn(`[RuleTrigger] Could not fetch price for ${monitoredAsset}, skipping price-based rule`);
         return false;
       }
       
-      // Determine comparison type (default to 'above')
+      // Get price history to check for percentage change
+      // For now, we need to store previous price in vault metadata or rule state
+      // Let's check if we have a reference price stored
+      const { data: priceHistory } = await supabase
+        .from('vaults')
+        .select('metadata')
+        .eq('vault_id', vault.vault_id)
+        .single();
+      
+      const lastPriceCheck = priceHistory?.metadata?.lastPriceCheck?.[monitoredAsset];
+      
+      // If we have percentage-based rule
+      if (percentage !== undefined && operator) {
+        // If no reference price, store current price and return false (first check)
+        if (!lastPriceCheck?.price || !lastPriceCheck?.timestamp) {
+          console.log(`[RuleTrigger] First price check for ${monitoredAsset}, storing reference price: ${currentPrice}`);
+          
+          // Store reference price
+          await supabase
+            .from('vaults')
+            .update({
+              metadata: {
+                ...(priceHistory?.metadata || {}),
+                lastPriceCheck: {
+                  ...(priceHistory?.metadata?.lastPriceCheck || {}),
+                  [monitoredAsset]: {
+                    price: currentPrice,
+                    timestamp: Date.now(),
+                  }
+                }
+              }
+            })
+            .eq('vault_id', vault.vault_id);
+          
+          return false; // Don't trigger on first check
+        }
+        
+        // Calculate percentage change from reference price
+        const referencePrice = lastPriceCheck.price;
+        const priceChange = ((currentPrice - referencePrice) / referencePrice) * 100;
+        
+        console.log(`[RuleTrigger] ${monitoredAsset} price change: ${priceChange.toFixed(2)}% (${referencePrice} → ${currentPrice})`);
+        
+        // Check if condition is met based on operator
+        let conditionMet = false;
+        
+        switch (operator) {
+          case 'lt': // less than (price dropped)
+            conditionMet = priceChange <= percentage; // percentage is negative for drops
+            break;
+          case 'gt': // greater than (price increased)
+            conditionMet = priceChange >= percentage;
+            break;
+          case 'eq': // equals
+            conditionMet = Math.abs(priceChange - percentage) < 0.5; // 0.5% tolerance
+            break;
+          default:
+            console.warn(`[RuleTrigger] Unknown operator: ${operator}`);
+            return false;
+        }
+        
+        // If condition is met, update reference price for next check
+        if (conditionMet) {
+          console.log(`[RuleTrigger] ✅ Price condition met! Updating reference price for next check.`);
+          await supabase
+            .from('vaults')
+            .update({
+              metadata: {
+                ...(priceHistory?.metadata || {}),
+                lastPriceCheck: {
+                  ...(priceHistory?.metadata?.lastPriceCheck || {}),
+                  [monitoredAsset]: {
+                    price: currentPrice,
+                    timestamp: Date.now(),
+                  }
+                }
+              }
+            })
+            .eq('vault_id', vault.vault_id);
+        }
+        
+        return conditionMet;
+      }
+      
+      // Legacy: Absolute price comparison (if no percentage specified)
       const comparisonType = rule.comparison_type || 'above';
       
       switch (comparisonType) {

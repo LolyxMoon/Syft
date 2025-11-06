@@ -29,13 +29,15 @@ export async function syncVaultState(vaultId: string): Promise<boolean> {
     }
 
     // Update vault in database
+    // Update both current_state column and config.current_state for compatibility
     const { error: updateError } = await supabase
       .from('vaults')
       .update({
         updated_at: new Date().toISOString(),
+        current_state: state, // Direct column update
         config: {
           ...vault.config,
-          current_state: state,
+          current_state: state, // Nested config update
         },
       })
       .eq('vault_id', vaultId);
@@ -44,6 +46,8 @@ export async function syncVaultState(vaultId: string): Promise<boolean> {
       console.error('Error updating vault:', updateError);
       return false;
     }
+    
+    console.log(`✅ [SyncVault] Updated vault ${vaultId} state: TVL=${state.totalValue} shares=${state.totalShares}`);
 
     // Record performance snapshot
     // Convert stroops to USD using real-time XLM price
