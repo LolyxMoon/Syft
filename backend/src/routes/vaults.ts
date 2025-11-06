@@ -780,7 +780,8 @@ router.post('/submit-deployment', async (req: Request, res: Response) => {
         // Store full asset objects with allocations if available, otherwise use simple asset codes
         assets: assetsToStore,
         rules: config.rules,
-        isPublic: config.isPublic ?? true,
+        // Vaults are private by default; visibility is controlled by marketplace listing
+        isPublic: false,
       },
       status: 'active',
       network: network || 'testnet',

@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Eye, EyeOff, Sparkles, Grid3x3, TrendingUp, Mic } from 'lucide-react';
+import { Save, Box, Play, Undo2, Redo2, FileText, AlertCircle, FolderOpen, X, Clock, CheckCircle, Sparkles, Grid3x3, TrendingUp, Mic } from 'lucide-react';
 import { Button, useModal } from '../components/ui';
 import BlockPalette from '../components/builder/BlockPalette';
 import VaultCanvas from '../components/builder/VaultCanvas';
@@ -49,7 +49,6 @@ const VaultBuilder = () => {
   // Vault metadata state
   const [vaultName, setVaultName] = useState('');
   const [vaultDescription, setVaultDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
   
   // Post-deployment state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -289,7 +288,6 @@ const VaultBuilder = () => {
       // Load metadata
       setVaultName(vault.name || '');
       setVaultDescription(vault.description || '');
-      setIsPublic(vault.config?.isPublic ?? true);
       
       setShowLoadModal(false);
       modal.message(`Loaded: ${vault.name}`, 'Vault Loaded', 'success');
@@ -368,14 +366,8 @@ const VaultBuilder = () => {
     try {
       setSaving(true);
       
-      // Add metadata to config
-      const configWithMetadata = {
-        ...config,
-        isPublic,
-      };
-      
       // Save to localStorage as backup
-      localStorage.setItem('vault_draft', JSON.stringify(configWithMetadata));
+      localStorage.setItem('vault_draft', JSON.stringify(config));
       
       // Save to backend
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
@@ -389,7 +381,7 @@ const VaultBuilder = () => {
           owner: address,
           name: vaultName,
           description: vaultDescription,
-          config: configWithMetadata,
+          config: config,
           network: normalizedNetwork,
         }),
       });
@@ -411,7 +403,7 @@ const VaultBuilder = () => {
     } finally {
       setSaving(false);
     }
-  }, [nodes, edges, address, vaultName, vaultDescription, isPublic, network, networkPassphrase, modal]);
+  }, [nodes, edges, address, vaultName, vaultDescription, network, networkPassphrase, modal]);
 
   // Deploy vault
   const handleDeploy = useCallback(async () => {
@@ -470,7 +462,6 @@ const VaultBuilder = () => {
         owner: address,
         name: vaultName,
         description: vaultDescription,
-        isPublic,
         // For deployment, send the deployment assets (includes target assets)
         assets: deploymentAssets.map(asset => {
           // If issuer exists (contract address or classic issuer), use it; otherwise use code
@@ -661,7 +652,6 @@ const VaultBuilder = () => {
               description: vaultDescription + '\n\n⚠️ Deployment timed out but may have succeeded. TX: ' + txHash,
               config: {
                 ...ConfigSerializer.serialize(nodes, edges),
-                isPublic,
                 pendingTxHash: txHash,
                 contractAddress: submitData.contractAddress,
               },
@@ -918,7 +908,7 @@ const VaultBuilder = () => {
     } finally {
       setDeploying(false);
     }
-  }, [nodes, edges, address, vaultName, vaultDescription, isPublic, network, networkPassphrase, modal]);
+  }, [nodes, edges, address, vaultName, vaultDescription, network, networkPassphrase, modal]);
 
   // Load template
   const handleLoadTemplate = useCallback((templateId: string) => {
@@ -1112,22 +1102,6 @@ const VaultBuilder = () => {
               <div className="flex-1 overflow-y-auto">
                 <BlockPalette onBlockSelect={handleBlockSelect} />
               </div>
-              
-              {/* Quick Templates */}
-              <div className="border-t border-default p-3 bg-neutral-900">
-                <h3 className="text-xs font-semibold text-neutral-400 mb-2">Quick Start Templates</h3>
-                <div className="space-y-1.5">
-                  {vaultTemplates.map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => handleLoadTemplate(template.id)}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-md bg-neutral-800 hover:bg-neutral-700 border border-default transition-colors text-neutral-300 text-left"
-                    >
-                      {template.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {/* Center - Canvas Area */}
@@ -1148,7 +1122,7 @@ const VaultBuilder = () => {
                   <h2 className="text-sm font-semibold text-neutral-50 mb-3">Vault Settings</h2>
                   
                   {/* Description */}
-                  <div className="mb-3">
+                  <div>
                     <label className="block text-xs font-medium text-neutral-400 mb-1.5">
                       Description
                     </label>
@@ -1166,30 +1140,23 @@ const VaultBuilder = () => {
                       </span>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Visibility */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-1.5">
-                      Visibility
-                    </label>
-                    <button
-                      onClick={() => setIsPublic(!isPublic)}
-                      className={`
-                        w-full px-3 py-2.5 rounded-md text-sm font-medium transition-all flex items-center justify-between
-                        ${isPublic 
-                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50 hover:bg-primary-500/30' 
-                          : 'bg-neutral-800 text-neutral-400 border border-default hover:bg-neutral-700'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center gap-2">
-                        {isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        <span>{isPublic ? 'Public' : 'Private'}</span>
-                      </div>
-                      <span className="text-xs opacity-70">
-                        {isPublic ? 'Visible on marketplace' : 'Only you can see'}
-                      </span>
-                    </button>
+              {/* Quick Start Templates */}
+              <div className="border-b border-default">
+                <div className="p-4 bg-neutral-900">
+                  <h3 className="text-xs font-semibold text-neutral-400 mb-2">Quick Start Templates</h3>
+                  <div className="space-y-1.5">
+                    {vaultTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => handleLoadTemplate(template.id)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded-md bg-neutral-800 hover:bg-neutral-700 border border-default transition-colors text-neutral-300 text-left"
+                      >
+                        {template.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1331,7 +1298,7 @@ const VaultBuilder = () => {
                   <h2 className="text-sm font-semibold text-neutral-50 mb-3">Vault Settings</h2>
                   
                   {/* Description */}
-                  <div className="mb-3">
+                  <div>
                     <label className="block text-xs font-medium text-neutral-400 mb-1.5">
                       Description
                     </label>
@@ -1348,31 +1315,6 @@ const VaultBuilder = () => {
                         {vaultDescription.length}/500
                       </span>
                     </div>
-                  </div>
-
-                  {/* Visibility */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-1.5">
-                      Visibility
-                    </label>
-                    <button
-                      onClick={() => setIsPublic(!isPublic)}
-                      className={`
-                        w-full px-3 py-2.5 rounded-md text-sm font-medium transition-all flex items-center justify-between
-                        ${isPublic 
-                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50 hover:bg-primary-500/30' 
-                          : 'bg-neutral-800 text-neutral-400 border border-default hover:bg-neutral-700'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center gap-2">
-                        {isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        <span>{isPublic ? 'Public' : 'Private'}</span>
-                      </div>
-                      <span className="text-xs opacity-70">
-                        {isPublic ? 'Visible on marketplace' : 'Only you can see'}
-                      </span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1440,7 +1382,7 @@ const VaultBuilder = () => {
                   <h2 className="text-sm font-semibold text-neutral-50 mb-3">Vault Settings</h2>
                   
                   {/* Description */}
-                  <div className="mb-3">
+                  <div>
                     <label className="block text-xs font-medium text-neutral-400 mb-1.5">
                       Description
                     </label>
@@ -1457,31 +1399,6 @@ const VaultBuilder = () => {
                         {vaultDescription.length}/500
                       </span>
                     </div>
-                  </div>
-
-                  {/* Visibility */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-1.5">
-                      Visibility
-                    </label>
-                    <button
-                      onClick={() => setIsPublic(!isPublic)}
-                      className={`
-                        w-full px-3 py-2.5 rounded-md text-sm font-medium transition-all flex items-center justify-between
-                        ${isPublic 
-                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50 hover:bg-primary-500/30' 
-                          : 'bg-neutral-800 text-neutral-400 border border-default hover:bg-neutral-700'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center gap-2">
-                        {isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        <span>{isPublic ? 'Public' : 'Private'}</span>
-                      </div>
-                      <span className="text-xs opacity-70">
-                        {isPublic ? 'Visible on marketplace' : 'Only you can see'}
-                      </span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1686,14 +1603,6 @@ const VaultBuilder = () => {
                     {deployedVaultData.contractAddress}
                   </p>
                 </div>
-                {isPublic && (
-                  <div className="pt-2 border-t border-default">
-                    <span className="text-xs text-success-400 flex items-center gap-1">
-                      <Eye className="w-3 h-3" />
-                      Public vault - visible in marketplace
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* Actions */}
@@ -1733,7 +1642,6 @@ const VaultBuilder = () => {
                     setEdges([]);
                     setVaultName('');
                     setVaultDescription('');
-                    setIsPublic(true);
                   }}
                 >
                   Create Another Vault

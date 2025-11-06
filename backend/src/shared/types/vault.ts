@@ -40,6 +40,7 @@ export interface VaultConfig {
   maxDeposit?: number;
   managementFee?: number; // percentage
   performanceFee?: number; // percentage
+  // @deprecated Visibility is now controlled by marketplace listing (NFT)
   isPublic: boolean;
 }
 
