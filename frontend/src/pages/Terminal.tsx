@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Terminal as TerminalIcon, Sparkles, Trash2, Loader2 } from 'lucide-react';
+import { Send, Terminal as TerminalIcon, Sparkles, Trash2, Loader2, History, Plus, X, Clock, StopCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useWallet } from '../providers/WalletProvider';
@@ -17,6 +17,16 @@ interface Message {
   functionResult?: any;
   type?: 'text' | 'function_call';
   action?: TransactionAction; // Action requiring user interaction
+}
+
+interface ConversationHistory {
+  id: string;
+  session_id: string;
+  title: string;
+  message_count: number;
+  wallet_address?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const Terminal = () => {
@@ -94,9 +104,14 @@ Let's build on Stellar! 🌟`,
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(getInitialSessionId);
+  const [sessionId, setSessionId] = useState(getInitialSessionId);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -161,13 +176,20 @@ Let's build on Stellar! 🌟`,
     });
   }, [isConnected, walletAddress]);
 
-  const pollJobStatus = async (jobId: string): Promise<any> => {
+  const pollJobStatus = async (jobId: string, abortSignal?: AbortSignal): Promise<any> => {
     const maxAttempts = 1200; // 1200 attempts × 500ms = 10 minutes max (for complex operations like web search + multi-step functions)
     const pollInterval = 500; // Poll every 500ms
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Check if request was aborted
+      if (abortSignal?.aborted) {
+        throw new Error('Request cancelled by user');
+      }
+
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/terminal/jobs/${jobId}`);
+        const response = await axios.get(`${API_BASE_URL}/api/terminal/jobs/${jobId}`, {
+          signal: abortSignal,
+        });
 
         if (response.data.status === 'completed') {
           return response.data.data;
@@ -178,6 +200,9 @@ Let's build on Stellar! 🌟`,
         // Job still processing, wait before next poll
         await new Promise((resolve) => setTimeout(resolve, pollInterval));
       } catch (error: any) {
+        if (error.name === 'CanceledError' || error.message === 'Request cancelled by user') {
+          throw new Error('Request cancelled by user');
+        }
         if (error.response?.status === 404) {
           throw new Error('Job expired or not found');
         }
@@ -186,6 +211,23 @@ Let's build on Stellar! 🌟`,
     }
 
     throw new Error('Request timeout after 10 minutes - operation may be too complex or stuck');
+  };
+
+  const stopCurrentRequest = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+      
+      const cancelMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '⏹️ **Request cancelled**\n\nYou can start a new request anytime.',
+        timestamp: new Date(),
+        type: 'text',
+      };
+      setMessages((prev) => [...prev, cancelMessage]);
+    }
   };
 
   const sendMessage = async () => {
@@ -203,6 +245,10 @@ Let's build on Stellar! 🌟`,
     setInput('');
     setIsLoading(true);
 
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       // Start the background job
       console.log('[Terminal] Sending message with wallet:', {
@@ -215,6 +261,8 @@ Let's build on Stellar! 🌟`,
         message: input,
         sessionId,
         walletAddress: isConnected ? walletAddress : undefined,
+      }, {
+        signal: abortController.signal,
       });
 
       if (!startResponse.data.success || !startResponse.data.jobId) {
@@ -223,8 +271,8 @@ Let's build on Stellar! 🌟`,
 
       const jobId = startResponse.data.jobId;
 
-      // Poll for the result
-      const result = await pollJobStatus(jobId);
+      // Poll for the result with abort signal
+      const result = await pollJobStatus(jobId, abortController.signal);
 
       if (result.success) {
         const assistantMessage: Message = {
@@ -243,6 +291,11 @@ Let's build on Stellar! 🌟`,
         throw new Error(result.error || 'Failed to get response');
       }
     } catch (error: any) {
+      // Don't show error message if request was cancelled
+      if (error.name === 'CanceledError' || error.message === 'Request cancelled by user') {
+        return;
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -253,32 +306,153 @@ Let's build on Stellar! 🌟`,
 
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+      abortControllerRef.current = null;
       setIsLoading(false);
       inputRef.current?.focus();
     }
   };
 
-  const clearChat = async () => {
+  // Load conversation history for the user
+  const loadConversationHistory = async () => {
+    if (!walletAddress) return;
+    
+    setIsLoadingHistory(true);
     try {
-      await axios.post(`${API_BASE_URL}/api/terminal/clear`, { sessionId });
-      
-      // Clear localStorage
-      localStorage.removeItem(STORAGE_KEY_MESSAGES);
-      localStorage.removeItem(STORAGE_KEY_SESSION);
-      
-      setMessages([
-        {
-          id: '0',
-          role: 'system',
-          content: '🔄 **Chat cleared!** How can I help you with Stellar today?',
-          timestamp: new Date(),
-          type: 'text',
-        },
-      ]);
+      // Get user ID from wallet address
+      const userResponse = await axios.get(`${API_BASE_URL}/api/users/${walletAddress}`);
+      const userId = userResponse.data.data.id;
+
+      const response = await axios.get(`${API_BASE_URL}/api/terminal/history/${userId}`);
+      if (response.data.success) {
+        setConversationHistory(response.data.conversations);
+      }
     } catch (error) {
-      console.error('Failed to clear chat:', error);
+      console.error('Failed to load conversation history:', error);
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
+
+  // Load a specific conversation
+  const loadConversation = async (conversationId: string) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/terminal/history/conversation/${conversationId}`);
+      if (response.data.success) {
+        const conv = response.data.conversation;
+        
+        // Convert database messages to UI message format
+        const loadedMessages: Message[] = conv.messages.map((msg: any) => ({
+          id: msg.id.toString(),
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.timestamp),
+          functionCalled: msg.function_called,
+          functionResult: msg.function_result,
+          type: msg.message_type || 'text',
+        }));
+
+        setMessages(loadedMessages);
+        setSessionId(conv.session_id);
+        setCurrentConversationId(conversationId);
+        
+        // Save to localStorage
+        localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(loadedMessages));
+        localStorage.setItem(STORAGE_KEY_SESSION, conv.session_id);
+        
+        setShowHistory(false);
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+    }
+  };
+
+  // Save current conversation
+  const saveCurrentConversation = async () => {
+    if (!walletAddress) return;
+    
+    try {
+      // Get user ID
+      const userResponse = await axios.get(`${API_BASE_URL}/api/users/${walletAddress}`);
+      const userId = userResponse.data.data.id;
+
+      await axios.post(`${API_BASE_URL}/api/terminal/history/save`, {
+        userId,
+        sessionId,
+        walletAddress,
+        title: undefined, // Will be auto-generated
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          functionCalled: msg.functionCalled,
+          functionResult: msg.functionResult,
+          type: msg.type,
+        })),
+      });
+
+      console.log('[Terminal] Conversation saved successfully');
+    } catch (error) {
+      console.error('Failed to save conversation:', error);
+    }
+  };
+
+  // Start a new conversation
+  const startNewConversation = () => {
+    // Save current conversation before starting new one
+    if (messages.length > 1) {
+      saveCurrentConversation();
+    }
+
+    // Generate new session ID
+    const newSessionId = `session_${Date.now()}_${Math.random()}`;
+    
+    // Clear localStorage
+    localStorage.removeItem(STORAGE_KEY_MESSAGES);
+    localStorage.setItem(STORAGE_KEY_SESSION, newSessionId);
+    
+    // Reset state
+    setSessionId(newSessionId);
+    setCurrentConversationId(null);
+    setMessages(getInitialMessages());
+    setShowHistory(false);
+  };
+
+  // Delete a conversation
+  const deleteConversation = async (conversationId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering loadConversation
+    
+    try {
+      await axios.delete(`${API_BASE_URL}/api/terminal/history/${conversationId}`);
+      
+      // Remove from local state
+      setConversationHistory(prev => prev.filter(c => c.id !== conversationId));
+      
+      // If deleted conversation was current, start new
+      if (currentConversationId === conversationId) {
+        startNewConversation();
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  };
+
+  // Auto-save conversation periodically (every 30 seconds when there are messages)
+  useEffect(() => {
+    if (messages.length <= 1) return; // Don't save if only welcome message
+    
+    const autoSaveInterval = setInterval(() => {
+      saveCurrentConversation();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [messages, walletAddress, sessionId]);
+
+  // Load history when showing history panel
+  useEffect(() => {
+    if (showHistory) {
+      loadConversationHistory();
+    }
+  }, [showHistory, walletAddress]);
 
   const formatContent = (content: string) => {
     // Convert markdown-style formatting to JSX
@@ -496,13 +670,24 @@ Let's build on Stellar! 🌟`,
               <p className="text-sm text-neutral-400">AI-Powered Blockchain Assistant</p>
             </div>
           </div>
-          <button
-            onClick={clearChat}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-50 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span className="text-sm">Clear</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={startNewConversation}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 hover:text-primary-300 transition-colors"
+              title="Start new conversation"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm">New</span>
+            </button>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-50 transition-colors"
+              title="View conversation history"
+            >
+              <History className="w-4 h-4" />
+              <span className="text-sm">History</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -802,12 +987,24 @@ Let's build on Stellar! 🌟`,
             className="flex justify-start"
           >
             <div className="max-w-3xl rounded-lg p-4 bg-secondary border border-default">
-              <div className="flex items-center gap-2 text-sm text-neutral-400">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>AI is thinking and executing blockchain operations...</span>
-              </div>
-              <div className="mt-2 text-xs text-neutral-500">
-                This may take a few seconds for complex operations
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 text-sm text-neutral-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>AI is thinking and executing blockchain operations...</span>
+                  </div>
+                  <div className="mt-2 text-xs text-neutral-500">
+                    This may take a few seconds for complex operations
+                  </div>
+                </div>
+                <button
+                  onClick={stopCurrentRequest}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors border border-red-500/20 hover:border-red-500/30"
+                  title="Stop current request"
+                >
+                  <StopCircle className="w-4 h-4" />
+                  <span className="text-xs font-medium">Stop</span>
+                </button>
               </div>
             </div>
           </motion.div>
@@ -849,6 +1046,108 @@ Let's build on Stellar! 🌟`,
           </div>
         </div>
       </div>
+
+      {/* History Sidebar */}
+      <AnimatePresence>
+        {showHistory && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+              onClick={() => setShowHistory(false)}
+            />
+
+            {/* Sidebar */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-96 bg-secondary border-l border-default z-50 flex flex-col"
+            >
+              {/* Sidebar Header */}
+              <div className="flex items-center justify-between p-4 border-b border-default">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5 text-primary-400" />
+                  <h2 className="text-lg font-semibold text-neutral-50">Chat History</h2>
+                </div>
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-neutral-400" />
+                </button>
+              </div>
+
+              {/* Sidebar Content */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {isLoadingHistory ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary-400" />
+                  </div>
+                ) : conversationHistory.length === 0 ? (
+                  <div className="text-center py-8 text-neutral-500">
+                    <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No conversation history yet</p>
+                    <p className="text-sm mt-1">Start chatting to build your history</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {conversationHistory.map((conv) => (
+                      <motion.div
+                        key={conv.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`group p-3 rounded-lg border transition-all cursor-pointer ${
+                          currentConversationId === conv.id
+                            ? 'bg-primary-500/10 border-primary-500/30'
+                            : 'bg-app border-default hover:border-primary-500/20 hover:bg-neutral-900/50'
+                        }`}
+                        onClick={() => loadConversation(conv.id)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-medium text-neutral-50 truncate mb-1">
+                              {conv.title}
+                            </h3>
+                            <div className="flex items-center gap-2 text-xs text-neutral-500">
+                              <Clock className="w-3 h-3" />
+                              <span>{new Date(conv.updated_at).toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>{conv.message_count} messages</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => deleteConversation(conv.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"
+                            title="Delete conversation"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-400" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Sidebar Footer */}
+              <div className="p-4 border-t border-default">
+                <button
+                  onClick={startNewConversation}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-500 hover:bg-primary-600 text-black rounded-lg transition-colors font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>New Conversation</span>
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

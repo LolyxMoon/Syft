@@ -145,7 +145,7 @@ export const QuestOnboardingModal = ({
                 <button
                   onClick={handleAccept}
                   disabled={isClosing}
-                  className="flex-1 px-4 py-3 bg-primary-500 hover:bg-primary-600 rounded-lg text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 bg-primary-500 hover:bg-primary-600 rounded-lg text-black font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Trophy className="w-5 h-5" />
                   <span>Start Quests</span>

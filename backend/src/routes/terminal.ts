@@ -434,6 +434,164 @@ router.post('/clear', async (req, res): Promise<void> => {
 });
 
 /**
+ * POST /api/terminal/history/save
+ * Save a conversation to database
+ */
+router.post('/history/save', async (req, res): Promise<void> => {
+  try {
+    const { userId, sessionId, walletAddress, title, messages } = req.body;
+
+    if (!userId || !sessionId) {
+      res.status(400).json({ error: 'User ID (UUID) and Session ID are required' });
+      return;
+    }
+
+    const result = await terminalAIService.saveConversation(
+      userId,
+      sessionId,
+      walletAddress,
+      title,
+      messages
+    );
+
+    res.json({
+      success: true,
+      conversationId: result.conversationId,
+      message: 'Conversation saved successfully',
+    });
+  } catch (error: any) {
+    console.error('Save conversation error:', error);
+    res.status(500).json({
+      error: 'Failed to save conversation',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/terminal/history/:userId
+ * Get all conversations for a user
+ */
+router.get('/history/:userId', async (req, res): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { limit = '50', offset = '0' } = req.query;
+
+    if (!userId) {
+      res.status(400).json({ error: 'User ID (UUID) is required' });
+      return;
+    }
+
+    const conversations = await terminalAIService.getConversations(
+      userId,
+      parseInt(limit as string),
+      parseInt(offset as string)
+    );
+
+    res.json({
+      success: true,
+      conversations,
+    });
+  } catch (error: any) {
+    console.error('Get conversations error:', error);
+    res.status(500).json({
+      error: 'Failed to get conversations',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/terminal/history/conversation/:conversationId
+ * Load a specific conversation with all messages
+ */
+router.get('/history/conversation/:conversationId', async (req, res): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+
+    if (!conversationId) {
+      res.status(400).json({ error: 'Conversation ID (UUID) is required' });
+      return;
+    }
+
+    const conversation = await terminalAIService.loadConversation(conversationId);
+
+    if (!conversation) {
+      res.status(404).json({ error: 'Conversation not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      conversation,
+    });
+  } catch (error: any) {
+    console.error('Load conversation error:', error);
+    res.status(500).json({
+      error: 'Failed to load conversation',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/terminal/history/:conversationId
+ * Delete a conversation
+ */
+router.delete('/history/:conversationId', async (req, res): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+
+    if (!conversationId) {
+      res.status(400).json({ error: 'Conversation ID (UUID) is required' });
+      return;
+    }
+
+    await terminalAIService.deleteConversation(conversationId);
+
+    res.json({
+      success: true,
+      message: 'Conversation deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Delete conversation error:', error);
+    res.status(500).json({
+      error: 'Failed to delete conversation',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * PATCH /api/terminal/history/:conversationId/title
+ * Update conversation title
+ */
+router.patch('/history/:conversationId/title', async (req, res): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+    const { title } = req.body;
+
+    if (!conversationId || !title) {
+      res.status(400).json({ error: 'Conversation ID (UUID) and title are required' });
+      return;
+    }
+
+    await terminalAIService.updateConversationTitle(conversationId, title);
+
+    res.json({
+      success: true,
+      message: 'Conversation title updated successfully',
+    });
+  } catch (error: any) {
+    console.error('Update conversation title error:', error);
+    res.status(500).json({
+      error: 'Failed to update conversation title',
+      details: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/terminal/stats/:sessionId
  * Get conversation statistics for a session
  */

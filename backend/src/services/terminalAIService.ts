@@ -5,6 +5,7 @@ import {
   countConversationTokens, 
   isApproachingLimit
 } from '../utils/tokenCounter.js';
+import { supabase } from '../lib/supabase.js';
 
 /**
  * OpenAI Function Definitions for Stellar Terminal
@@ -1832,6 +1833,223 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
       totalTokens,
       averageTokensPerSession: sessions.length > 0 ? Math.round(totalTokens / sessions.length) : 0,
     };
+  }
+
+  /**
+   * Save a conversation to the database
+   */
+  async saveConversation(
+    userId: string,
+    sessionId: string,
+    walletAddress: string | undefined,
+    title: string | undefined,
+    messages: any[]
+  ): Promise<{ conversationId: string }> {
+    try {
+      // Generate title from first user message if not provided
+      const conversationTitle = title || this.generateConversationTitle(messages);
+      
+      // Count tokens
+      const tokenCount = countConversationTokens(messages, process.env.OPENAI_MODEL);
+
+      // Check if conversation already exists
+      const { data: existingConv, error: findError } = await supabase
+        .from('terminal_conversations')
+        .select('id')
+        .eq('session_id', sessionId)
+        .single();
+
+      if (findError && findError.code !== 'PGRST116') {
+        throw findError;
+      }
+
+      let conversationId: string;
+
+      if (existingConv) {
+        // Update existing conversation
+        const { error: updateError } = await supabase
+          .from('terminal_conversations')
+          .update({
+            title: conversationTitle,
+            message_count: messages.length,
+            token_count: tokenCount,
+            wallet_address: walletAddress,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingConv.id);
+
+        if (updateError) throw updateError;
+
+        conversationId = existingConv.id;
+
+        // Delete old messages
+        const { error: deleteError } = await supabase
+          .from('terminal_messages')
+          .delete()
+          .eq('conversation_id', conversationId);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Create new conversation
+        const { data: newConv, error: insertError } = await supabase
+          .from('terminal_conversations')
+          .insert({
+            user_id: userId,
+            session_id: sessionId,
+            wallet_address: walletAddress,
+            title: conversationTitle,
+            message_count: messages.length,
+            token_count: tokenCount,
+          })
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        conversationId = newConv.id;
+      }
+
+      // Insert messages
+      const messageRecords = messages.map((msg) => ({
+        conversation_id: conversationId,
+        role: msg.role,
+        content: msg.content,
+        function_called: msg.functionCalled || null,
+        function_result: msg.functionResult || null,
+        message_type: msg.type || 'text',
+        tool_call_id: msg.tool_call_id || null,
+        timestamp: msg.timestamp || new Date().toISOString(),
+      }));
+
+      const { error: messagesError } = await supabase
+        .from('terminal_messages')
+        .insert(messageRecords);
+
+      if (messagesError) throw messagesError;
+
+      console.log(`[Terminal AI] 💾 Saved conversation ${conversationId} with ${messages.length} messages`);
+
+      return { conversationId };
+    } catch (error: any) {
+      console.error('[Terminal AI] Failed to save conversation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all conversations for a user
+   */
+  async getConversations(
+    userId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('terminal_conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error: any) {
+      console.error('[Terminal AI] Failed to get conversations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load a specific conversation with all messages
+   */
+  async loadConversation(conversationId: string): Promise<any | null> {
+    try {
+      // Get conversation metadata
+      const { data: conversation, error: convError } = await supabase
+        .from('terminal_conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .single();
+
+      if (convError) throw convError;
+      if (!conversation) return null;
+
+      // Get all messages
+      const { data: messages, error: messagesError } = await supabase
+        .from('terminal_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('timestamp', { ascending: true });
+
+      if (messagesError) throw messagesError;
+
+      return {
+        ...conversation,
+        messages: messages || [],
+      };
+    } catch (error: any) {
+      console.error('[Terminal AI] Failed to load conversation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a conversation
+   */
+  async deleteConversation(conversationId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('terminal_conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      console.log(`[Terminal AI] 🗑️  Deleted conversation ${conversationId}`);
+    } catch (error: any) {
+      console.error('[Terminal AI] Failed to delete conversation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update conversation title
+   */
+  async updateConversationTitle(conversationId: string, title: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('terminal_conversations')
+        .update({ title })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      console.log(`[Terminal AI] ✏️  Updated conversation ${conversationId} title to: ${title}`);
+    } catch (error: any) {
+      console.error('[Terminal AI] Failed to update conversation title:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a conversation title from messages
+   */
+  private generateConversationTitle(messages: any[]): string {
+    // Find first user message
+    const firstUserMessage = messages.find(msg => msg.role === 'user');
+    
+    if (!firstUserMessage) {
+      return `Terminal Session ${new Date().toLocaleDateString()}`;
+    }
+
+    // Use first 50 characters of first user message
+    let title = firstUserMessage.content.slice(0, 50);
+    if (firstUserMessage.content.length > 50) {
+      title += '...';
+    }
+
+    return title;
   }
 }
 
