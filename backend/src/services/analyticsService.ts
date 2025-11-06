@@ -1210,12 +1210,26 @@ export async function getPortfolioPerformanceHistory(
       }
       const drawdown = peak > 0 ? ((currentValue - peak) / peak) * 100 : 0;
 
+      // Calculate daily return (return from previous day)
+      let dailyReturn = 0;
+      if (index > 0) {
+        const prevValue = portfolioHistory[index - 1].totalValue;
+        if (prevValue > 0) {
+          dailyReturn = ((currentValue - prevValue) / prevValue) * 100;
+        }
+      }
+
+      // Estimate volume (change in portfolio value)
+      const volume = index > 0 ? Math.abs(currentValue - portfolioHistory[index - 1].totalValue) : 0;
+
       return {
         date: new Date(point.timestamp).toLocaleDateString(),
         value: currentValue,
         apy: apy,
         volatility: volatility,
         drawdown: drawdown,
+        dailyReturn: dailyReturn,
+        volume: volume,
         timestamp: point.timestamp,
       };
     });
