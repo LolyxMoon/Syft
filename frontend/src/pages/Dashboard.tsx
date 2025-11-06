@@ -602,7 +602,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold flex items-center gap-2 text-neutral-50">
                 <Activity className="w-5 h-5 text-primary-500" />
-                Active Vaults
+                Owned Vaults
               </h2>
               <Link to="/app/builder">
                 <Button variant="primary" size="md">Create New Vault</Button>
