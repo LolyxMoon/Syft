@@ -10,6 +10,8 @@ import storage from "../util/storage";
 import { questValidation } from "../services/questValidation";
 import { WatchWalletChanges } from "@stellar/freighter-api";
 
+const API_URL = `${import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com'}/api`;
+
 export interface WalletContextType {
   address?: string;
   network?: string;
@@ -50,6 +52,35 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     storage.removeItem("networkPassphrase");
   };
 
+  // Register user in database when wallet connects
+  const registerUser = async (walletAddress: string, network?: string) => {
+    try {
+      console.log("[WalletProvider] Registering user in database:", walletAddress);
+      
+      const response = await fetch(`${API_URL}/users/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          walletAddress,
+          network: network || 'testnet',
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log("[WalletProvider] User registered successfully:", data.data);
+      } else {
+        console.error("[WalletProvider] Failed to register user:", data.error);
+      }
+    } catch (error) {
+      console.error("[WalletProvider] Error registering user:", error);
+      // Don't throw - registration failure shouldn't block wallet connection
+    }
+  };
+
   const updateState = (newState: Omit<WalletContextType, "isPending">) => {
     setState((prev: Omit<WalletContextType, "isPending">) => {
       const hasChanged =
@@ -65,6 +96,9 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
           questValidation.setWalletAddress(newState.address);
           // Validate connect wallet quest
           questValidation.validateConnectWallet();
+          
+          // Register user in database
+          void registerUser(newState.address, newState.network);
         }
         
         // Reset quest validation when disconnecting
@@ -205,6 +239,12 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
           
           // Update storage with new address
           storage.setItem("walletAddress", watcherResults.address);
+          
+          // Register the new account in database
+          void registerUser(
+            watcherResults.address, 
+            watcherResults.network?.toLowerCase() || storedNetwork
+          );
           
           // Update state
           updateState({
