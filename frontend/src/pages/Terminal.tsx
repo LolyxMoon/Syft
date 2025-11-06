@@ -583,6 +583,78 @@ Let's build on Stellar! 🌟`,
                       
                       setMessages((prev) => [...prev, resultMessage]);
 
+                      // Check if there's a next action (e.g., deposit after pool trustline)
+                      // Check both result.nextAction and message.action.nextAction for compatibility
+                      const nextAction = result.nextAction || message.action?.nextAction;
+                      console.log('[Terminal] Checking for next action:', { 
+                        hasResultNextAction: !!result.nextAction, 
+                        hasMessageNextAction: !!message.action?.nextAction,
+                        nextAction 
+                      });
+                      
+                      if (result.success && nextAction) {
+                        console.log('[Terminal] Next action found, type:', nextAction.type);
+                        
+                        if (nextAction.type === 'add_liquidity') {
+                          // Automatically trigger the liquidity deposit now that trustline is established
+                          const nextStepMessage: Message = {
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
+                            content: `✅ **Pool trustline established!** Now proceeding with liquidity deposit...`,
+                            timestamp: new Date(),
+                          };
+                          setMessages((prev) => [...prev, nextStepMessage]);
+
+                          // Trigger the add_liquidity function directly
+                          setIsLoading(true);
+                          try {
+                            const { asset1, asset2, amount1, amount2 } = nextAction;
+                            
+                            const depositResponse = await axios.post(`${API_BASE_URL}/api/terminal/add-liquidity`, {
+                              sessionId,
+                              asset1,
+                              asset2,
+                              amount1,
+                              amount2,
+                            });
+
+                            if (!depositResponse.data.success || !depositResponse.data.jobId) {
+                              throw new Error('Failed to start liquidity deposit');
+                            }
+
+                            const depositResult = await pollJobStatus(depositResponse.data.jobId);
+
+                            console.log('[Terminal] Auto-deposit result:', depositResult);
+
+                            if (depositResult.success) {
+                              const depositResponseMessage: Message = {
+                                id: (Date.now() + 2).toString(),
+                                role: 'assistant',
+                                content: depositResult.message || '✅ Liquidity added successfully!',
+                                timestamp: new Date(),
+                                functionCalled: depositResult.functionCalled,
+                                functionResult: depositResult.functionResult,
+                                type: depositResult.type,
+                                action: depositResult.functionResult?.action,
+                              };
+                              setMessages((prev) => [...prev, depositResponseMessage]);
+                            } else {
+                              throw new Error(depositResult.error || depositResult.message || 'Liquidity deposit failed');
+                            }
+                          } catch (error: any) {
+                            const errorMessage: Message = {
+                              id: (Date.now() + 2).toString(),
+                              role: 'assistant',
+                              content: `❌ Auto-deposit failed: ${error.message}. Please try your add liquidity command again manually.`,
+                              timestamp: new Date(),
+                            };
+                            setMessages((prev) => [...prev, errorMessage]);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }
+                      }
+
                       // Check if there's a follow-up action (e.g., swap after trustline)
                       if (result.success && message.action?.followUpAction) {
                         const followUp = message.action.followUpAction;

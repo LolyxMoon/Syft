@@ -16,11 +16,19 @@ export interface TransactionAction {
     type: string;
     params: Record<string, any>;
   };
+  nextAction?: {
+    type: string;
+    asset1?: string;
+    asset2?: string;
+    amount1?: string;
+    amount2?: string;
+    poolId?: string;
+  };
 }
 
 interface TerminalActionCardProps {
   action: TransactionAction;
-  onComplete?: (result: { success: boolean; hash?: string; error?: string }) => void;
+  onComplete?: (result: { success: boolean; hash?: string; error?: string; nextAction?: any }) => void;
 }
 
 export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardProps) => {
@@ -47,8 +55,12 @@ export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardPro
       setStatus('success');
       setTransactionHash(result.hash);
 
-      // Notify parent component
-      onComplete?.({ success: true, hash: result.hash });
+      // Notify parent component (include nextAction if this was step 1)
+      onComplete?.({ 
+        success: true, 
+        hash: result.hash,
+        nextAction: action.nextAction // Pass along the next action if present
+      });
     } catch (error: any) {
       console.error('[TerminalAction] Transaction failed:', error);
 

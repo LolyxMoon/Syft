@@ -201,6 +201,81 @@ async function processDirectSwap(
 }
 
 /**
+ * Direct add liquidity function call (used for follow-up deposit after trustline)
+ */
+router.post('/add-liquidity', async (req, res): Promise<void> => {
+  try {
+    const { sessionId, asset1, asset2, amount1, amount2 } = req.body;
+
+    console.log('[Terminal Route] Direct add liquidity request:', {
+      sessionId,
+      asset1,
+      asset2,
+      amount1,
+      amount2,
+    });
+
+    if (!sessionId || !asset1 || !asset2 || !amount1 || !amount2) {
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
+    }
+
+    // Create a job ID for this add liquidity request
+    const jobId = `addliq_${sessionId}_${Date.now()}`;
+    
+    // Create the job
+    jobQueue.createJob(jobId);
+
+    // Start processing in background
+    processDirectAddLiquidity(jobId, sessionId, asset1, asset2, amount1, amount2);
+
+    // Return job ID immediately
+    res.json({
+      success: true,
+      jobId,
+      status: 'processing',
+      message: 'Add liquidity is being processed',
+    });
+  } catch (error: any) {
+    console.error('Terminal add liquidity error:', error);
+    res.status(500).json({
+      error: 'Failed to process add liquidity',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Background processing for direct add liquidity
+ */
+async function processDirectAddLiquidity(
+  jobId: string,
+  sessionId: string,
+  asset1: string,
+  asset2: string,
+  amount1: string,
+  amount2: string
+) {
+  try {
+    jobQueue.markProcessing(jobId);
+
+    // Call the add liquidity function directly via terminalAIService
+    const response = await terminalAIService.executeAddLiquidity(
+      sessionId,
+      asset1,
+      asset2,
+      amount1,
+      amount2
+    );
+
+    jobQueue.completeJob(jobId, response);
+  } catch (error: any) {
+    console.error('Direct add liquidity processing error:', error);
+    jobQueue.failJob(jobId, error.message);
+  }
+}
+
+/**
  * POST /api/terminal/upload-wasm
  * Upload WASM file and install it to Stellar network
  */

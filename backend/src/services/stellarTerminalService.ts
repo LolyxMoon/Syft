@@ -648,7 +648,7 @@ export class StellarTerminalService {
       };
     }
   }
-  
+
   /**
    * DEX & LIQUIDITY OPERATIONS
    */
@@ -829,6 +829,104 @@ export class StellarTerminalService {
     }
   }
 
+  async establishPoolTrustline(
+    sessionId: string,
+    asset1: string,
+    asset2: string
+  ): Promise<any> {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
+      }
+
+      const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
+
+      // Parse assets
+      let stellarAsset1: Asset;
+      let stellarAsset2: Asset;
+
+      if (asset1 === 'XLM' || asset1.toLowerCase() === 'native') {
+        stellarAsset1 = Asset.native();
+      } else {
+        const [code, issuer] = asset1.split(':');
+        stellarAsset1 = new Asset(code, issuer);
+      }
+
+      if (asset2 === 'XLM' || asset2.toLowerCase() === 'native') {
+        stellarAsset2 = Asset.native();
+      } else {
+        const [code, issuer] = asset2.split(':');
+        stellarAsset2 = new Asset(code, issuer);
+      }
+
+      // Create liquidity pool asset for trustline
+      const liquidityPoolAsset = new StellarSdk.LiquidityPoolAsset(
+        stellarAsset1,
+        stellarAsset2,
+        StellarSdk.LiquidityPoolFeeV18
+      );
+
+      const poolId = StellarSdk.getLiquidityPoolId(
+        'constant_product',
+        {
+          assetA: stellarAsset1,
+          assetB: stellarAsset2,
+          fee: 30,
+        }
+      ).toString('hex');
+
+      const transaction = new TransactionBuilder(sourceAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.changeTrust({
+            asset: liquidityPoolAsset,
+            limit: '100000',
+          })
+        )
+        .setTimeout(300)
+        .build();
+
+      if (!sourceKeypair) {
+        return {
+          success: true,
+          message: `Ready to establish trustline for liquidity pool ${poolId}. Sign & approve in Freighter.`,
+          action: {
+            type: 'establish_pool_trustline',
+            title: 'Establish Pool Trustline',
+            description: `Create trustline for ${asset1}/${asset2} pool shares`,
+            xdr: transaction.toXDR(),
+            details: {
+              asset1,
+              asset2,
+              pool_id: poolId,
+              network: 'testnet',
+            },
+          },
+        };
+      }
+
+      transaction.sign(sourceKeypair);
+      const result = await horizonServer.submitTransaction(transaction);
+
+      return {
+        success: true,
+        message: `Successfully established trustline for ${asset1}/${asset2} liquidity pool`,
+        transactionHash: result.hash,
+        poolId,
+        link: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to establish pool trustline',
+      };
+    }
+  }
+
   async addLiquidity(
     sessionId: string,
     asset1: string,
@@ -863,6 +961,13 @@ export class StellarTerminalService {
         stellarAsset2 = new Asset(code, issuer);
       }
 
+      // Create liquidity pool asset for trustline
+      const liquidityPoolAsset = new StellarSdk.LiquidityPoolAsset(
+        stellarAsset1,
+        stellarAsset2,
+        StellarSdk.LiquidityPoolFeeV18
+      );
+
       // Build transaction to deposit to liquidity pool
       const poolId = StellarSdk.getLiquidityPoolId(
         'constant_product',
@@ -873,7 +978,66 @@ export class StellarTerminalService {
         }
       ).toString('hex');
 
-      const transaction = new TransactionBuilder(sourceAccount, {
+      // Check if trustline for pool shares exists
+      const account = await horizonServer.loadAccount(session.publicKey);
+      const balances = account.balances;
+      
+      const hasPoolTrustline = balances.some((balance: any) => 
+        balance.asset_type === 'liquidity_pool_shares' && 
+        balance.liquidity_pool_id === poolId
+      );
+
+      // If no pool trustline, return the trustline transaction first
+      if (!hasPoolTrustline) {
+        const trustlineTransaction = new TransactionBuilder(sourceAccount, {
+          fee: BASE_FEE,
+          networkPassphrase: Networks.TESTNET,
+        })
+          .addOperation(
+            Operation.changeTrust({
+              asset: liquidityPoolAsset,
+              limit: '100000',
+            })
+          )
+          .setTimeout(300)
+          .build();
+
+        if (!sourceKeypair) {
+          return {
+            success: true,
+            requiresTrustline: true,
+            message: `⚠️ Step 1/2: You need to establish a trustline for the ${asset1}/${asset2} liquidity pool shares first.`,
+            action: {
+              type: 'establish_pool_trustline',
+              title: 'Step 1: Establish Pool Trustline',
+              description: `Create trustline for ${asset1}/${asset2} pool shares before adding liquidity`,
+              xdr: trustlineTransaction.toXDR(),
+              details: {
+                asset1,
+                asset2,
+                pool_id: poolId,
+                network: 'testnet',
+                next_step: 'After signing this, you can add liquidity',
+              },
+              // Include the next action INSIDE the action object so frontend can access it
+              nextAction: {
+                type: 'add_liquidity',
+                asset1,
+                asset2,
+                amount1,
+                amount2,
+                poolId,
+              },
+            },
+          };
+        }
+
+        trustlineTransaction.sign(sourceKeypair);
+        await horizonServer.submitTransaction(trustlineTransaction);
+      }
+
+      // Now create the deposit transaction (trustline already exists or was just created)
+      const depositTransaction = new TransactionBuilder(sourceAccount, {
         fee: BASE_FEE,
         networkPassphrase: Networks.TESTNET,
       })
@@ -882,8 +1046,8 @@ export class StellarTerminalService {
             liquidityPoolId: poolId,
             maxAmountA: amount1,
             maxAmountB: amount2,
-            minPrice: { n: 1, d: 2 }, // Min price ratio
-            maxPrice: { n: 2, d: 1 }, // Max price ratio
+            minPrice: { n: 1, d: 10 }, // More flexible min price ratio (10% of spot)
+            maxPrice: { n: 10, d: 1 }, // More flexible max price ratio (10x spot)
           })
         )
         .setTimeout(300)
@@ -893,12 +1057,12 @@ export class StellarTerminalService {
       if (!sourceKeypair) {
         return {
           success: true,
-          message: 'Please sign this transaction with your wallet to add liquidity.',
+          message: `✅ Step 2/2: Ready to add liquidity: ${amount1} ${asset1} + ${amount2} ${asset2} to pool. Sign & approve to receive LP tokens.`,
           action: {
             type: 'add_liquidity',
-            title: 'Add Liquidity',
-            description: `Add ${amount1} ${asset1} + ${amount2} ${asset2} to pool`,
-            xdr: transaction.toXDR(),
+            title: 'Step 2: Add Liquidity',
+            description: `Deposit ${amount1} ${asset1} + ${amount2} ${asset2} to pool ${poolId.substring(0, 8)}...`,
+            xdr: depositTransaction.toXDR(),
             details: {
               asset1: asset1,
               asset2: asset2,
@@ -911,9 +1075,9 @@ export class StellarTerminalService {
         };
       }
 
-      transaction.sign(sourceKeypair);
+      depositTransaction.sign(sourceKeypair);
 
-      const result = await horizonServer.submitTransaction(transaction);
+      const result = await horizonServer.submitTransaction(depositTransaction);
 
       return {
         success: true,

@@ -211,8 +211,26 @@ const TERMINAL_FUNCTIONS = [
     },
   },
   {
+    name: 'establish_pool_trustline',
+    description: 'Establish trustline for liquidity pool shares BEFORE adding liquidity. This is REQUIRED before you can deposit into a pool.',
+    parameters: {
+      type: 'object',
+      properties: {
+        asset1: {
+          type: 'string',
+          description: 'First asset (e.g., XLM or USDC:ISSUER)',
+        },
+        asset2: {
+          type: 'string',
+          description: 'Second asset (e.g., XLM or USDC:ISSUER)',
+        },
+      },
+      required: ['asset1', 'asset2'],
+    },
+  },
+  {
     name: 'add_liquidity',
-    description: 'Add liquidity to a pool and receive LP tokens.',
+    description: 'Add liquidity to a pool and receive LP tokens. NOTE: User must have trustline for pool shares first (use establish_pool_trustline).',
     parameters: {
       type: 'object',
       properties: {
@@ -539,6 +557,14 @@ If user requests swap to "random token" or any non-USDC asset:
 
 Example response:
 "Stellar testnet has limited liquidity pools. The most reliable swap on testnet is XLM ↔ USDC. Would you like me to swap your XLM to USDC instead? On mainnet, there are many more token pairs available."
+
+CRITICAL - LIQUIDITY POOL TRUSTLINES:
+Before adding liquidity to ANY pool, you MUST establish a trustline for the pool shares:
+1. First call: establish_pool_trustline(asset1, asset2) - User signs this
+2. Then call: add_liquidity(asset1, asset2, amount1, amount2) - User signs this
+Without step 1, the add_liquidity transaction will FAIL with "tx_failed" error!
+
+The updated addLiquidity function now automatically includes trustline operations, but it's still good practice to inform users about this two-step process.
 
 CRITICAL: Do NOT show web search results in your response! Web search is a SILENT helper tool. Only show the final blockchain operation (swap, transfer, trustline) to the user. Your reasoning is internal - just present the final action.
 
@@ -1036,6 +1062,12 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
             args.amount,
             args.slippage
           );
+        case 'establish_pool_trustline':
+          return await service.establishPoolTrustline(
+            sessionId,
+            args.asset1,
+            args.asset2
+          );
         case 'add_liquidity':
           return await service.addLiquidity(
             sessionId,
@@ -1262,6 +1294,130 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
         error: error.message,
         message: `Failed to execute swap: ${error.message}`,
         functionCalled: 'swap_assets',
+        functionResult: { success: false, error: error.message },
+        type: 'function_call',
+      };
+    }
+  }
+
+  /**
+   * Execute add liquidity directly (used for follow-up actions after trustline)
+   * This maintains conversation context while directly calling the add liquidity function
+   */
+  async executeAddLiquidity(
+    sessionId: string,
+    asset1: string,
+    asset2: string,
+    amount1: string,
+    amount2: string
+  ): Promise<any> {
+    try {
+      console.log('[Terminal AI] Direct add liquidity execution:', { 
+        sessionId, asset1, asset2, amount1, amount2 
+      });
+      
+      // Get conversation context to maintain history
+      const context = this.conversationHistory.get(sessionId);
+      
+      // Add system message about auto-continuation
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `[Auto-continuing after pool trustline setup] Now executing add liquidity: ${amount1} ${asset1} + ${amount2} ${asset2}`,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+      
+      const service = stellarTerminalService;
+      const result = await service.addLiquidity(sessionId, asset1, asset2, amount1, amount2);
+
+      console.log('[Terminal AI] Add liquidity result:', JSON.stringify(result, null, 2));
+
+      // Add the execution to conversation history
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `Executed add_liquidity function with parameters: asset1=${asset1}, asset2=${asset2}, amount1=${amount1}, amount2=${amount2}`,
+        });
+        
+        context.messages.push({
+          role: 'tool',
+          content: JSON.stringify(result),
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+
+      // Format response similar to chat responses
+      if (result.action) {
+        const responseMessage = result.message || `✅ Ready to add ${amount1} ${asset1} + ${amount2} ${asset2} to pool. You'll see a Freighter popup to sign & approve.`;
+        
+        if (context) {
+          context.messages.push({
+            role: 'assistant',
+            content: responseMessage,
+          });
+          context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+        }
+        
+        return {
+          success: true,
+          message: responseMessage,
+          functionCalled: 'add_liquidity',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      // Check if the result indicates failure
+      if (!result.success) {
+        const errorMsg = result.error || 'Add liquidity failed';
+        console.error('[Terminal AI] Add liquidity failed:', errorMsg);
+        
+        return {
+          success: false,
+          error: errorMsg,
+          message: errorMsg,
+          functionCalled: 'add_liquidity',
+          functionResult: result,
+          type: 'function_call',
+        };
+      }
+
+      const responseMessage = result.message || 'Liquidity added successfully';
+      
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: responseMessage,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+
+      return {
+        success: true,
+        message: responseMessage,
+        functionCalled: 'add_liquidity',
+        functionResult: result,
+        type: 'function_call',
+      };
+    } catch (error: any) {
+      console.error('[Terminal AI] Direct add liquidity error:', error);
+      
+      // Add error to conversation history
+      const context = this.conversationHistory.get(sessionId);
+      if (context) {
+        context.messages.push({
+          role: 'assistant',
+          content: `Error executing auto add liquidity: ${error.message}`,
+        });
+        context.tokenCount = countConversationTokens(context.messages, process.env.OPENAI_MODEL);
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        message: `Failed to execute add liquidity: ${error.message}`,
+        functionCalled: 'add_liquidity',
         functionResult: { success: false, error: error.message },
         type: 'function_call',
       };
