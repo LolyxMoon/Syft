@@ -83,7 +83,9 @@ const Analytics = () => {
   const [error, setError] = useState<string | null>(null);
   const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
   const [assetCorrelations, setAssetCorrelations] = useState<AssetCorrelation[]>([]);
-  const [rebalanceHistory, setRebalanceHistory] = useState<RebalanceEvent[]>([]);
+  // Rebalance history kept for future implementation (currently empty)
+  // Only the state value is currently used; omit the unused setter to avoid TS warnings
+  const [rebalanceHistory] = useState<RebalanceEvent[]>([]);
   const [liquidityMetrics, setLiquidityMetrics] = useState<LiquidityMetrics[]>([]);
   const [timeAnalysis, setTimeAnalysis] = useState<TimeAnalysis[]>([]);
   const [assetContributions, setAssetContributions] = useState<AssetContribution[]>([]);
@@ -110,14 +112,138 @@ const Analytics = () => {
     setError(null);
 
     try {
-      if (selectedView === 'risk') {
-        await fetchRiskAnalytics();
-      } else if (selectedView === 'performance') {
-        await fetchPerformanceAnalytics();
-      } else if (selectedView === 'liquidity') {
+      // Use comprehensive endpoint for faster loading
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+      const normalizedNetwork = network?.toLowerCase() || 'testnet';
+      const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+      const days = daysMap[selectedPeriod] || 30;
+
+      console.log('[Analytics] Fetching comprehensive data...');
+      const startTime = Date.now();
+
+      const comprehensiveResponse = await fetch(
+        `${backendUrl}/api/analytics/portfolio/${address}/comprehensive?network=${normalizedNetwork}&days=${days}`
+      );
+
+      if (comprehensiveResponse.ok) {
+        const comprehensiveData = await comprehensiveResponse.json();
+        console.log(`[Analytics] Data fetched in ${Date.now() - startTime}ms`);
+
+        if (comprehensiveData.success && comprehensiveData.data) {
+          const { analytics, allocation, breakdown, history } = comprehensiveData.data;
+
+          // Process analytics data
+          if (analytics) {
+            setRiskMetrics({
+              portfolioVolatility: analytics.volatility || 0,
+              sharpeRatio: analytics.sharpeRatio || 0,
+              sortinoRatio: analytics.sortinoRatio || 0,
+              maxDrawdown: analytics.maxDrawdown || 0,
+              valueAtRisk: analytics.valueAtRisk || 0,
+              beta: analytics.beta || 1,
+              alpha: analytics.alpha || 0,
+              informationRatio: analytics.informationRatio || 0
+            });
+
+            if (analytics.assetCorrelations && Array.isArray(analytics.assetCorrelations)) {
+              setAssetCorrelations(analytics.assetCorrelations);
+            }
+          }
+
+          // Process allocation data
+          if (allocation && Array.isArray(allocation)) {
+            const colors = ['#3b82f6', '#a8c93a', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981'];
+            const contributions = allocation.map((asset: any, index: number) => ({
+              asset: asset.asset || 'Unknown',
+              totalReturn: asset.totalReturn || 0,
+              returnContribution: asset.returnContribution || 0,
+              riskContribution: asset.riskContribution || 0,
+              allocation: asset.percentage || 0,
+              color: colors[index % colors.length]
+            }));
+            setAssetContributions(contributions);
+          }
+
+          // Process breakdown data
+          if (breakdown && Array.isArray(breakdown)) {
+            const attributions = breakdown.map((vault: any) => ({
+              vaultId: vault.vaultId || vault.vault_id,
+              vaultName: vault.name || 'Unnamed Vault',
+              assetSelection: vault.attribution?.assetSelection || 0,
+              timing: vault.attribution?.timing || 0,
+              rebalancing: vault.attribution?.rebalancing || 0,
+              fees: vault.attribution?.fees || 0,
+              totalReturn: vault.totalReturn || 0
+            }));
+            setPerformanceAttribution(attributions);
+          }
+
+          // Process history data
+          if (history && history.length > 0) {
+            // For volatility chart
+            const volatilityData = history.map((point: any) => ({
+              date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              volatility: point.volatility || 0,
+              benchmark: 0 // Could add benchmark data later
+            }));
+            setHistoricalVolatility(volatilityData);
+
+            // For drawdown chart
+            const drawdownData = history.map((point: any) => ({
+              date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              drawdown: point.drawdown || 0,
+              maxDrawdown: analytics?.maxDrawdown || 0
+            }));
+            setDrawdownHistory(drawdownData);
+
+            // For time analysis
+            const dayMap = new Map<string, { returns: number[], volumes: number[], volatilities: number[] }>();
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+            history.forEach((point: any) => {
+              const date = new Date(point.timestamp);
+              const dayName = days[date.getDay()];
+
+              if (!dayMap.has(dayName)) {
+                dayMap.set(dayName, { returns: [], volumes: [], volatilities: [] });
+              }
+
+              const dayData = dayMap.get(dayName)!;
+              if (point.dailyReturn != null) dayData.returns.push(point.dailyReturn);
+              if (point.volume != null) dayData.volumes.push(point.volume);
+              if (point.volatility != null) dayData.volatilities.push(point.volatility);
+            });
+
+            const timeAnalysisData = days.slice(1).concat(days[0]).map(dayName => {
+              const data = dayMap.get(dayName) || { returns: [0], volumes: [0], volatilities: [0] };
+              const avgReturn = data.returns.length > 0
+                ? data.returns.reduce((a, b) => a + b, 0) / data.returns.length
+                : 0;
+              const totalVolume = data.volumes.length > 0
+                ? data.volumes.reduce((a, b) => a + b, 0) / data.volumes.length
+                : 0;
+              const volatility = data.volatilities.length > 0
+                ? data.volatilities.reduce((a, b) => a + b, 0) / data.volatilities.length
+                : 0;
+
+              return {
+                period: dayName,
+                avgReturn,
+                totalVolume,
+                volatility,
+                bestDay: '',
+                worstDay: ''
+              };
+            });
+
+            setTimeAnalysis(timeAnalysisData);
+          }
+        }
+      }
+
+      // Still fetch liquidity separately as it comes from Horizon
+      if (selectedView === 'liquidity') {
         await fetchLiquidityAnalytics();
-      } else if (selectedView === 'time') {
-        await fetchTimeAnalytics();
       }
     } catch (err: any) {
       console.error('Failed to fetch analytics:', err);
@@ -125,135 +251,6 @@ const Analytics = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  };
-
-  const fetchRiskAnalytics = async () => {
-    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-    const normalizedNetwork = network?.toLowerCase() || 'testnet';
-    
-    try {
-      // Fetch portfolio analytics with risk metrics
-      const analyticsResponse = await fetch(
-        `${backendUrl}/api/analytics/portfolio/${address}?network=${normalizedNetwork}`
-      );
-      
-      if (analyticsResponse.ok) {
-        const analyticsData = await analyticsResponse.json();
-        if (analyticsData.success && analyticsData.data) {
-          const data = analyticsData.data;
-          
-          // Set risk metrics from real data
-          setRiskMetrics({
-            portfolioVolatility: data.volatility || 0,
-            sharpeRatio: data.sharpeRatio || 0,
-            sortinoRatio: data.sortinoRatio || 0,
-            maxDrawdown: data.maxDrawdown || 0,
-            valueAtRisk: data.valueAtRisk || 0,
-            beta: data.beta || 1,
-            alpha: data.alpha || 0,
-            informationRatio: data.informationRatio || 0
-          });
-          
-          // Calculate asset correlations from real portfolio data
-          if (data.assetCorrelations && Array.isArray(data.assetCorrelations)) {
-            setAssetCorrelations(data.assetCorrelations);
-          }
-        }
-      }
-
-      // Fetch historical volatility data
-      const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
-      const days = daysMap[selectedPeriod] || 30;
-      
-      const historyResponse = await fetch(
-        `${backendUrl}/api/analytics/portfolio/${address}/history?network=${normalizedNetwork}&days=${days}`
-      );
-      
-      if (historyResponse.ok) {
-        const historyData = await historyResponse.json();
-        if (historyData.success && historyData.data && historyData.data.length > 0) {
-          // Calculate volatility and drawdown from historical data
-          const volatilityData = historyData.data.map((point: any) => ({
-            date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            volatility: point.volatility || 0,
-            benchmark: point.benchmarkVolatility || 0
-          }));
-          setHistoricalVolatility(volatilityData);
-
-          // Calculate drawdown history
-          let peak = 0;
-          const drawdownData = historyData.data.map((point: any) => {
-            const value = point.totalValue || 0;
-            peak = Math.max(peak, value);
-            const drawdown = peak > 0 ? ((value - peak) / peak) * 100 : 0;
-            
-            return {
-              date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-              drawdown: drawdown,
-              maxDrawdown: point.maxDrawdown || 0
-            };
-          });
-          setDrawdownHistory(drawdownData);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch risk analytics:', err);
-      throw err;
-    }
-  };
-
-  const fetchPerformanceAnalytics = async () => {
-    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-    const normalizedNetwork = network?.toLowerCase() || 'testnet';
-    
-    try {
-      // Fetch asset allocation data for contribution analysis
-      const allocationResponse = await fetch(
-        `${backendUrl}/api/analytics/portfolio/${address}/allocation?network=${normalizedNetwork}`
-      );
-      
-      if (allocationResponse.ok) {
-        const allocationData = await allocationResponse.json();
-        if (allocationData.success && allocationData.data && Array.isArray(allocationData.data)) {
-          // Map allocation data to asset contributions
-          const colors = ['#3b82f6', '#a8c93a', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981'];
-          const contributions = allocationData.data.map((asset: any, index: number) => ({
-            asset: asset.asset || asset.assetCode || 'Unknown',
-            totalReturn: asset.totalReturn || 0,
-            returnContribution: asset.returnContribution || 0,
-            riskContribution: asset.riskContribution || 0,
-            allocation: asset.percentage || 0,
-            color: colors[index % colors.length]
-          }));
-          setAssetContributions(contributions);
-        }
-      }
-
-      // Fetch vault breakdown for performance attribution
-      const breakdownResponse = await fetch(
-        `${backendUrl}/api/analytics/portfolio/${address}/breakdown?network=${normalizedNetwork}`
-      );
-      
-      if (breakdownResponse.ok) {
-        const breakdownData = await breakdownResponse.json();
-        if (breakdownData.success && breakdownData.data && Array.isArray(breakdownData.data)) {
-          // Map vault data to performance attribution
-          const attributions = breakdownData.data.map((vault: any) => ({
-            vaultId: vault.vaultId || vault.vault_id,
-            vaultName: vault.name || vault.vaultName || 'Unnamed Vault',
-            assetSelection: vault.attribution?.assetSelection || 0,
-            timing: vault.attribution?.timing || 0,
-            rebalancing: vault.attribution?.rebalancing || 0,
-            fees: vault.attribution?.fees || 0,
-            totalReturn: vault.totalReturn || vault.returnsAllTime || 0
-          }));
-          setPerformanceAttribution(attributions);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch performance analytics:', err);
-      throw err;
     }
   };
 
@@ -371,119 +368,6 @@ const Analytics = () => {
       }
     } catch (err) {
       console.error('Failed to fetch liquidity analytics:', err);
-      throw err;
-    }
-  };
-
-  const fetchTimeAnalytics = async () => {
-    const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-    const normalizedNetwork = network?.toLowerCase() || 'testnet';
-    
-    try {
-      // Fetch historical data for time-based analysis
-      const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
-      const days = daysMap[selectedPeriod] || 30;
-      
-      const historyResponse = await fetch(
-        `${backendUrl}/api/analytics/portfolio/${address}/history?network=${normalizedNetwork}&days=${days}`
-      );
-      
-      if (historyResponse.ok) {
-        const historyData = await historyResponse.json();
-        if (historyData.success && historyData.data && historyData.data.length > 0) {
-          // Aggregate data by day of week
-          const dayMap = new Map<string, { returns: number[], volumes: number[], volatilities: number[] }>();
-          const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-          
-          historyData.data.forEach((point: any) => {
-            const date = new Date(point.timestamp);
-            const dayName = days[date.getDay()];
-            
-            if (!dayMap.has(dayName)) {
-              dayMap.set(dayName, { returns: [], volumes: [], volatilities: [] });
-            }
-            
-            const dayData = dayMap.get(dayName)!;
-            if (point.dailyReturn != null) dayData.returns.push(point.dailyReturn);
-            if (point.volume != null) dayData.volumes.push(point.volume);
-            if (point.volatility != null) dayData.volatilities.push(point.volatility);
-          });
-          
-          // Calculate averages for each day
-          const timeAnalysisData = days.slice(1).concat(days[0]).map(dayName => {
-            const data = dayMap.get(dayName) || { returns: [0], volumes: [0], volatilities: [0] };
-            const avgReturn = data.returns.length > 0 
-              ? data.returns.reduce((a, b) => a + b, 0) / data.returns.length 
-              : 0;
-            const totalVolume = data.volumes.length > 0 
-              ? data.volumes.reduce((a, b) => a + b, 0) / data.volumes.length 
-              : 0;
-            const volatility = data.volatilities.length > 0 
-              ? data.volatilities.reduce((a, b) => a + b, 0) / data.volatilities.length 
-              : 0;
-            
-            return {
-              period: dayName,
-              avgReturn,
-              totalVolume,
-              volatility,
-              bestDay: '',
-              worstDay: ''
-            };
-          });
-          
-          setTimeAnalysis(timeAnalysisData);
-        }
-      }
-
-      // Fetch rebalance history from user's vaults
-      const vaultsResponse = await fetch(
-        `${backendUrl}/api/vaults/user/${address}?network=${normalizedNetwork}`
-      );
-      
-      if (vaultsResponse.ok) {
-        const vaultsData = await vaultsResponse.json();
-        if (vaultsData.success && vaultsData.data && Array.isArray(vaultsData.data)) {
-          const rebalances: RebalanceEvent[] = [];
-          
-          // Fetch rebalance history for each vault
-          for (const vault of vaultsData.data) {
-            try {
-              const historyResponse = await fetch(
-                `${backendUrl}/api/vaults/${vault.vault_id}/history?limit=10`
-              );
-              
-              if (historyResponse.ok) {
-                const historyData = await historyResponse.json();
-                if (historyData.success && historyData.data && Array.isArray(historyData.data)) {
-                  // Filter rebalance events
-                  const vaultRebalances = historyData.data
-                    .filter((event: any) => event.event_type === 'rebalance')
-                    .map((event: any) => ({
-                      timestamp: new Date(event.timestamp).getTime(),
-                      vaultId: vault.vault_id,
-                      vaultName: vault.name || vault.config?.name || 'Unnamed Vault',
-                      cost: event.fee || 0,
-                      tvlBefore: event.tvl_before || 0,
-                      tvlAfter: event.tvl_after || 0,
-                      impact: event.impact || 0
-                    }));
-                  
-                  rebalances.push(...vaultRebalances);
-                }
-              }
-            } catch (err) {
-              console.error(`Failed to fetch history for vault ${vault.vault_id}:`, err);
-            }
-          }
-          
-          // Sort by timestamp (most recent first) and limit to 10
-          rebalances.sort((a, b) => b.timestamp - a.timestamp);
-          setRebalanceHistory(rebalances.slice(0, 10));
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch time analytics:', err);
       throw err;
     }
   };

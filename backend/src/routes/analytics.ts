@@ -61,6 +61,61 @@ router.get('/vault/:vaultId/history', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/analytics/portfolio/:userAddress/comprehensive
+ * Get ALL portfolio analytics data in a single optimized call
+ * Query params: network (default: testnet), days (default: 30)
+ * Returns: analytics, allocation, breakdown, and history in one response
+ */
+router.get('/portfolio/:userAddress/comprehensive', async (req: Request, res: Response) => {
+  try {
+    const { userAddress } = req.params;
+    const network = (req.query.network as string) || 'testnet';
+    const days = parseInt(req.query.days as string) || 30;
+
+    console.log(`[Comprehensive Analytics] Fetching for ${userAddress} on ${network}`);
+    
+    // Import all necessary functions
+    const { 
+      getPortfolioAnalytics, 
+      getPortfolioAllocation, 
+      getVaultBreakdown,
+      getPortfolioPerformanceHistory 
+    } = await import('../services/analyticsService.js');
+
+    // Fetch all data in parallel for speed
+    const [analytics, allocation, breakdown, history] = await Promise.all([
+      getPortfolioAnalytics(userAddress, network),
+      getPortfolioAllocation(userAddress, network),
+      getVaultBreakdown(userAddress, network),
+      getPortfolioPerformanceHistory(userAddress, network, days),
+    ]);
+
+    console.log('[Comprehensive Analytics] Data fetched:', {
+      totalTVL: analytics.totalTVL,
+      assetCount: allocation.length,
+      vaultCount: breakdown.length,
+      historyPoints: history.length,
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        analytics,
+        allocation,
+        breakdown,
+        history,
+      },
+    });
+  } catch (error) {
+    console.error('Error in GET /api/analytics/portfolio/:userAddress/comprehensive:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+});
+
+/**
  * GET /api/analytics/portfolio/:userAddress
  * Get portfolio-wide analytics for a user
  * Query params: network (default: testnet)
