@@ -1267,6 +1267,33 @@ export async function getPortfolioAllocation(
       
       console.log(`[getPortfolioAllocation] Processing vault ${vault.vault_id}`);
       
+      // Skip vaults with null or missing contract addresses
+      if (!vault.contract_address) {
+        console.warn(`[getPortfolioAllocation] Vault ${vault.vault_id} has no contract address, using configured allocations`);
+        const analytics = vaultAnalytics[i];
+        const vaultTVL = analytics.tvl;
+        const assets = vault.config?.assets || [];
+
+        for (const asset of assets) {
+          let assetKey = typeof asset === 'string' ? asset : (asset.code || 'UNKNOWN');
+          let assetCode = assetKey;
+          
+          if (typeof assetCode === 'string' && assetCode.startsWith('C') && assetCode.length === 56) {
+            assetCode = await resolveAssetName(assetCode, network);
+          }
+
+          const allocation = typeof asset === 'object' && asset.allocation 
+            ? asset.allocation 
+            : (100 / assets.length);
+          
+          const assetValue = (vaultTVL * allocation) / 100;
+          
+          const currentValue = assetMap.get(assetCode) || 0;
+          assetMap.set(assetCode, currentValue + assetValue);
+        }
+        continue;
+      }
+      
       // Get actual on-chain state with real token balances
       try {
         const { monitorVaultState } = await import('./vaultMonitorService.js');
@@ -1336,9 +1363,8 @@ export async function getPortfolioAllocation(
     // Calculate total from actual asset values (not totalTVL which may have rounding differences)
     const totalAssetValue = Array.from(assetMap.values()).reduce((sum, val) => sum + val, 0);
     
-    // Get portfolio analytics to calculate returns
-    const portfolioAnalytics = await getPortfolioAnalytics(userAddress, network);
-    const totalReturn = portfolioAnalytics.totalEarnings;
+    // Calculate total earnings from all vaults (avoid circular dependency)
+    const totalEarnings = vaultAnalytics.reduce((sum, va) => sum + va.totalEarnings, 0);
     
     const allocation = Array.from(assetMap.entries())
       .map(([asset, value]) => {
@@ -1348,7 +1374,7 @@ export async function getPortfolioAllocation(
         const returnContribution = percentage;
         
         // Calculate total return for this asset (proportional to allocation)
-        const assetTotalReturn = totalReturn * (percentage / 100);
+        const assetTotalReturn = totalEarnings * (percentage / 100);
         
         // Risk contribution is also proportional to allocation (simplified)
         const riskContribution = percentage;
@@ -1368,7 +1394,7 @@ export async function getPortfolioAllocation(
     console.log('[getPortfolioAllocation] Asset Allocation:', {
       totalTVL: `$${totalTVL.toFixed(2)}`,
       totalAssetValue: `$${totalAssetValue.toFixed(2)}`,
-      totalReturn: `$${totalReturn.toFixed(2)}`,
+      totalEarnings: `$${totalEarnings.toFixed(2)}`,
       assets: allocation.map(a => `${a.asset}: $${a.value.toFixed(2)} (${a.percentage.toFixed(1)}%) - Return: $${a.totalReturn.toFixed(2)}`),
       totalPercentage: `${allocation.reduce((sum, a) => sum + a.percentage, 0).toFixed(2)}%`,
     });
