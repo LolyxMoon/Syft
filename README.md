@@ -112,13 +112,13 @@ The Wallet Kit integration is utilized across all major features:
 - [🏗️ Architecture](#️-architecture)
 - [🚀 Getting Started](#-getting-started)
 - [📱 Platform Features](#-platform-features)
+  - [💻 Terminal AI](#-terminal-ai)
   - [🎨 Vault Builder](#-vault-builder)
   - [📊 Dashboard](#-dashboard)
   - [🏪 NFT Marketplace](#-nft-marketplace)
   - [📈 Analytics](#-analytics)
   - [🧪 Backtesting](#-backtesting)
   - [💡 AI Suggestions](#-ai-suggestions)
-  - [💻 Terminal AI](#-terminal-ai)
 - [🛠️ Technology Stack](#️-technology-stack)
 - [📦 Smart Contracts](#-smart-contracts)
 - [🤖 AI-Powered Features](#-ai-powered-features)
@@ -132,11 +132,12 @@ The Wallet Kit integration is utilized across all major features:
 
 ## ✨ Overview
 
-**Syft** is a next-generation DeFi platform built on Stellar that revolutionizes yield vault creation and management. With three intuitive ways to build strategies—visual drag-and-drop, AI chat, and voice commands—Syft empowers users to create sophisticated DeFi strategies without writing a single line of code.
+**Syft** is a next-generation DeFi platform built on Stellar that revolutionizes yield vault creation and management. With three intuitive ways to build strategies—visual drag-and-drop, AI chat, and voice commands—plus a **powerful Terminal AI for blockchain operations**, Syft empowers users to create sophisticated DeFi strategies and execute complex blockchain operations without writing a single line of code.
 
 ### Why Syft?
 
 - **🎨 Three Ways to Build**: Visual canvas, AI chat, or voice commands
+- **💻 Terminal AI Command Center**: Execute any blockchain operation with natural language (deploy contracts, swap assets, mint NFTs, manage liquidity, and more)
 - **🤖 GPT-5 Nano Powered**: Advanced AI model (gpt-5-nano-2025-08-07) for intelligent strategy creation
 - **🖼️ NFT Marketplace**: Monetize your strategies by minting and selling vault NFTs
 - **📊 Comprehensive Analytics**: Real-time monitoring, backtesting, and performance tracking
@@ -152,6 +153,7 @@ The Wallet Kit integration is utilized across all major features:
 
 - **Visual Strategy Builder**: Drag-and-drop interface for building complex yield strategies
 - **AI-Powered Creation**: Chat with AI or use voice commands to create strategies naturally
+- **⭐ Terminal AI**: Execute blockchain operations with natural language commands (see [Terminal AI](#-terminal-ai) below)
 - **Vault NFT Minting**: Convert your vaults into tradeable NFTs with AI-generated artwork
 - **Revenue Sharing**: Earn passive income from subscribers (e.g., 5% profit share)
 - **Real-time Monitoring**: Track performance, TVL, APY, and user positions
@@ -357,7 +359,113 @@ The heart of Syft—where strategies come to life.
 - Yield comparison across protocols
 - Multi-network support (Testnet, Futurenet, Mainnet)
 
-### 📊 Dashboard
+### 💻 Terminal AI
+
+**Your intelligent blockchain assistant for the Stellar network.**
+
+**Powered by GPT-5 Nano (gpt-5-nano-2025-08-07)**
+
+The Terminal AI is a powerful natural language interface that transforms how you interact with blockchain operations. Instead of navigating menus or writing code, simply describe what you want to do and the AI handles it.
+
+**Capabilities:**
+
+1. **Wallet Management** 👛
+   - Fund account from Friendbot faucet
+   - Check XLM and custom asset balances
+   - Create new accounts
+   - Export secret key (with security warnings)
+
+2. **Asset Operations** 💰
+   - Create custom assets (e.g., MYCATTY, SYFT)
+   - Transfer assets between accounts
+   - Batch transfers for efficiency
+   - Check asset information
+
+3. **Trustlines** 🔗
+   - Set up trustlines for non-XLM assets
+   - Revoke existing trustlines
+   - Manage asset permissions
+
+4. **Smart Contracts** 📜
+   - Deploy Soroban contracts
+   - Invoke contract functions
+   - Read contract state (view functions)
+   - Upgrade existing contracts
+   - Stream contract events
+
+5. **DEX & Liquidity** 💱
+   - Swap assets on Stellar DEX
+   - Add liquidity to pools
+   - Remove liquidity
+   - View pool analytics and prices
+
+6. **NFTs** 🎨
+   - Mint NFTs with AI-generated artwork
+   - Transfer NFT ownership
+   - Burn NFTs
+   - List and view owned NFTs
+
+7. **Transaction Management** 📋
+   - Simulate transactions before submission
+   - View transaction history
+   - Search transactions on Stellar Explorer
+   - Batch operations
+
+8. **Network Analytics** 📊
+   - Get network statistics
+   - Query price oracles
+   - Check protocol yields
+   - Monitor gas fees
+
+9. **Web Search & Data Retrieval** 🔍
+   - Real-time info via **Tavily API**
+   - Look up asset issuers
+   - Find contract addresses
+   - Fetch documentation
+   - Get market data
+
+10. **Federated Addresses** 🌐
+    - Resolve federated addresses (user*domain)
+    - Convert to Stellar public keys
+
+11. **Advanced Multi-Step Actions** 🎯
+    - Balance-based operations (e.g., "swap half my XLM")
+    - Automatic balance checks
+    - Sequential execution
+    - Error handling and retries
+
+12. **Batch Workflows** ⚡
+    - Execute multiple transfers in one operation
+    - Coordinate complex multi-step actions
+    - Optimize gas costs
+
+**Smart Context Management:**
+- Automatic conversation summarization at ~80k tokens
+- Preserves context while preventing token overflow
+- Seamless long-running sessions
+- Persistent chat history via localStorage
+
+**Security Features:**
+- Wallet connection via Freighter only
+- No private key storage
+- Transaction simulation before execution
+- Clear security warnings for sensitive operations
+
+**Example Commands:**
+```
+"Show me my balance"
+"Fund my account from the faucet"
+"Mint me a Goku NFT with lightning powers"
+"Transfer 100 XLM to GDSAMPLE..."
+"Swap 50% of my XLM for USDC"
+"What's the current XLM price?"
+"Deploy my vault contract"
+"List my NFTs"
+```
+
+---
+
+### Dashboard
 
 Your command center for all vault operations.
 
@@ -530,109 +638,7 @@ Intelligent recommendations to improve your vaults.
 - AI chat pre-filled with improvement prompt
 - Refine and deploy with one click
 
-### 💻 Terminal AI
 
-Your intelligent blockchain assistant for the Stellar network.
-
-**Powered by GPT-5 Nano (gpt-5-nano-2025-08-07)**
-
-**Capabilities:**
-
-1. **Wallet Management** 👛
-   - Fund account from Friendbot faucet
-   - Check XLM and custom asset balances
-   - Create new accounts
-   - Export secret key (with security warnings)
-
-2. **Asset Operations** 💰
-   - Create custom assets (e.g., MYCATTY, SYFT)
-   - Transfer assets between accounts
-   - Batch transfers for efficiency
-   - Check asset information
-
-3. **Trustlines** 🔗
-   - Set up trustlines for non-XLM assets
-   - Revoke existing trustlines
-   - Manage asset permissions
-
-4. **Smart Contracts** 📜
-   - Deploy Soroban contracts
-   - Invoke contract functions
-   - Read contract state (view functions)
-   - Upgrade existing contracts
-   - Stream contract events
-
-5. **DEX & Liquidity** 💱
-   - Swap assets on Stellar DEX
-   - Add liquidity to pools
-   - Remove liquidity
-   - View pool analytics and prices
-
-6. **NFTs** 🎨
-   - Mint NFTs with AI-generated artwork
-   - Transfer NFT ownership
-   - Burn NFTs
-   - List and view owned NFTs
-
-7. **Transaction Management** 📋
-   - Simulate transactions before submission
-   - View transaction history
-   - Search transactions on Stellar Explorer
-   - Batch operations
-
-8. **Network Analytics** 📊
-   - Get network statistics
-   - Query price oracles
-   - Check protocol yields
-   - Monitor gas fees
-
-9. **Web Search & Data Retrieval** 🔍
-   - Real-time info via **Tavily API**
-   - Look up asset issuers
-   - Find contract addresses
-   - Fetch documentation
-   - Get market data
-
-10. **Federated Addresses** 🌐
-    - Resolve federated addresses (user*domain)
-    - Convert to Stellar public keys
-
-11. **Advanced Multi-Step Actions** 🎯
-    - Balance-based operations (e.g., "swap half my XLM")
-    - Automatic balance checks
-    - Sequential execution
-    - Error handling and retries
-
-12. **Batch Workflows** ⚡
-    - Execute multiple transfers in one operation
-    - Coordinate complex multi-step actions
-    - Optimize gas costs
-
-**Smart Context Management:**
-- Automatic conversation summarization at ~80k tokens
-- Preserves context while preventing token overflow
-- Seamless long-running sessions
-- Persistent chat history via localStorage
-
-**Security Features:**
-- Wallet connection via Freighter only
-- No private key storage
-- Transaction simulation before execution
-- Clear security warnings for sensitive operations
-
-**Example Commands:**
-```
-"Show me my balance"
-"Fund my account from the faucet"
-"Mint me a Goku NFT with lightning powers"
-"Transfer 100 XLM to GDSAMPLE..."
-"Swap 50% of my XLM for USDC"
-"What's the current XLM price?"
-"Deploy my vault contract"
-"List my NFTs"
-```
-
----
 
 ## 🛠️ Technology Stack
 
