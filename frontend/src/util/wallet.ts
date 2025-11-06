@@ -3,20 +3,22 @@ import {
   ISupportedWallet,
   StellarWalletsKit,
   WalletNetwork,
-  FreighterModule,
+  allowAllModules,
 } from "@creit.tech/stellar-wallets-kit";
 import { Horizon } from "@stellar/stellar-sdk";
 import { networkPassphrase, stellarNetwork, horizonUrl } from "../contracts/util";
 
+// Initialize the kit with all supported wallet modules
+// This includes: xBull, Albedo, Freighter, Rabet, WalletConnect, Lobstr, Hana, Hot Wallet, and Klever
 const kit: StellarWalletsKit = new StellarWalletsKit({
   network: networkPassphrase as WalletNetwork,
-  modules: [new FreighterModule()],
+  modules: allowAllModules(),
 });
 
 export const connectWallet = async () => {
   console.log("[connectWallet] Starting connection...");
   await kit.openModal({
-    modalTitle: "Connect to your wallet",
+    modalTitle: "Connect Your Wallet • Freighter Recommended",
     onWalletSelected: (option: ISupportedWallet) => {
       const selectedId = option.id;
       console.log("[connectWallet] Wallet selected:", selectedId);
