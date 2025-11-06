@@ -255,13 +255,17 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
             rebalanceSuccess = true;
           } else {
             console.error(`[VaultActions] ❌ Rebalance submit failed:`, submitRebalanceData.error);
+            console.warn(`[VaultActions] Your deposit was successful, but rebalancing failed. You can manually trigger rebalancing from the vault details page.`);
           }
         } catch (rebalanceError) {
           console.error(`[VaultActions] ❌ Auto-rebalance exception:`, rebalanceError);
+          console.warn(`[VaultActions] Your deposit was successful, but rebalancing encountered an error. You can manually trigger rebalancing from the vault details page.`);
           // Don't fail the deposit if rebalance fails
         }
       } else {
-        console.log(`[VaultActions] No rebalance needed for this vault`);
+        console.log(`[VaultActions] No rebalance needed for this vault (single-asset or no assets configured)`);
+        console.log(`[VaultActions] needsRebalance:`, submitData.data.needsRebalance);
+        console.log(`[VaultActions] has rebalanceXDR:`, !!submitData.data.rebalanceXDR);
       }
 
       setMessage({

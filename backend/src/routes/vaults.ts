@@ -1438,6 +1438,8 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
         .eq('vault_id', vaultId)
         .single();
       
+      console.log(`[Submit Deposit] Vault config:`, JSON.stringify(vault?.config, null, 2));
+      
       // Auto-rebalance after deposit if:
       // - Vault has multiple assets (to maintain target allocation)
       // Note: We use force_rebalance which bypasses scheduled rule checks
@@ -1445,9 +1447,12 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
       // should always happen to maintain proper asset allocation
       const hasMultipleAssets = vault?.config?.assets && vault.config.assets.length > 1;
       
+      console.log(`[Submit Deposit] Has multiple assets: ${hasMultipleAssets}`);
+      console.log(`[Submit Deposit] Asset count: ${vault?.config?.assets?.length || 0}`);
+      
       if (hasMultipleAssets) {
-        console.log(`[Submit Deposit] Multi-asset vault detected, building rebalance transaction...`);
-        console.log(`[Submit Deposit] Target allocation:`, vault.config.assets);
+        console.log(`[Submit Deposit] 🎯 Multi-asset vault detected, building rebalance transaction...`);
+        console.log(`[Submit Deposit] Target allocation:`, JSON.stringify(vault.config.assets, null, 2));
         
         // Import the rebalance helper
         const { buildRebalanceTransaction } = await import('../services/vaultActionService.js');
@@ -1464,16 +1469,23 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
         rebalanceXDR = result.xdr;
         needsRebalance = true;
         
-        console.log(`[Submit Deposit] ✅ Rebalance transaction built, ready for user signature`);
+        console.log(`[Submit Deposit] ✅ Rebalance transaction built successfully`);
+        console.log(`[Submit Deposit] Rebalance XDR length: ${rebalanceXDR?.length || 0} chars`);
       } else {
-        console.log(`[Submit Deposit] Single-asset vault, skipping auto-rebalance`);
+        console.log(`[Submit Deposit] ℹ️  Single-asset vault or no assets configured, skipping auto-rebalance`);
       }
     } catch (rebalanceError) {
-      console.error('[Submit Deposit] Failed to build rebalance transaction (non-critical):', rebalanceError);
+      console.error('[Submit Deposit] ❌ Failed to build rebalance transaction:', rebalanceError);
+      console.error('[Submit Deposit] Error details:', rebalanceError instanceof Error ? rebalanceError.message : String(rebalanceError));
       // Don't fail the deposit if rebalance build fails - just log it
       // The user can manually trigger rebalance later
     }
 
+    console.log(`[Submit Deposit] 📦 Returning response:`);
+    console.log(`[Submit Deposit]   - Transaction Hash: ${txHash}`);
+    console.log(`[Submit Deposit]   - Needs Rebalance: ${needsRebalance}`);
+    console.log(`[Submit Deposit]   - Has Rebalance XDR: ${!!rebalanceXDR}`);
+    
     return res.json({
       success: true,
       data: {

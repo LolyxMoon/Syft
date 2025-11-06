@@ -50,8 +50,10 @@ export async function buildDepositTransaction(
       const vaultConfig = vault.config;
       if (vaultConfig?.assets && vaultConfig.assets.length > 0) {
         const firstAsset = vaultConfig.assets[0];
-        // Asset can be {assetCode: "XLM", ...} or just "XLM"
-        const assetCode = typeof firstAsset === 'string' ? firstAsset : firstAsset.assetCode;
+        // Asset can be {code: "XLM", ...} or {assetCode: "XLM", ...} or just "XLM"
+        const assetCode = typeof firstAsset === 'string' 
+          ? firstAsset 
+          : (firstAsset.code || firstAsset.assetCode);
         tokenAddress = getAssetAddress(assetCode, network);
       } else {
         // Fallback to native XLM
@@ -701,6 +703,23 @@ export async function executeRebalance(
     }
 
     let txHash: string | undefined;
+    
+    // Check if vault has any balance before attempting rebalance
+    const vaultState = vault.current_state;
+    const totalValue = parseInt(vaultState?.totalValue || '0');
+    const totalShares = parseInt(vaultState?.totalShares || '0');
+    
+    console.log(`📊 Vault state - Total Value: ${totalValue}, Total Shares: ${totalShares}`);
+    
+    if (totalValue === 0 || totalShares === 0) {
+      console.warn(`⚠️  Vault ${vaultId} has zero balance (value: ${totalValue}, shares: ${totalShares})`);
+      console.warn(`⚠️  Skipping on-chain rebalance - vault needs deposits first`);
+      return {
+        success: false,
+        error: 'Vault has zero balance - deposits required before rebalancing',
+        timestamp: new Date().toISOString(),
+      };
+    }
     
     // Execute on-chain rebalance if we have a keypair
     if (rebalancerKeypair) {
