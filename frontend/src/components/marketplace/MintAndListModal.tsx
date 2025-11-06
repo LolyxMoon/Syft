@@ -275,11 +275,11 @@ export function MintAndListModal({
             </div>
 
             {/* Compact Step Progress */}
-            <div className="flex items-center gap-2 mt-3">
-              <div className={`flex items-center gap-1.5 flex-1 ${
+            <div className="flex items-center gap-1.5 mt-3 justify-center">
+              <div className={`flex items-center gap-1 ${
                 currentStep === 1 ? 'opacity-100' : 'opacity-50'
               }`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                   mintedNftId || skipMint
                     ? 'bg-success-400 text-dark-950'
                     : currentStep === 1
@@ -288,20 +288,20 @@ export function MintAndListModal({
                 }`}>
                   {mintedNftId || (skipMint && existingNfts.length > 0) ? <Check className="w-3 h-3" /> : '1'}
                 </div>
-                <span className="text-xs font-medium text-neutral-300 truncate">Mint</span>
+                <span className="text-xs font-medium text-neutral-300">Mint</span>
               </div>
-              <div className="h-0.5 w-8 bg-neutral-700 flex-shrink-0"></div>
-              <div className={`flex items-center gap-1.5 flex-1 ${
+              <div className="h-0.5 w-4 bg-neutral-700 flex-shrink-0"></div>
+              <div className={`flex items-center gap-1 ${
                 currentStep === 2 ? 'opacity-100' : 'opacity-50'
               }`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                   currentStep === 2
                     ? 'bg-primary-500 text-dark-950'
                     : 'bg-neutral-800 text-neutral-400'
                 }`}>
                   2
                 </div>
-                <span className="text-xs font-medium text-neutral-300 truncate">List</span>
+                <span className="text-xs font-medium text-neutral-300">List</span>
               </div>
             </div>
           </div>
