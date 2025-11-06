@@ -6,11 +6,13 @@
 
 **Create, deploy, and manage automated yield strategies. No coding required. Maximum security. Optimal returns.**
 
+[![Hackathon](https://img.shields.io/badge/🏆_Stellar_Scaffold_Hackathon-2025-gold?style=for-the-badge)](https://stellar.org/events)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stellar](https://img.shields.io/badge/Built%20on-Stellar-7D4698?logo=stellar)](https://stellar.org)
 [![Soroban](https://img.shields.io/badge/Powered%20by-Soroban-7D4698)](https://soroban.stellar.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange?logo=rust)](https://www.rust-lang.org/)
+[![Scaffold Stellar](https://img.shields.io/badge/Built_with-Scaffold_Stellar-blueviolet?logo=stellar)](https://github.com/stellar/scaffold-stellar)
 
 [Live Demo](https://syft-defi.vercel.app) · [Documentation](./docs) · [Report Bug](https://github.com/zaikaman/Syft/issues) · [Request Feature](https://github.com/zaikaman/Syft/issues)
 
@@ -18,8 +20,93 @@
 
 ---
 
+## 🏆 Stellar Scaffold Hackathon 2025 Submission
+
+**Syft** is our official submission for the **Stellar Scaffold Hackathon 2025**. This project demonstrates full utilization of the Scaffold Stellar framework and satisfies all three required submission components:
+
+### ✅ 1. Deployed Smart Contracts (Rust → WebAssembly)
+
+Our platform features multiple production-ready Soroban smart contracts written in Rust and compiled to WebAssembly:
+
+**Vault Factory Contract** (Testnet)
+- **Contract ID**: `CCODOMK6HSVVKX7FP2CCUVL7VKKOYCO3AJPWC5C656RP4FXGFPWU3YM2`
+- **Explorer**: [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CCODOMK6HSVVKX7FP2CCUVL7VKKOYCO3AJPWC5C656RP4FXGFPWU3YM2)
+- **Purpose**: Factory pattern for deploying vault instances dynamically
+
+**NFT Contract** (Testnet)
+- **Contract ID**: `CCTSYGMDPB37KKXGT7CW4KYYDHJKSW4K2DF3S4PXWFZ7JVA5LOS4AIWU`
+- **Explorer**: [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CCTSYGMDPB37KKXGT7CW4KYYDHJKSW4K2DF3S4PXWFZ7JVA5LOS4AIWU)
+- **Purpose**: ERC-721 compatible NFT contract for vault tokenization
+
+All contracts are built using the Scaffold Stellar-generated Rust project structure and compiled to WASM for Soroban deployment.
+
+### ✅ 2. Modern TypeScript + React Frontend (Vite)
+
+Our frontend is built entirely with the modern stack provided by Scaffold Stellar:
+
+- **Framework**: React 19 with TypeScript
+- **Build Tool**: Vite (fast HMR and optimized production builds)
+- **Architecture**: Component-based with modern hooks and state management
+- **Features**: 
+  - Visual drag-and-drop vault builder with XYFlow React
+  - Real-time analytics dashboard with Recharts
+  - NFT marketplace with AI-generated artwork
+  - AI-powered chat and voice interfaces
+  - Comprehensive backtesting engine
+  - Terminal AI for blockchain operations
+
+**Tech Stack Highlights**:
+- TypeScript 5.3+ for type safety
+- React 19 with concurrent features
+- Vite for lightning-fast development
+- Tailwind CSS for modern styling
+- TanStack Query for data fetching
+- Zustand for state management
+
+### ✅ 3. Stellar Wallet Kit Integration
+
+Syft implements full **Stellar Wallet Kit** integration, enabling seamless wallet connectivity:
+
+**Supported Wallets**:
+- **Freighter**: Primary wallet integration
+- **Albedo**: Alternative wallet support
+- **LOBSTR**: Mobile wallet compatibility
+- **xBull**: Extended wallet support
+
+**Wallet Features**:
+- One-click wallet connection
+- Multi-network support (Testnet, Futurenet, Mainnet)
+- Automatic account detection
+- Transaction signing with user confirmation
+- Balance queries and asset management
+- Contract invocation with proper authorization
+- Session persistence and reconnection
+
+**Implementation Highlights**:
+```typescript
+// Wallet connection via Stellar Wallet Kit
+import { StellarWalletsKit, WalletNetwork } from '@creit.tech/stellar-wallets-kit';
+
+// Used throughout the application for:
+// - Vault deposits and withdrawals
+// - NFT minting and transfers
+// - Contract deployments
+// - Asset swaps and liquidity operations
+// - All blockchain transactions
+```
+
+The Wallet Kit integration is utilized across all major features:
+- **Vault Builder**: Deploy and manage vaults
+- **Dashboard**: Monitor positions and claim rewards
+- **Marketplace**: Purchase NFTs and subscribe to vaults
+- **Terminal AI**: Execute blockchain operations via chat
+- **Analytics**: Query on-chain data in real-time
+
+---
+
 ## 📖 Table of Contents
 
+- [🏆 Stellar Scaffold Hackathon 2025](#-stellar-scaffold-hackathon-2025-submission)
 - [✨ Overview](#-overview)
 - [🎯 Key Features](#-key-features)
 - [🏗️ Architecture](#️-architecture)
@@ -38,6 +125,7 @@
 - [🔐 Security](#-security)
 - [🌐 Deployment](#-deployment)
 - [🤝 Contributing](#-contributing)
+- [🎯 Scaffold Stellar Framework Utilization](#-scaffold-stellar-framework-utilization)
 - [📄 License](#-license)
 
 ---
@@ -938,9 +1026,51 @@ limitations under the License.
 
 ---
 
+## 🎯 Scaffold Stellar Framework Utilization
+
+Syft is built entirely on the **Scaffold Stellar** framework, leveraging all its core features:
+
+### Smart Contract Development
+- **Rust Project Generation**: All contracts use Scaffold Stellar's Rust project structure
+- **Soroban SDK Integration**: Built with `soroban-sdk` 22.0.8
+- **WASM Compilation**: Optimized WebAssembly output for Soroban
+- **Contract Templates**: Factory pattern, NFT standards, and custom vault logic
+- **Development Scripts**: PowerShell deployment and testing scripts
+
+### Frontend Development
+- **Vite Template**: Fast HMR and optimized production builds
+- **TypeScript Configuration**: Strict type checking with modern ES features
+- **React Integration**: Component-based architecture with hooks
+- **Build Pipeline**: Automated building and deployment workflow
+
+### Stellar Integration
+- **Stellar SDK**: `@stellar/stellar-sdk` for blockchain interactions
+- **Network Configuration**: Multi-network support (Testnet, Futurenet, Mainnet)
+- **Wallet Kit**: Full `@creit.tech/stellar-wallets-kit` implementation
+- **Horizon API**: Real-time blockchain data fetching
+- **Soroban RPC**: Contract invocation and state queries
+
+### Additional Framework Benefits
+- **Boilerplate Elimination**: Scaffold Stellar removed 90%+ of setup overhead
+- **Best Practices**: Following Stellar's recommended patterns and standards
+- **Developer Experience**: Fast iteration with hot reloading and type safety
+- **Production Ready**: Security, optimization, and deployment configurations included
+
+**Without Scaffold Stellar**, this project would have required weeks of additional setup time for:
+- Rust toolchain configuration
+- WebAssembly build pipelines
+- TypeScript + React + Vite integration
+- Stellar SDK and wallet integrations
+- Network and contract deployment scripts
+
+**With Scaffold Stellar**, we focused on building features, not infrastructure. 🚀
+
+---
+
 ## 🙏 Acknowledgments
 
-- **Stellar Development Foundation**: For the amazing Stellar and Soroban platforms
+- **Stellar Development Foundation**: For the amazing Stellar and Soroban platforms, and the Scaffold Stellar framework
+- **Scaffold Stellar Team**: For eliminating boilerplate and accelerating DeFi development
 - **OpenAI**: For GPT-5 Nano AI model
 - **Runware**: For AI-generated NFT artwork
 - **Tavily**: For real-time web search capabilities
