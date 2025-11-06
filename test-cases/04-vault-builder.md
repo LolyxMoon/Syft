@@ -303,7 +303,7 @@
 ### Expected Results
 - ✅ Deployment stops
 - ✅ "Deploying..." indicator disappears
-- ✅ Error toast: "Transaction rejected by user"
+- ✅ Error message with title "Transaction Cancelled" and message "You cancelled the transaction. Your vault was not deployed."
 - ✅ Vault remains in "draft" status
 - ✅ User can retry deployment
 

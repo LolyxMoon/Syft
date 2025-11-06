@@ -701,13 +701,27 @@ const VaultBuilder = () => {
               return;
             }
           }
-        } catch (initError) {
+        } catch (initError: any) {
           console.error(`[VaultBuilder] Error during initialization:`, initError);
-          modal.message(
-            `Vault deployed but initialization failed. You may need to initialize manually.\n\nContract: ${contractAddress}`,
-            'Initialization Failed',
-            'warning'
-          );
+          
+          // Check if user rejected the initialization transaction
+          const errorMsg = initError?.message?.toLowerCase() || '';
+          if (errorMsg.includes('user declined') || 
+              errorMsg.includes('user rejected') || 
+              errorMsg.includes('cancelled') ||
+              errorMsg.includes('canceled')) {
+            modal.message(
+              `Vault deployed successfully but you cancelled the initialization step.\n\nContract: ${contractAddress}\n\nYou'll need to initialize it manually before it can be used.`,
+              'Initialization Cancelled',
+              'warning'
+            );
+          } else {
+            modal.message(
+              `Vault deployed but initialization failed. You may need to initialize manually.\n\nContract: ${contractAddress}`,
+              'Initialization Failed',
+              'warning'
+            );
+          }
           return;
         }
 
@@ -770,10 +784,21 @@ const VaultBuilder = () => {
               console.warn(`[VaultBuilder] ⚠️ Router submission failed:`, routerSubmitData.error);
             }
           }
-        } catch (routerError) {
+        } catch (routerError: any) {
           console.error(`[VaultBuilder] Error setting up router:`, routerError);
-          // Don't fail the deployment if router setup fails
-          console.warn(`[VaultBuilder] Continuing without router - auto-swap will not work`);
+          
+          // Check if user rejected the router setup transaction
+          const errorMsg = routerError?.message?.toLowerCase() || '';
+          if (errorMsg.includes('user declined') || 
+              errorMsg.includes('user rejected') || 
+              errorMsg.includes('cancelled') ||
+              errorMsg.includes('canceled')) {
+            console.log(`[VaultBuilder] User cancelled router setup - continuing without router`);
+            // Don't show a modal for this, it's optional and user actively declined
+          } else {
+            // Don't fail the deployment if router setup fails
+            console.warn(`[VaultBuilder] Continuing without router - auto-swap will not work`);
+          }
         }
 
         // Success - deployment, initialization, and router setup complete
@@ -788,11 +813,61 @@ const VaultBuilder = () => {
       }
     } catch (error) {
       console.error('Error deploying vault:', error);
-      modal.message(
-        `Failed to deploy vault: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'Deploy Failed',
-        'error'
-      );
+      
+      // Provide user-friendly error messages based on error type
+      let errorMessage = 'Failed to deploy vault';
+      let errorTitle = 'Deployment Failed';
+      
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        
+        // User rejected/cancelled transaction
+        if (errorMsg.includes('user declined') || 
+            errorMsg.includes('user rejected') || 
+            errorMsg.includes('cancelled') ||
+            errorMsg.includes('canceled') ||
+            errorMsg.includes('rejected by user')) {
+          errorMessage = 'You cancelled the transaction. Your vault was not deployed.';
+          errorTitle = 'Transaction Cancelled';
+        }
+        // Wallet not connected
+        else if (errorMsg.includes('wallet not connected') || 
+                 errorMsg.includes('no wallet')) {
+          errorMessage = 'Please connect your wallet to deploy a vault.';
+          errorTitle = 'Wallet Not Connected';
+        }
+        // Transaction timeout
+        else if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
+          errorMessage = `Transaction timed out. Your vault may still be deploying.\n\n${error.message}`;
+          errorTitle = 'Transaction Timeout';
+        }
+        // Insufficient balance
+        else if (errorMsg.includes('insufficient') || 
+                 errorMsg.includes('balance')) {
+          errorMessage = 'Insufficient XLM balance to complete deployment. Please add funds to your wallet.';
+          errorTitle = 'Insufficient Balance';
+        }
+        // Network issues
+        else if (errorMsg.includes('network') || 
+                 errorMsg.includes('connection')) {
+          errorMessage = `Network error occurred. Please check your connection and try again.\n\n${error.message}`;
+          errorTitle = 'Network Error';
+        }
+        // Invalid configuration
+        else if (errorMsg.includes('invalid') || 
+                 errorMsg.includes('validation')) {
+          errorMessage = `Invalid vault configuration: ${error.message}`;
+          errorTitle = 'Invalid Configuration';
+        }
+        // Default: use the actual error message if available
+        else {
+          errorMessage = `Failed to deploy vault: ${error.message}`;
+        }
+      } else {
+        errorMessage = 'Failed to deploy vault: An unknown error occurred. Please try again.';
+      }
+      
+      modal.message(errorMessage, errorTitle, 'error');
     } finally {
       setDeploying(false);
     }
