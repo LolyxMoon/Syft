@@ -220,10 +220,6 @@ const VaultBuilder = () => {
 
       if (data.success) {
         setSavedVaults(data.data);
-        // Auto-show modal if user has saved drafts
-        if (data.data.length > 0 && nodes.length === 0) {
-          setShowLoadModal(true);
-        }
       }
     } catch (error) {
       console.error('Error loading saved vaults:', error);

@@ -316,32 +316,72 @@ Monetize your strategies and discover top performers.
 
 ### 📈 Analytics
 
-Deep insights into vault performance and risk metrics.
+Comprehensive multi-view analytics dashboard for deep insights into portfolio performance and risk.
 
-**Portfolio Analytics:**
-- Total portfolio value and returns
-- Performance comparison across time periods
-- Asset allocation analysis
-- Risk metrics (Sharpe ratio, max drawdown, volatility)
+**Four Analysis Views:**
 
-**Vault-Level Analytics:**
-- TVL trends and changes
-- Historical APY tracking
-- Deposit/withdrawal flows
-- Share price evolution
-- Rebalance history
-- Gas cost analysis
+1. **Risk Analysis** 🛡️
+   - **Risk Metrics Dashboard**:
+     - Portfolio Volatility: Real-time volatility measurement
+     - Sharpe Ratio: Risk-adjusted return metric
+     - Sortino Ratio: Downside risk-adjusted returns
+     - Maximum Drawdown: Largest peak-to-trough decline
+     - Value at Risk (VaR): Potential loss estimation
+     - Beta & Alpha: Market correlation and excess returns
+     - Information Ratio: Active management effectiveness
+   
+   - **Historical Volatility Chart**: Time-series volatility tracking with benchmark comparison
+   - **Drawdown Analysis**: Visual drawdown tracking over selected period
+   - **Asset Correlation Matrix**: Pairwise correlations between portfolio assets
+   - **Risk Distribution**: Value at Risk and concentration analysis
 
-**Advanced Metrics:**
-- Sharpe Ratio: Risk-adjusted returns
-- Maximum Drawdown: Largest peak-to-trough decline
-- Volatility: Standard deviation of returns
-- Win Rate: Percentage of profitable periods
+2. **Performance Analysis** 📊
+   - **Asset Contribution Analysis**: Visual breakdown of each asset's return contribution
+   - **Asset Performance Breakdown Table**:
+     - Total return per asset
+     - Return contribution percentage
+     - Risk contribution percentage
+     - Current allocation weight
+   
+   - **Performance Attribution by Vault**:
+     - Individual vault returns
+     - Decomposition by: asset selection, timing, rebalancing, fees
+     - Compare multiple vaults simultaneously
 
-**Export & Reporting:**
-- Download data as CSV
-- Generate performance reports
-- Compare multiple vaults side-by-side
+3. **Liquidity Analysis** 💧
+   - **Real Liquidity Metrics** (from Stellar Horizon):
+     - Pool Depth: Total value locked in pools
+     - Average Slippage: Trading impact estimates
+     - 24h Volume: Trading activity
+     - Liquidity Score: Composite quality metric (0-100)
+   
+   - **Liquidity Score Distribution**: Visual ranking of available pools
+   - **Top Liquidity Pools**: Real-time data from Stellar DEX
+
+4. **Time Analysis** ⏰
+   - **Day of Week Performance**: Average returns by day of week
+   - **Volume Distribution**: Trading volume patterns across days
+   - **Rebalancing History**: Recent rebalance events with:
+     - Timestamp and vault name
+     - Transaction cost
+     - TVL before/after
+     - Impact analysis
+
+**Key Features:**
+
+- **Multi-Period Support**: 7D, 30D, 90D, 1Y analysis windows
+- **Real-time Refresh**: Up-to-date data with manual refresh option
+- **Interactive Charts**: Zoom, hover, and drill-down capabilities (via Recharts)
+- **Network Support**: Works across Stellar Testnet, Futurenet, and Mainnet
+- **Responsive Design**: Optimized for desktop and tablet viewing
+- **Loading States**: Skeleton screens and error handling for better UX
+
+**Data Sources:**
+
+- Backend API for portfolio and vault analytics
+- Stellar Horizon API for real liquidity pool data
+- Historical performance tracking from database
+- Real-time correlations and risk calculations
 
 ### 🧪 Backtesting
 
