@@ -256,20 +256,21 @@ const TERMINAL_FUNCTIONS = [
   },
   {
     name: 'remove_liquidity',
-    description: 'Remove liquidity from pool by burning LP tokens.',
+    description: 'Remove liquidity from a pool by burning LP (liquidity pool) tokens to receive back underlying assets.',
     parameters: {
       type: 'object',
       properties: {
         poolId: {
           type: 'string',
-          description: 'Liquidity pool ID',
+          description: 'The liquidity pool ID (hexadecimal string)',
         },
         lpTokens: {
           type: 'string',
-          description: 'Amount of LP tokens to burn',
+          description: 'Amount of LP tokens to burn (numeric string)',
         },
       },
       required: ['poolId', 'lpTokens'],
+      additionalProperties: false,
     },
   },
   {
@@ -664,14 +665,35 @@ Format transaction hashes and addresses nicely for readability.`,
         function: func,
       }));
 
+      console.log('[Terminal AI] Sending request with', tools.length, 'tools');
+
       // Call OpenAI with function calling - NO max_tokens to allow full responses
-      const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
-        messages: context.messages,
-        tools,
-        tool_choice: 'auto',
-        temperature: 0.7,
-      });
+      let response;
+      try {
+        response = await openai.chat.completions.create({
+          model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
+          messages: context.messages,
+          tools,
+          tool_choice: 'auto',
+          temperature: 0.7,
+        });
+      } catch (error: any) {
+        console.error('[Terminal AI] OpenAI API Error:', {
+          status: error.status,
+          message: error.message,
+          type: error.type,
+          code: error.code,
+          toolCount: tools.length,
+          lastUserMessage: context.messages[context.messages.length - 1],
+        });
+        
+        // If it's an authentication error with tools, try without specific problematic tools
+        if (error.status === 401 && error.type === 'new_api_error') {
+          console.warn('[Terminal AI] Auth error - this might be a New API/One API proxy issue with tool definitions');
+        }
+        
+        throw error;
+      }
 
       const assistantMessage = response.choices[0].message;
 
