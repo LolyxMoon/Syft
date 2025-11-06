@@ -349,7 +349,7 @@ export function VaultDetail({ vaultId, listingId }: VaultDetailProps) {
     : (vault.name || vault.config?.name || 'Loading...');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pt-6 pb-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}

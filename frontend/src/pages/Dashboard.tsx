@@ -597,7 +597,7 @@ const Dashboard = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="pb-8"
+          className="pb-0"
         >
           <Card className="p-5 bg-card">
             <div className="flex items-center justify-between mb-5">
@@ -770,7 +770,7 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.5 }}
-            className="mt-6"
+            className="mt-6 pb-8"
           >
             <ProfitDistribution walletAddress={address} />
           </motion.div>
