@@ -486,6 +486,8 @@ const Dashboard = () => {
                       borderRadius: '6px',
                       fontSize: '12px',
                     }}
+                    formatter={(value: number) => [`$${value.toFixed(4)}`, 'Value']}
+                    labelFormatter={(label) => label}
                   />
                   <Area
                     type="monotone"
