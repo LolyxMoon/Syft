@@ -1071,24 +1071,6 @@ const VaultBuilder = () => {
         </div>
       </div>
 
-      {/* Custom Token Warning Banner */}
-      {nodes.some(node => node.type === 'asset' && node.data.assetType === 'CUSTOM') && (
-        <div className="flex-shrink-0 bg-warning-500/10 border-b border-warning-500/30 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-warning-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm text-warning-400 font-semibold mb-1">
-                Custom Tokens Detected
-              </p>
-              <p className="text-xs text-warning-400/80">
-                Custom tokens are available for demonstration purposes only. The testnet currently only has active pools for USDC and XLM. 
-                You are free to create vaults with custom tokens, but please note that you won't be able to deposit into those vaults until pools are available.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
         {builderMode === 'visual' ? (

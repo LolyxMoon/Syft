@@ -6,6 +6,14 @@ import {
   isApproachingLimit
 } from '../utils/tokenCounter.js';
 import { supabase } from '../lib/supabase.js';
+import * as StellarSdk from '@stellar/stellar-sdk';
+import { pollUntil } from '../utils/retryLogic.js';
+
+// Stellar network configuration
+const HORIZON_URL = 'https://horizon-testnet.stellar.org';
+const SOROBAN_RPC_URL = 'https://soroban-testnet.stellar.org';
+const horizonServer = new StellarSdk.Horizon.Server(HORIZON_URL);
+const sorobanServer = new StellarSdk.rpc.Server(SOROBAN_RPC_URL);
 
 /**
  * OpenAI Function Definitions for Stellar Terminal
@@ -739,10 +747,17 @@ When user requests to swap XLM to any of these tokens (AQX, VLTK, SLX, WRX, SIXN
 2. Call swap_assets with fromAsset: "XLM", toAsset: "<TOKEN_ADDRESS>", amount: "<amount>"
 3. The swap will use the dedicated liquidity pool with 10,000 XLM liquidity
 4. Slippage tolerance: 0.5% (0.005) recommended
-5. User will need to establish trustline first if not already done
+5. **IMPORTANT: These are Soroban tokens - NO TRUSTLINE NEEDED!** Unlike classic Stellar assets, custom Soroban tokens don't require trustlines. You can swap directly!
 
 Example: "Swap 100 XLM to RELIO"
 → swap_assets(fromAsset: "XLM", toAsset: "CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H", amount: "100", slippage: "0.005")
+
+**DO NOT call setup_trustline for custom Soroban tokens (AQX, VLTK, SLX, etc.) - they don't need trustlines!**
+
+If user asks to setup trustline for a custom token, explain:
+"That's a Soroban token - no trustline needed! Soroban tokens work differently from classic Stellar assets. You can swap directly without establishing a trustline first."
+
+For CLASSIC Stellar assets (with G-address issuers like USDC), trustlines ARE required.
 
 If user requests swap to "random token" or any other non-listed asset:
 1. Inform them that testnet has limited liquidity
@@ -2118,6 +2133,170 @@ ${JSON.stringify(messagesToSummarize, null, 2)}`;
     }
 
     return title;
+  }
+
+  /**
+   * Submit a signed transaction XDR to the network
+   * Handles both Horizon and Soroban RPC submissions
+   */
+  async submitSignedTransaction(signedXdr: string, network: string = 'testnet'): Promise<any> {
+    try {
+      console.log(`\n========== SUBMIT SIGNED TRANSACTION START ==========`);
+      console.log('[Submit Signed] Network:', network);
+      console.log('[Submit Signed] XDR length:', signedXdr?.length);
+      console.log('[Submit Signed] Parsing transaction XDR...');
+      
+      // Parse the signed transaction
+      const transaction = StellarSdk.TransactionBuilder.fromXDR(
+        signedXdr,
+        network === 'testnet' ? StellarSdk.Networks.TESTNET : StellarSdk.Networks.PUBLIC
+      );
+
+      console.log('[Submit Signed] ✓ Transaction parsed successfully');
+      console.log('[Submit Signed] Transaction details:', {
+        fee: transaction.fee,
+        operations: transaction.operations.length,
+        operationTypes: transaction.operations.map((op: any) => op.type),
+      });
+
+      // Determine if this is a Soroban transaction (has Soroban operations)
+      const hasSorobanOps = transaction.operations.some((op: any) => 
+        op.type === 'invokeHostFunction' || 
+        op.type === 'extendFootprintTtl' || 
+        op.type === 'restoreFootprint'
+      );
+
+      console.log('[Submit Signed] Transaction type:', hasSorobanOps ? 'SOROBAN' : 'HORIZON');
+
+      if (hasSorobanOps) {
+        console.log('[Submit Signed] Detected Soroban transaction, submitting via Soroban RPC...');
+        
+        // Submit to Soroban RPC
+        const result = await sorobanServer.sendTransaction(transaction);
+
+        console.log('[Submit Signed] Send result:', {
+          status: result.status,
+          hash: result.hash,
+          errorResultXdr: result.errorResult?.toXDR('base64')?.substring(0, 100),
+        });
+
+        if (result.status === 'PENDING') {
+          // Poll for result
+          console.log('[Submit Signed] Transaction pending, polling for result...');
+          
+          const getResponse = await pollUntil(
+            () => sorobanServer.getTransaction(result.hash),
+            (response: any) =>
+              response !== null &&
+              response.status !== StellarSdk.rpc.Api.GetTransactionStatus.NOT_FOUND,
+            {
+              intervalMs: 1000,
+              timeoutMs: 30000,
+            }
+          );
+
+          console.log('[Submit Signed] Poll result:', {
+            status: getResponse.status,
+          });
+
+          if (getResponse.status === StellarSdk.rpc.Api.GetTransactionStatus.SUCCESS) {
+            console.log('[Submit Signed] ✅ Transaction successful!');
+            console.log(`========== SUBMIT SIGNED TRANSACTION END ==========\n`);
+            
+            return {
+              success: true,
+              message: 'Transaction submitted successfully!',
+              transactionHash: result.hash,
+              status: 'SUCCESS',
+              link: `https://stellar.expert/explorer/${network}/tx/${result.hash}`,
+            };
+          } else {
+            console.error('[Submit Signed] ❌ Transaction failed on blockchain');
+            console.error('[Submit Signed] Failure details:', JSON.stringify(getResponse, null, 2));
+            console.error(`========== SUBMIT SIGNED TRANSACTION END ==========\n`);
+            
+            return {
+              success: false,
+              error: 'Transaction failed on blockchain',
+              status: getResponse.status,
+              details: getResponse,
+            };
+          }
+        } else {
+          console.error('[Submit Signed] ❌ Transaction submission failed');
+          console.error('[Submit Signed] Result:', JSON.stringify(result, null, 2));
+          console.error(`========== SUBMIT SIGNED TRANSACTION END ==========\n`);
+          
+          return {
+            success: false,
+            error: 'Transaction submission failed',
+            status: result.status,
+            details: result,
+          };
+        }
+      } else {
+        console.log('[Submit Signed] Detected Horizon transaction, submitting via Horizon...');
+        
+        // Submit to Horizon
+        const result = await horizonServer.submitTransaction(transaction);
+
+        console.log('[Submit Signed] ✅ Transaction successful!');
+        console.log(`========== SUBMIT SIGNED TRANSACTION END ==========\n`);
+        
+        return {
+          success: true,
+          message: 'Transaction submitted successfully!',
+          transactionHash: result.hash,
+          ledger: result.ledger,
+          link: `https://stellar.expert/explorer/${network}/tx/${result.hash}`,
+        };
+      }
+    } catch (error: any) {
+      console.error(`\n========== SUBMIT SIGNED ERROR ==========`);
+      console.error('[Submit Signed] ❌ Error occurred:', error.message);
+      console.error('[Submit Signed] Error type:', error.constructor.name);
+      
+      // Extract meaningful error messages
+      let errorMessage = error.message || 'Unknown error occurred';
+      let errorCode = 'UNKNOWN';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        console.error('[Submit Signed] Response data:', JSON.stringify(errorData, null, 2));
+        
+        const txCode = errorData.extras?.result_codes?.transaction;
+        const opCodes = errorData.extras?.result_codes?.operations;
+        
+        if (txCode) {
+          errorCode = txCode;
+          errorMessage = `Transaction error: ${txCode}`;
+          if (opCodes && opCodes.length > 0) {
+            const failedOps = opCodes
+              .map((code: string, idx: number) => 
+                code !== 'op_success' ? `Op ${idx + 1}: ${code}` : null
+              )
+              .filter(Boolean);
+            if (failedOps.length > 0) {
+              errorMessage += ` (${failedOps.join(', ')})`;
+            }
+          }
+        }
+      }
+      
+      console.error('[Submit Signed] Extracted error:', {
+        code: errorCode,
+        message: errorMessage,
+      });
+      console.error('[Submit Signed] Full error:', error);
+      console.error(`========== SUBMIT SIGNED ERROR END ==========\n`);
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode,
+        details: error.response?.data,
+      };
+    }
   }
 }
 

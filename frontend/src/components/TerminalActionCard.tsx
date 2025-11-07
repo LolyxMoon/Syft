@@ -11,6 +11,7 @@ export interface TransactionAction {
   title: string;
   description: string;
   xdr: string;
+  needsPreparation?: boolean; // If true, XDR will be prepared with fresh sequence before signing
   details: Record<string, any>;
   followUpAction?: {
     type: string;
@@ -48,6 +49,7 @@ export const TerminalActionCard = ({ action, onComplete }: TerminalActionCardPro
         xdr: action.xdr,
         network: action.details.network || 'testnet',
         description: action.description,
+        needsPreparation: action.needsPreparation, // Pass through the preparation flag
       });
 
       console.log('[TerminalAction] Transaction successful:', result.hash);

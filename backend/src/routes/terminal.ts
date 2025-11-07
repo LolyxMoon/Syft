@@ -406,6 +406,105 @@ router.post('/upload-wasm', express.raw({ type: 'multipart/form-data', limit: '1
 
 
 /**
+ * POST /api/terminal/prepare-swap
+ * Build and prepare a swap transaction with FRESH sequence number
+ * This is called right before user signs to prevent tx_bad_seq
+ */
+router.post('/prepare-swap', async (req, res): Promise<void> => {
+  try {
+    const { sessionId, fromAsset, toAsset, amount, slippage } = req.body;
+
+    console.log('[Terminal Route] Prepare swap (fresh):', {
+      sessionId: sessionId?.substring(0, 8) + '...',
+      fromAsset,
+      toAsset,
+      amount,
+      slippage,
+    });
+
+    if (!sessionId || !fromAsset || !toAsset || !amount) {
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
+    }
+
+    // Build transaction with CURRENT sequence number
+    const response = await terminalAIService.executeSwap(sessionId, fromAsset, toAsset, amount, slippage || '0.5');
+
+    res.json(response);
+  } catch (error: any) {
+    console.error('Terminal prepare swap error:', error);
+    res.status(500).json({
+      error: 'Failed to prepare swap',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/terminal/submit-signed
+ * Submit a signed transaction XDR to the network
+ * Handles both Horizon and Soroban transactions
+ */
+router.post('/submit-signed', async (req, res): Promise<void> => {
+  try {
+    const { signedXdr, network = 'testnet' } = req.body;
+
+    if (!signedXdr) {
+      res.status(400).json({ error: 'Signed XDR is required' });
+      return;
+    }
+
+    console.log('[Terminal Route] Submit signed transaction:', {
+      xdrLength: signedXdr.length,
+      network,
+    });
+
+    // Create a job ID for this submission
+    const jobId = `submit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create the job
+    jobQueue.createJob(jobId);
+
+    // Start processing in background
+    processSignedTransaction(jobId, signedXdr, network);
+
+    // Return job ID immediately
+    res.json({
+      success: true,
+      jobId,
+      status: 'processing',
+      message: 'Transaction is being submitted',
+    });
+  } catch (error: any) {
+    console.error('Terminal submit signed error:', error);
+    res.status(500).json({
+      error: 'Failed to submit transaction',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Background processing for signed transaction submission
+ */
+async function processSignedTransaction(
+  jobId: string,
+  signedXdr: string,
+  network: string
+) {
+  try {
+    jobQueue.markProcessing(jobId);
+
+    const response = await terminalAIService.submitSignedTransaction(signedXdr, network);
+
+    jobQueue.completeJob(jobId, response);
+  } catch (error: any) {
+    console.error('Signed transaction processing error:', error);
+    jobQueue.failJob(jobId, error.message);
+  }
+}
+
+/**
  * POST /api/terminal/clear
  * Clear conversation history for a session
  */

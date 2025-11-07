@@ -38,6 +38,34 @@ const CUSTOM_TOKEN_POOLS: { [tokenAddress: string]: string } = {
   'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR': 'CA6KURSAHVBAOZXPD3M5CQLWNDCJ6IWEH2A3XCCVPAXI2DDVVBESAVB5', // NUMER
 };
 
+// Token code to contract address mapping (for user-friendly names)
+const TOKEN_CODE_TO_ADDRESS: { [code: string]: string } = {
+  'AQX': 'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3',
+  'VLTK': 'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME',
+  'SLX': 'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5',
+  'WRX': 'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE',
+  'SIXN': 'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O',
+  'MBIUS': 'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP',
+  'TRIO': 'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL',
+  'RELIO': 'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H',
+  'TRI': 'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW',
+  'NUMER': 'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR',
+};
+
+// Reverse mapping for display
+const ADDRESS_TO_TOKEN_CODE: { [address: string]: string } = {
+  'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3': 'AQX',
+  'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME': 'VLTK',
+  'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5': 'SLX',
+  'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE': 'WRX',
+  'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O': 'SIXN',
+  'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP': 'MBIUS',
+  'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL': 'TRIO',
+  'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H': 'RELIO',
+  'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW': 'TRI',
+  'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR': 'NUMER',
+};
+
 const XLM_ADDRESS = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 
 /**
@@ -610,6 +638,42 @@ export class StellarTerminalService {
       console.log(`[Setup Trustline] 🔗 Setting up trustline for ${assetCode}:${issuer}`);
       console.log(`[Setup Trustline] Session found for: ${session.publicKey}`);
 
+      // Check if this is a custom Soroban token (contract address)
+      if (issuer.startsWith('C') && issuer.length === 56) {
+        console.log(`[Setup Trustline] 🔍 Detected Soroban token contract: ${issuer}`);
+        
+        // Check if it's one of our known custom tokens
+        const isKnownCustomToken = Object.values(CUSTOM_TOKEN_POOLS).includes(issuer) || 
+                                   Object.keys(CUSTOM_TOKEN_POOLS).includes(issuer);
+        
+        if (isKnownCustomToken || TOKEN_CODE_TO_ADDRESS[assetCode]) {
+          const tokenName = ADDRESS_TO_TOKEN_CODE[issuer] || assetCode;
+          return {
+            success: true,
+            message: `✅ ${tokenName} is a Soroban token - **no trustline needed**!\n\n` +
+                     `Soroban tokens (like ${tokenName}) work differently from classic Stellar assets. ` +
+                     `You can interact with them directly without establishing a trustline.\n\n` +
+                     `You're all set to swap XLM ↔ ${tokenName}! Just use the swap command.`,
+            info: {
+              tokenType: 'Soroban SAC Token',
+              contractAddress: issuer,
+              trustlineRequired: false,
+              tokenCode: tokenName,
+              pool: CUSTOM_TOKEN_POOLS[issuer],
+            }
+          };
+        } else {
+          // Unknown Soroban token
+          return {
+            success: false,
+            error: `The token contract ${issuer} is not recognized in our system.`,
+            message: `⚠️ This appears to be a Soroban token contract, but it's not in our supported token list.\n\n` +
+                     `Supported custom tokens: ${Object.keys(TOKEN_CODE_TO_ADDRESS).join(', ')}`,
+          };
+        }
+      }
+
+      // Classic Stellar asset - proceed with normal trustline setup
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
       const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
@@ -768,11 +832,15 @@ export class StellarTerminalService {
       }
 
       // Check if this is a custom token pool swap (XLM <-> Custom Token)
-      const isXLMToCustom = (fromAsset === 'XLM' || fromAsset.toLowerCase() === 'native') && CUSTOM_TOKEN_POOLS[toAsset];
-      const isCustomToXLM = CUSTOM_TOKEN_POOLS[fromAsset] && (toAsset === 'XLM' || toAsset.toLowerCase() === 'native');
+      // First resolve token codes to addresses
+      const fromTokenAddr = TOKEN_CODE_TO_ADDRESS[fromAsset.toUpperCase()] || fromAsset;
+      const toTokenAddr = TOKEN_CODE_TO_ADDRESS[toAsset.toUpperCase()] || toAsset;
+      
+      const isXLMToCustom = (fromAsset === 'XLM' || fromAsset.toLowerCase() === 'native') && CUSTOM_TOKEN_POOLS[toTokenAddr];
+      const isCustomToXLM = CUSTOM_TOKEN_POOLS[fromTokenAddr] && (toAsset === 'XLM' || toAsset.toLowerCase() === 'native');
 
       if (isXLMToCustom || isCustomToXLM) {
-        // Use custom pool swap
+        // Use custom pool swap - return unprepared transaction for frontend to prepare
         return this.swapThroughCustomPool(sessionId, fromAsset, toAsset, amount, slippage);
       }
 
@@ -952,92 +1020,176 @@ export class StellarTerminalService {
     slippage: string = '0.5'
   ): Promise<any> {
     try {
+      console.log(`\n========== SWAP THROUGH CUSTOM POOL START ==========`);
+      console.log(`[swapThroughCustomPool] Parameters:`, {
+        sessionId: sessionId?.substring(0, 8) + '...',
+        fromAsset,
+        toAsset,
+        amount,
+        slippage,
+      });
+
       const session = this.sessions.get(sessionId);
       if (!session) {
+        console.error(`[swapThroughCustomPool] ❌ Session not found: ${sessionId}`);
         return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
+      console.log(`[swapThroughCustomPool] ✓ Session found for wallet: ${session.publicKey}`);
 
       // Determine which is the custom token and which is XLM
       const isXLMToCustom = (fromAsset === 'XLM' || fromAsset.toLowerCase() === 'native');
-      const customTokenAddress = isXLMToCustom ? toAsset : fromAsset;
+      
+      // Resolve token code to address if needed (e.g., "AQX" -> "CAABH...")
+      let customTokenInput = isXLMToCustom ? toAsset : fromAsset;
+      let customTokenAddress: string;
+      
+      // Check if it's a code (like "AQX") or already an address
+      if (customTokenInput.length < 56 && TOKEN_CODE_TO_ADDRESS[customTokenInput.toUpperCase()]) {
+        customTokenAddress = TOKEN_CODE_TO_ADDRESS[customTokenInput.toUpperCase()];
+        console.log(`[swapThroughCustomPool] Resolved token code ${customTokenInput} → ${customTokenAddress}`);
+      } else {
+        customTokenAddress = customTokenInput;
+      }
+      
       const poolAddress = CUSTOM_TOKEN_POOLS[customTokenAddress];
 
+      console.log(`[swapThroughCustomPool] Swap direction:`, {
+        isXLMToCustom,
+        customTokenInput,
+        customTokenAddress,
+        poolAddress,
+      });
+
       if (!poolAddress) {
+        console.error(`[swapThroughCustomPool] ❌ No pool found for token: ${customTokenAddress}`);
         return { 
           success: false, 
           error: `No liquidity pool found for this token. Available pools: AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER` 
         };
       }
 
-      const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+      console.log(`[swapThroughCustomPool] Loading account from Soroban RPC...`);
+      // Use Soroban RPC's getAccount() instead of Horizon's loadAccount()
+      // This prevents tx_bad_seq errors for Soroban transactions
+      const sourceAccount = await sorobanServer.getAccount(session.publicKey);
+      console.log(`[swapThroughCustomPool] ✓ Account loaded. Sequence: ${sourceAccount.sequenceNumber()}`);
 
-      // Check if user has trustline for the custom token (if receiving it)
-      if (isXLMToCustom) {
-        const balances = sourceAccount.balances;
-        const hasTrustline = balances.some(
-          (balance: any) => balance.asset_code && balance.asset_issuer === customTokenAddress
-        );
-
-        // If no trustline, need to establish it first
-        if (!hasTrustline) {
-          const trustlineOp = Operation.changeTrust({
-            asset: new Asset('TOKEN', customTokenAddress), // Code doesn't matter for SAC
-            limit: '922337203685.4775807', // Max int64 / 10^7
-          });
-
-          const trustlineTx = new TransactionBuilder(sourceAccount, {
-            fee: BASE_FEE,
-            networkPassphrase: Networks.TESTNET,
-          })
-            .addOperation(trustlineOp)
-            .setTimeout(300)
-            .build();
-
-          return {
-            success: true,
-            message: `To receive this custom token, you need to establish a trustline first.\n\nSign the trustline transaction, then I'll automatically proceed with your swap.`,
-            action: {
-              type: 'setup_trustline',
-              title: 'Setup Trustline Required',
-              description: `Establish trustline for custom token before swapping`,
-              xdr: trustlineTx.toXDR(),
-              details: {
-                tokenAddress: customTokenAddress,
-                network: 'testnet',
-                reason: 'Required to receive swapped custom tokens',
-              },
-              followUpAction: {
-                type: 'swap_assets',
-                params: {
-                  fromAsset,
-                  toAsset,
-                  amount,
-                  slippage,
-                },
-              },
-            },
-          };
-        }
-      }
+      // NOTE: Soroban tokens (SAC) don't use traditional trustlines
+      // The token contract handles authorization when tokens are transferred
+      // No need to check or establish trustlines for custom tokens
 
       // Build the swap transaction using Soroban contract call
       const poolContract = new Contract(poolAddress);
       
       // Convert amount to stroops (7 decimals)
-      const amountStroops = Math.floor(parseFloat(amount) * 10_000_000);
+      const amountStroops = BigInt(Math.floor(parseFloat(amount) * 10_000_000));
+      console.log(`[swapThroughCustomPool] Amount in stroops: ${amountStroops}`);
       
-      // Calculate minimum output with slippage
-      // Simplified: assume 1:1 ratio, apply 0.3% fee and slippage
-      const feeMultiplier = 0.997; // 0.3% fee
-      const slippageMultiplier = 1 - parseFloat(slippage) / 100;
-      const estimatedOutput = amountStroops * feeMultiplier;
-      const minOutput = Math.floor(estimatedOutput * slippageMultiplier);
+      // Query actual pool reserves to calculate accurate output
+      let reserveIn: bigint;
+      let reserveOut: bigint;
+      
+      try {
+        console.log(`[swapThroughCustomPool] Querying pool reserves...`);
+        // Call get_reserves() to get actual pool state
+        const reservesTx = new TransactionBuilder(sourceAccount, {
+          fee: BASE_FEE,
+          networkPassphrase: Networks.TESTNET,
+        })
+          .addOperation(poolContract.call('get_reserves'))
+          .setTimeout(30)
+          .build();
+        
+        const reservesResult = await sorobanServer.simulateTransaction(reservesTx);
+        
+        if (StellarSdk.rpc.Api.isSimulationSuccess(reservesResult) && reservesResult.result?.retval) {
+          const reserves = scValToNative(reservesResult.result.retval);
+          console.log(`[swapThroughCustomPool] ✓ Raw reserves:`, reserves);
+          
+          // reserves is a tuple: [reserve_a, reserve_b]
+          // Determine which reserve is which based on token order
+          const tokenA: any = await (async () => {
+            const tokenATx = new TransactionBuilder(sourceAccount, {
+              fee: BASE_FEE,
+              networkPassphrase: Networks.TESTNET,
+            })
+              .addOperation(poolContract.call('get_token_a'))
+              .setTimeout(30)
+              .build();
+            const tokenAResult = await sorobanServer.simulateTransaction(tokenATx);
+            if (StellarSdk.rpc.Api.isSimulationSuccess(tokenAResult) && tokenAResult.result?.retval) {
+              return scValToNative(tokenAResult.result.retval);
+            }
+            return XLM_ADDRESS; // fallback
+          })();
+          
+          console.log(`[swapThroughCustomPool] Token A in pool: ${tokenA}`);
+          
+          // Determine which reserve is input and which is output
+          const tokenInAddr = isXLMToCustom ? XLM_ADDRESS : customTokenAddress;
+          if (tokenInAddr === tokenA) {
+            reserveIn = BigInt(reserves[0]);
+            reserveOut = BigInt(reserves[1]);
+          } else {
+            reserveIn = BigInt(reserves[1]);
+            reserveOut = BigInt(reserves[0]);
+          }
+          
+          console.log(`[swapThroughCustomPool] ✓ Reserves determined:`, {
+            reserveIn: reserveIn.toString(),
+            reserveOut: reserveOut.toString(),
+          });
+        } else {
+          // Fallback to assumed 10K liquidity if query fails
+          console.warn('[swapThroughCustomPool] ⚠️ Could not query reserves, using default 10K assumption');
+          reserveIn = BigInt(10_000 * 10_000_000);
+          reserveOut = BigInt(10_000 * 10_000_000);
+        }
+      } catch (error) {
+        console.error('[swapThroughCustomPool] ❌ Error querying reserves:', error);
+        // Fallback to assumed 10K liquidity
+        reserveIn = BigInt(10_000 * 10_000_000);
+        reserveOut = BigInt(10_000 * 10_000_000);
+      }
+      
+      // Calculate output using AMM formula: amount_out = (amount_in * 997 * reserve_out) / (reserve_in * 1000 + amount_in * 997)
+      const amountInWithFee = amountStroops * BigInt(997);
+      const numerator = amountInWithFee * reserveOut;
+      const denominator = (reserveIn * BigInt(1000)) + amountInWithFee;
+      const estimatedOutput = numerator / denominator;
+      
+      console.log(`[swapThroughCustomPool] AMM Calculation:`, {
+        amountIn: amountStroops.toString(),
+        amountInWithFee: amountInWithFee.toString(),
+        estimatedOutput: estimatedOutput.toString(),
+        estimatedOutputDecimal: (Number(estimatedOutput) / 10_000_000).toFixed(7),
+      });
+      
+      // Apply slippage tolerance (e.g., 0.5% = 0.005)
+      const slippageTolerance = parseFloat(slippage);
+      const slippageMultiplier = 1 - slippageTolerance;
+      const minOutput = (estimatedOutput * BigInt(Math.floor(slippageMultiplier * 1_000_000))) / BigInt(1_000_000);
+      
+      console.log(`[swapThroughCustomPool] Slippage Calculation:`, {
+        slippageTolerance: `${slippage}%`,
+        slippageMultiplier,
+        minOutput: minOutput.toString(),
+        minOutputDecimal: (Number(minOutput) / 10_000_000).toFixed(7),
+      });
 
       // Build contract call parameters
       const userAddress = Address.fromString(session.publicKey);
       const tokenInAddress = isXLMToCustom ? Address.fromString(XLM_ADDRESS) : Address.fromString(customTokenAddress);
       const amountInScVal = nativeToScVal(amountStroops, { type: 'i128' });
       const minOutScVal = nativeToScVal(minOutput, { type: 'i128' });
+
+      console.log(`[swapThroughCustomPool] Building transaction...`);
+      console.log(`[swapThroughCustomPool] Contract call params:`, {
+        user: session.publicKey,
+        tokenIn: tokenInAddress.toString(),
+        amountIn: amountStroops.toString(),
+        minOut: minOutput.toString(),
+      });
 
       // Build the transaction
       const swapTx = new TransactionBuilder(sourceAccount, {
@@ -1056,23 +1208,34 @@ export class StellarTerminalService {
         .setTimeout(300)
         .build();
 
-      // Prepare and simulate the transaction
-      const preparedTx = await sorobanServer.prepareTransaction(swapTx);
+      console.log(`[swapThroughCustomPool] ✓ Transaction built.`);
+      
+      // DON'T prepare here - let Freighter/frontend prepare it with fresh sequence!
+      // This is how vaults work successfully
+      console.log(`[swapThroughCustomPool] ℹ️ Returning UNPREPARED transaction`);
+      console.log(`[swapThroughCustomPool] Frontend will prepare with fresh sequence before signing`);
+      console.log(`========== SWAP THROUGH CUSTOM POOL END ==========\n`);
+
+      // Get user-friendly token name for display
+      const tokenDisplayName = ADDRESS_TO_TOKEN_CODE[customTokenAddress] || customTokenAddress;
+      const fromDisplayName = isXLMToCustom ? 'XLM' : tokenDisplayName;
+      const toDisplayName = isXLMToCustom ? tokenDisplayName : 'XLM';
 
       return {
         success: true,
-        message: `Ready to swap ${amount} ${isXLMToCustom ? 'XLM' : 'custom token'} for ~${(estimatedOutput / 10_000_000).toFixed(7)} ${isXLMToCustom ? 'custom token' : 'XLM'} through custom liquidity pool.`,
+        message: `Ready to swap ${amount} ${fromDisplayName} for ~${(Number(estimatedOutput) / 10_000_000).toFixed(7)} ${toDisplayName} through custom liquidity pool.`,
         action: {
           type: 'swap_assets',
           title: 'Custom Pool Swap',
-          description: `Swap ${amount} ${fromAsset} for ${toAsset} (0.3% fee)`,
-          xdr: preparedTx.toXDR(),
+          description: `Swap ${amount} ${fromDisplayName} for ${toDisplayName} (0.3% fee)`,
+          xdr: swapTx.toXDR(),  // UNPREPARED XDR - frontend will prepare it
+          needsPreparation: true,  // Signal to frontend to prepare before signing
           details: {
-            from_asset: fromAsset,
-            to_asset: toAsset,
+            from_asset: fromDisplayName,
+            to_asset: toDisplayName,
             from_amount: amount,
-            estimated_output: (estimatedOutput / 10_000_000).toFixed(7),
-            min_output: (minOutput / 10_000_000).toFixed(7),
+            estimated_output: (Number(estimatedOutput) / 10_000_000).toFixed(7),
+            min_output: (Number(minOutput) / 10_000_000).toFixed(7),
             slippage: `${slippage}%`,
             pool: poolAddress,
             network: 'testnet',
@@ -1080,10 +1243,19 @@ export class StellarTerminalService {
         },
       };
     } catch (error: any) {
-      console.error('[swapThroughCustomPool] Error:', error);
+      console.error(`\n========== SWAP ERROR ==========`);
+      console.error('[swapThroughCustomPool] ❌ Error occurred:', error);
+      console.error('[swapThroughCustomPool] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+      });
+      console.error(`========== SWAP ERROR END ==========\n`);
+      
       return {
         success: false,
         error: error.message || 'Custom pool swap failed',
+        details: error.response?.data || error.toString(),
       };
     }
   }
@@ -1973,8 +2145,9 @@ export class StellarTerminalService {
       console.log(`[List NFTs] 🔍 Querying blockchain for wallet: ${address}`);
       console.log(`[List NFTs] 📜 Contracts to query: ${nftContractAddresses.length}`);
 
-      // Load account once for all queries
-      const sourceAccount = await horizonServer.loadAccount(address).catch((err) => {
+      // Use Soroban RPC's getAccount() for Soroban contract queries
+      // This prevents tx_bad_seq errors
+      const sourceAccount = await sorobanServer.getAccount(address).catch((err) => {
         console.log(`[List NFTs] ❌ Failed to load account ${address}:`, err.message);
         return null;
       });
