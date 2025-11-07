@@ -656,31 +656,32 @@ export async function buildRebalanceStepTransaction(
     // Create contract instance
     const contract = new StellarSdk.Contract(vault.contract_address);
 
-    // Manually construct RebalanceStep struct as a Map
-    // This is necessary because nativeToScVal doesn't handle custom Rust structs properly
-    // IMPORTANT: Keys must be sorted alphabetically for Soroban
-    const stepScVal = StellarSdk.xdr.ScVal.scvMap([
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("amount_in"),
-        val: StellarSdk.nativeToScVal(BigInt(step.amount_in), { type: "i128" })
-      }),
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("from_token"),
-        val: StellarSdk.Address.fromString(step.from_token).toScVal()
-      }),
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("min_amount_out"),
-        val: StellarSdk.nativeToScVal(BigInt(step.min_amount_out), { type: "i128" })
-      }),
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("pool_address"),
-        val: StellarSdk.Address.fromString(step.pool_address).toScVal()
-      }),
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("to_token"),
-        val: StellarSdk.Address.fromString(step.to_token).toScVal()
-      })
-    ]);
+    // Convert step to native object format that nativeToScVal can handle
+    // The struct fields must match the Rust #[contracttype] RebalanceStep definition
+    const stepObject = {
+      amount_in: BigInt(step.amount_in),
+      from_token: step.from_token,
+      to_token: step.to_token,
+      min_amount_out: BigInt(step.min_amount_out),
+      pool_address: step.pool_address,
+    };
+
+    console.log(`[Build Rebalance Step] Converting step object to ScVal...`);
+    console.log(`[Build Rebalance Step] Step object:`, stepObject);
+
+    // Use nativeToScVal with explicit type structure for custom struct
+    // This properly handles Soroban contracttype structs
+    const stepScVal = StellarSdk.nativeToScVal(stepObject, {
+      type: {
+        amount_in: ['i128'],
+        from_token: ['address'],
+        to_token: ['address'],
+        min_amount_out: ['i128'],
+        pool_address: ['address'],
+      }
+    });
+
+    console.log(`[Build Rebalance Step] ScVal created successfully`);
 
     // Build execute_rebalance_step operation
     const operation = contract.call('execute_rebalance_step', stepScVal);
