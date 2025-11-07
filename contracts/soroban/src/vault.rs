@@ -1,5 +1,5 @@
 // Vault core contract functionality
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, symbol_short, token, log, String, Vec as SdkVec};
+use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, symbol_short, token, log};
 
 use crate::types::{VaultConfig, VaultState, UserPosition};
 use crate::errors::VaultError;
@@ -88,7 +88,7 @@ impl VaultContract {
         let mut position = Self::get_position(env.clone(), user.clone());
         env.events().publish((symbol_short!("debug"),), symbol_short!("pos_ok"));
 
-        // Get config to determine base asset (first asset in the vault)
+        // Get config to check vault is properly set up
         let config: VaultConfig = env.storage().instance().get(&CONFIG)
             .ok_or(VaultError::NotInitialized)?;
         env.events().publish((symbol_short!("debug"),), symbol_short!("cfg_ok"));
@@ -97,9 +97,6 @@ impl VaultContract {
             return Err(VaultError::InvalidConfiguration);
         }
         
-        // Note: base_token no longer used since we swap directly to target allocations
-        // let _base_token = config.assets.get(0)
-        //     .ok_or(VaultError::InvalidConfiguration)?;
         env.events().publish((symbol_short!("debug"),), symbol_short!("tok_ok"));
 
         // Get vault address
@@ -112,94 +109,10 @@ impl VaultContract {
         deposit_token_client.transfer(&user, &vault_address, &amount);
         env.events().publish((symbol_short!("debug"),), symbol_short!("xfer_ok"));
 
-        // OPTIMIZED DEPOSIT: Instead of swapping all to base token then rebalancing,
-        // we swap directly from deposit token to each target asset according to allocation
-        // This is more efficient and saves gas + slippage
-        
-        // Get target allocation from rebalance rules
-        let mut target_allocation: SdkVec<i128> = SdkVec::new(&env);
-        let mut found_allocation = false;
-        
-        for i in 0..config.rules.len() {
-            if let Some(rule) = config.rules.get(i) {
-                if rule.action == String::from_str(&env, "rebalance") && 
-                   rule.target_allocation.len() == config.assets.len() {
-                    for j in 0..rule.target_allocation.len() {
-                        if let Some(alloc) = rule.target_allocation.get(j) {
-                            target_allocation.push_back(alloc);
-                        }
-                    }
-                    found_allocation = true;
-                    break;
-                }
-            }
-        }
-        
-        // If no allocation found, use equal distribution
-        if !found_allocation {
-            let equal_share = 100_0000 / (config.assets.len() as i128);
-            for _ in 0..config.assets.len() {
-                target_allocation.push_back(equal_share);
-            }
-        }
-        
-        env.events().publish((symbol_short!("alloc_len"),), target_allocation.len());
-        
-        // Check if router is configured (we'll need it for swaps)
-        let router_address = config.router_address
-            .ok_or(VaultError::RouterNotSet)?;
-        
-        // Track total value received across all swaps
-        let mut total_value_received: i128 = 0;
-        
-        // Swap deposit token to each target asset according to allocation
-        for i in 0..config.assets.len() {
-            if let (Some(target_asset), Some(alloc_pct)) = (config.assets.get(i), target_allocation.get(i)) {
-                // Calculate amount to swap to this asset based on allocation percentage
-                let amount_for_asset = amount.checked_mul(alloc_pct)
-                    .and_then(|v| v.checked_div(100_0000))
-                    .ok_or(VaultError::InvalidAmount)?;
-                
-                env.events().publish(
-                    (symbol_short!("asset_amt"),),
-                    (i as u32, amount_for_asset)
-                );
-                
-                if amount_for_asset == 0 {
-                    continue; // Skip if allocation rounds to 0
-                }
-                
-                // If deposit token matches target asset, no swap needed
-                if deposit_token == target_asset {
-                    total_value_received = total_value_received.checked_add(amount_for_asset)
-                        .ok_or(VaultError::InvalidAmount)?;
-                    continue;
-                }
-                
-                // Swap deposit token to target asset
-                let swapped_amount = crate::swap_router::swap_via_router(
-                    &env,
-                    &router_address,
-                    &deposit_token,
-                    &target_asset,
-                    amount_for_asset,
-                    0, // min_amount_out = 0 (accept any slippage for now)
-                )?;
-                
-                total_value_received = total_value_received.checked_add(swapped_amount)
-                    .ok_or(VaultError::InvalidAmount)?;
-                
-                env.events().publish(
-                    (symbol_short!("swapped"),),
-                    (i as u32, swapped_amount)
-                );
-            }
-        }
-        
-        env.events().publish((symbol_short!("tot_recv"),), total_value_received);
-        
-        // Use total_value_received as final amount
-        let final_amount = total_value_received;
+        // NO AUTO-SWAP: Keep deposit token as-is
+        // The force_rebalance function will swap to target allocation in a separate transaction
+        // This is cleaner and more gas-efficient
+        let final_amount = amount;
 
         // Get current state
         let mut state: VaultState = env.storage().instance().get(&STATE)
@@ -230,17 +143,20 @@ impl VaultContract {
         env.storage().instance().set(&STATE, &state);
         env.storage().instance().set(&(POSITION, user.clone()), &position);
 
-        // Emit event with final amount (after swap)
+        // Emit event with final amount (no swap in deposit)
         emit_deposit(&env, &user, final_amount, shares);
 
-        // NOTE: Deposits are now optimized to swap directly to target allocation
-        // Each portion of the deposit token is swapped directly to its target asset
-        // Example: Deposit 100 XLM into 50% AQX / 50% RELIO vault:
-        //   - Swaps 50 XLM → AQX
-        //   - Swaps 50 XLM → RELIO
-        // This is more efficient than the old approach (swap all → base, then rebalance)
+        // NOTE: Deposit does NOT swap tokens - it just accepts them as-is
+        // The deposit token (e.g., XLM) stays as XLM in the vault
         //
-        // NO NEED to call force_rebalance() after deposit - assets are already allocated correctly!
+        // IMPORTANT: For multi-asset vaults, call force_rebalance() in a SECOND transaction
+        // The rebalance function will swap the deposit token to target assets
+        //
+        // Example: Deposit 100 XLM into 50% AQX / 50% SLX vault:
+        //   Transaction 1 (deposit_with_token): Accept 100 XLM, mint shares
+        //   Transaction 2 (force_rebalance): Swap 50 XLM → AQX, 50 XLM → SLX
+        //
+        // This 2-transaction approach is cleaner and gives users control over when to rebalance
 
         Ok(shares)
     }
