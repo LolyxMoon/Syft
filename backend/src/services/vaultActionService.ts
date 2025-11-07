@@ -662,7 +662,7 @@ export async function buildRebalanceStepTransaction(
     const stepScVal = StellarSdk.xdr.ScVal.scvMap([
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("amount_in"),
-        val: StellarSdk.nativeToScVal(step.amount_in, { type: "i128" })
+        val: StellarSdk.nativeToScVal(BigInt(step.amount_in), { type: "i128" })
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("from_token"),
@@ -670,7 +670,7 @@ export async function buildRebalanceStepTransaction(
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("min_amount_out"),
-        val: StellarSdk.nativeToScVal(step.min_amount_out, { type: "i128" })
+        val: StellarSdk.nativeToScVal(BigInt(step.min_amount_out), { type: "i128" })
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("pool_address"),
