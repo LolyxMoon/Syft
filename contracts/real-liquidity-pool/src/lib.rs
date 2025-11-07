@@ -395,6 +395,15 @@ impl RealLiquidityPool {
             .unwrap_or_else(|| panic_with_error!(&env, PoolError::NotInitialized))
     }
 
+    /// Aliases for compatibility with vault contract
+    pub fn token_a(env: Env) -> Address {
+        Self::token_0(env)
+    }
+
+    pub fn token_b(env: Env) -> Address {
+        Self::token_1(env)
+    }
+
     // ========== Helper Functions ==========
 
     /// Calculate quote for adding liquidity

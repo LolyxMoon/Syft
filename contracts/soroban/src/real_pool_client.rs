@@ -27,11 +27,11 @@ pub trait RealPoolInterface {
     /// Returns (reserve_a, reserve_b)
     fn get_reserves(env: Env) -> (i128, i128);
     
-    /// Get token A address
-    fn token_a(env: Env) -> Address;
+    /// Get token 0 address
+    fn token_0(env: Env) -> Address;
     
-    /// Get token B address
-    fn token_b(env: Env) -> Address;
+    /// Get token 1 address
+    fn token_1(env: Env) -> Address;
 }
 
 /// Execute a swap through our real liquidity pool
@@ -58,8 +58,8 @@ pub fn swap_via_real_pool(
     let vault_address = env.current_contract_address();
     
     // Get pool token addresses to verify this is the correct pool
-    let token_a = pool_client.token_a();
-    let token_b = pool_client.token_b();
+    let token_a = pool_client.token_0();
+    let token_b = pool_client.token_1();
     
     // Verify tokens match
     if (from_token != &token_a && from_token != &token_b) || 
@@ -139,8 +139,8 @@ pub fn calculate_real_pool_output(
     let pool_client = RealPoolClient::new(env, pool_address);
     
     // Get pool token addresses to determine which is token_a and token_b
-    let token_a = pool_client.token_a();
-    let token_b = pool_client.token_b();
+    let token_a = pool_client.token_0();
+    let token_b = pool_client.token_1();
     
     // Determine which token we're swapping from
     let is_token_a_in = if from_token == &token_a {
@@ -209,8 +209,8 @@ pub fn find_pool_for_pair(
     if let Some(pool) = get_custom_token_pool(env, token_a) {
         // Verify this pool actually contains both tokens
         let pool_client = RealPoolClient::new(env, &pool);
-        let pool_token_a = pool_client.token_a();
-        let pool_token_b = pool_client.token_b();
+        let pool_token_a = pool_client.token_0();
+        let pool_token_b = pool_client.token_1();
         
         if (token_a == &pool_token_a || token_a == &pool_token_b) &&
            (token_b == &pool_token_a || token_b == &pool_token_b) {
@@ -222,8 +222,8 @@ pub fn find_pool_for_pair(
     if let Some(pool) = get_custom_token_pool(env, token_b) {
         // Verify this pool actually contains both tokens
         let pool_client = RealPoolClient::new(env, &pool);
-        let pool_token_a = pool_client.token_a();
-        let pool_token_b = pool_client.token_b();
+        let pool_token_a = pool_client.token_0();
+        let pool_token_b = pool_client.token_1();
         
         if (token_a == &pool_token_a || token_a == &pool_token_b) &&
            (token_b == &pool_token_a || token_b == &pool_token_b) {
