@@ -1235,24 +1235,22 @@ pub fn calculate_rebalance_plan(
                             let excess = source_current - source_target;
                             
                             // Find pool for this pair
+                            // For custom tokens: use registered pool
+                            // For standard tokens (XLM, USDC): use zero address to signal router lookup
                             let pool_address = {
                                 if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &source_asset) {
-                                    Some(custom_pool)
+                                    custom_pool
                                 } else if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &asset) {
-                                    Some(custom_pool)
+                                    custom_pool
                                 } else {
-                                    None
-                                }
-                            };
-                            
-                            let pool_address = match pool_address {
-                                Some(addr) => addr,
-                                None => {
+                                    // No custom pool registered - this is a standard token pair (e.g., XLM/USDC)
+                                    // Use account zero as a placeholder to signal: "lookup pool via router/factory"
+                                    // The execute_rebalance_step function will handle this specially
                                     env.events().publish(
-                                        (symbol_short!("no_pool"),),
+                                        (symbol_short!("use_rtr"),), // "use router"
                                         (source_asset.clone(), asset.clone())
                                     );
-                                    continue;
+                                    Address::from_string(&String::from_str(env, "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"))
                                 }
                             };
                             

@@ -57,6 +57,43 @@ export function NaturalLanguageBuilder({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Helper to save messages to localStorage
+  const saveMessagesToLocalStorage = (msgs: Message[], sessionId: string | null) => {
+    if (sessionId) {
+      try {
+        // Convert messages to a serializable format
+        const serializedMessages = msgs.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp.toISOString(),
+        }));
+        localStorage.setItem(`syft_chat_messages_${sessionId}`, JSON.stringify(serializedMessages));
+        console.log('[Chat] Saved', msgs.length, 'messages to localStorage');
+      } catch (err) {
+        console.error('[Chat] Error saving messages to localStorage:', err);
+      }
+    }
+  };
+
+  // Helper to load messages from localStorage
+  const loadMessagesFromLocalStorage = (sessionId: string): Message[] | null => {
+    try {
+      const stored = localStorage.getItem(`syft_chat_messages_${sessionId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert timestamps back to Date objects
+        const messages = parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+        console.log('[Chat] Loaded', messages.length, 'messages from localStorage');
+        return messages;
+      }
+    } catch (err) {
+      console.error('[Chat] Error loading messages from localStorage:', err);
+    }
+    return null;
+  };
+
   // Helper to get welcome message
   const getWelcomeMessage = (): Message => ({
     id: 'welcome',
@@ -104,6 +141,13 @@ export function NaturalLanguageBuilder({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0 && currentSessionId) {
+      saveMessagesToLocalStorage(messages, currentSessionId);
+    }
+  }, [messages, currentSessionId]);
+
   // Load current session on mount
   useEffect(() => {
     const loadCurrentSession = async () => {
@@ -119,9 +163,25 @@ export function NaturalLanguageBuilder({
           console.log('[Chat] Wallet address changed, clearing stored session');
           localStorage.removeItem('syft_current_chat_session');
           localStorage.removeItem('syft_chat_wallet_address');
+          // Clear all chat message caches
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('syft_chat_messages_')) {
+              localStorage.removeItem(key);
+            }
+          });
           setMessages([getWelcomeMessage()]);
         } else if (storedSessionId) {
           console.log('[Chat] Loading session from localStorage:', storedSessionId);
+          
+          // Load from localStorage first for instant display
+          const cachedMessages = loadMessagesFromLocalStorage(storedSessionId);
+          if (cachedMessages && cachedMessages.length > 0) {
+            console.log('[Chat] Loaded cached messages, displaying immediately');
+            setMessages(cachedMessages);
+            setCurrentSessionId(storedSessionId);
+          }
+          
+          // Then verify/sync with backend in the background
           await loadSession(storedSessionId);
         } else {
           // No stored session, show welcome message
@@ -220,7 +280,7 @@ export function NaturalLanguageBuilder({
       const data = await response.json();
 
       if (data.success && data.data) {
-        console.log('[Chat] Received', data.data.length, 'messages');
+        console.log('[Chat] Received', data.data.length, 'messages from backend');
         
         // Convert backend messages to UI messages
         const loadedMessages: Message[] = data.data.map((msg: any) => ({
@@ -246,11 +306,22 @@ export function NaturalLanguageBuilder({
         throw new Error('Invalid response format');
       }
     } catch (err) {
-      console.error('[Chat] Error loading session:', err);
-      // On error, show welcome message and clear session
-      setMessages([getWelcomeMessage()]);
-      setCurrentSessionId(null);
-      localStorage.removeItem('syft_current_chat_session');
+      console.error('[Chat] Error loading session from backend:', err);
+      // Don't clear messages if we have cached ones - only log the error
+      // The cached messages from localStorage will remain displayed
+      console.log('[Chat] Using cached messages instead of backend data');
+      
+      // Still set the session ID if we have cached messages
+      const cachedMessages = loadMessagesFromLocalStorage(sessionId);
+      if (cachedMessages && cachedMessages.length > 0) {
+        setCurrentSessionId(sessionId);
+        localStorage.setItem('syft_current_chat_session', sessionId);
+      } else {
+        // Only clear if we have no cached messages either
+        setMessages([getWelcomeMessage()]);
+        setCurrentSessionId(null);
+        localStorage.removeItem('syft_current_chat_session');
+      }
     }
   };
 
@@ -261,6 +332,12 @@ export function NaturalLanguageBuilder({
     setIsHistoryOpen(false);
     // Clear localStorage
     localStorage.removeItem('syft_current_chat_session');
+    // Clear all chat message caches
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('syft_chat_messages_')) {
+        localStorage.removeItem(key);
+      }
+    });
     // Keep wallet address tracking
     if (walletAddress) {
       localStorage.setItem('syft_chat_wallet_address', walletAddress);
