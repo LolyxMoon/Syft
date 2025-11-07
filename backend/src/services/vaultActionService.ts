@@ -658,18 +658,15 @@ export async function buildRebalanceStepTransaction(
 
     // Manually construct RebalanceStep struct as a Map
     // This is necessary because nativeToScVal doesn't handle custom Rust structs properly
+    // IMPORTANT: Keys must be sorted alphabetically for Soroban
     const stepScVal = StellarSdk.xdr.ScVal.scvMap([
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("from_token"),
-        val: StellarSdk.nativeToScVal(step.from_token, { type: "address" })
-      }),
-      new StellarSdk.xdr.ScMapEntry({
-        key: StellarSdk.nativeToScVal("to_token"),
-        val: StellarSdk.nativeToScVal(step.to_token, { type: "address" })
-      }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("amount_in"),
         val: StellarSdk.nativeToScVal(step.amount_in, { type: "i128" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("from_token"),
+        val: StellarSdk.nativeToScVal(step.from_token, { type: "address" })
       }),
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("min_amount_out"),
@@ -678,6 +675,10 @@ export async function buildRebalanceStepTransaction(
       new StellarSdk.xdr.ScMapEntry({
         key: StellarSdk.nativeToScVal("pool_address"),
         val: StellarSdk.nativeToScVal(step.pool_address, { type: "address" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("to_token"),
+        val: StellarSdk.nativeToScVal(step.to_token, { type: "address" })
       })
     ]);
 
