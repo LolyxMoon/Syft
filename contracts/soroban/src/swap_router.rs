@@ -28,9 +28,13 @@ pub fn swap_via_router(
     amount_in: i128,
     min_amount_out: i128,
 ) -> Result<i128, VaultError> {
+    use soroban_sdk::log;
+    
     if amount_in <= 0 {
         return Err(VaultError::InvalidAmount);
     }
+
+    log!(env, "Swap router: {} -> {}, amount: {}", from_token, to_token, amount_in);
 
     // PRIORITY CHECK: If there's a custom pool for this token pair, use it
     // This handles our custom token liquidity pools
@@ -39,6 +43,7 @@ pub fn swap_via_router(
         from_token,
         to_token,
     ) {
+        log!(env, "Found custom pool: {}", pool_address);
         return crate::real_pool_client::swap_via_real_pool(
             env,
             &pool_address,
@@ -48,6 +53,8 @@ pub fn swap_via_router(
             min_amount_out,
         );
     }
+    
+    log!(env, "No custom pool found, trying Soroswap...");
 
     // WORKAROUND: Instead of using the router which has auth issues,
     // we'll swap directly through the liquidity pool

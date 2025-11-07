@@ -21,6 +21,14 @@ export async function buildDepositTransaction(
   depositToken?: string,
   withRebalance: boolean = true
 ): Promise<{ xdr: string; contractAddress: string }> {
+  console.log(`[Build Deposit TX] ===== START =====`);
+  console.log(`[Build Deposit TX] Vault: ${vaultId}`);
+  console.log(`[Build Deposit TX] User: ${userAddress}`);
+  console.log(`[Build Deposit TX] Amount: ${amount}`);
+  console.log(`[Build Deposit TX] Network: ${network}`);
+  console.log(`[Build Deposit TX] Deposit Token: ${depositToken}`);
+  console.log(`[Build Deposit TX] With Rebalance: ${withRebalance}`);
+  
   try {
     // Get vault from database
     const { data: vault, error } = await supabase
@@ -297,34 +305,50 @@ export async function buildDepositTransaction(
 
       // WasmVm MissingValue - accessing storage that doesn't exist
       if (errorMsg.includes('Error(WasmVm, MissingValue)')) {
+        console.error('[Build Deposit TX] Full simulation error:', JSON.stringify(simulationResponse, null, 2));
+        
         throw new Error(
-          `Contract state error: The vault or token contract is missing required data. ` +
-          `This usually means:\n` +
-          `1. The vault was deployed but not initialized (missing CONFIG or STATE storage)\n` +
-          `2. A custom token in the vault wasn't properly initialized\n` +
-          `3. The vault contract doesn't have permission to read from a token\n\n` +
-          `If you're the vault owner, try re-deploying the vault through VaultBuilder. ` +
-          `If this is an existing vault, please contact the vault owner to reinitialize it.`
+          `Contract state error: The vault or token contract is missing required data.\n\n` +
+          `Common causes:\n` +
+          `1. Vault was deployed but not initialized (missing CONFIG or STATE storage)\n` +
+          `2. Custom token in the vault wasn't properly initialized\n` +
+          `3. Vault contract doesn't have permission to read from a token\n` +
+          `4. You're using an old vault deployed with previous WASM - needs redeployment\n\n` +
+          `Actual error:\n${errorMsg}\n\n` +
+          `Solution: Deploy a NEW vault through VaultBuilder with the latest contract.\n` +
+          `(Check console for full error details)`
         );
       }
 
       // Auth errors
       if (errorMsg.includes('Error(Auth,') || errorMsg.includes('authorization')) {
+        console.error('[Build Deposit TX] Auth error:', JSON.stringify(simulationResponse, null, 2));
         throw new Error(
           `Authorization failed: Please make sure you've approved the transaction in your wallet and that ` +
-          `you have sufficient XLM for transaction fees (minimum ~0.5 XLM recommended).`
+          `you have sufficient XLM for transaction fees (minimum ~0.5 XLM recommended).\n\n` +
+          `Error: ${errorMsg}\n` +
+          `(Check console for full details)`
         );
       }
 
       // Budget exceeded
       if (errorMsg.includes('Budget exceeded') || errorMsg.includes('ExceededLimit')) {
+        console.error('[Build Deposit TX] Budget error:', JSON.stringify(simulationResponse, null, 2));
         throw new Error(
           `Transaction too complex: This operation requires more computational resources than allowed. ` +
-          `Try depositing a smaller amount or contact the vault owner to optimize the vault.`
+          `Try depositing a smaller amount or contact the vault owner to optimize the vault.\n\n` +
+          `Error: ${errorMsg}\n` +
+          `(Check console for full details)`
         );
       }
       
-      throw new Error(`Deposit simulation failed: ${simulationResponse.error || 'Unknown error'}`);
+      // Generic error with full details
+      console.error('[Build Deposit TX] Simulation error:', JSON.stringify(simulationResponse, null, 2));
+      throw new Error(
+        `Deposit simulation failed.\n\n` +
+        `Error: ${simulationResponse.error || 'Unknown error'}\n\n` +
+        `Check the browser console or backend logs for full error details.`
+      );
     }
 
     // Assemble transaction with simulation results

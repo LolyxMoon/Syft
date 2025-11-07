@@ -218,6 +218,92 @@ async function initializeVaultContract(
   console.log(`[Initialize] Transaction hash: ${submitResult.hash}`);
 }
 
+// Auto-register custom token pools after vault initialization
+async function autoRegisterCustomPools(
+  contractAddress: string,
+  _network: string | undefined,
+  servers: any
+): Promise<void> {
+  console.log(`[Auto-Register Pools] Starting for vault ${contractAddress}`);
+  
+  // Custom token pools on testnet (from CUSTOM_TOKENS.env and LIQUIDITY_POOLS.env)
+  const customPools = [
+    { token: 'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3', pool: 'CDNN77W7A4X3IKVENIKRQMUVBODUF3WRLUZYJ4WQYVNML6SVAORUVXFN' }, // AQX
+    { token: 'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME', pool: 'CDV2HI43TPWV36KJS6X6GLXDTZQFWFQI2H3DFD4O47LRTHA3A3KKTAEI' }, // VLTK
+    { token: 'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5', pool: 'CC47IJVCOHTNGKBQZFABNMPSAKFRGSXXXVOH3256L6K4WLAQJDJG2DDS' }, // SLX
+    { token: 'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE', pool: 'CD6Z46SJGJH6QADZAG5TXQJKCGAW5VP2JSOFRZ3UGOZFHXTZ4AS62E24' }, // WRX
+    { token: 'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O', pool: 'CDC2NAQ6RNVZHQ4Q2BBPO4FRZMJDCUCKX5P67W772I5HLTBKRJQLJKOO' }, // SIXN
+    { token: 'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP', pool: 'CAM2UB4364HCDFIVQGW2YIONWMMCNZ43MXXVUD43X5ZP3PWAXBW5ABBK' }, // MBIUS
+    { token: 'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL', pool: 'CDL44UJMRKE5LZG2SVMNM3T2TSTBDGZUD4MJF3X5DBTYO2A4XU2UGKU2' }, // TRIO
+    { token: 'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H', pool: 'CAKKECWO4LPCX5B4O4KENUKPBKFOJJL5HJXOC237TLU2LPKP3DDTGWLL' }, // RELIO
+    { token: 'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW', pool: 'CAT3BC6DPFZHQBLDIZKRGIIYIWQTN6S6TGJUNXXLIYHBUDI3T7VPEOUA' }, // TRI
+    { token: 'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR', pool: 'CAKFDKYUVLM2ZJURHAIA4W626IZR3Y76KPEDTEK7NZIS5TMSFCYCKOM6' }, // NUMER
+  ];
+
+  const deployerSecret = process.env.DEPLOYER_SECRET_KEY;
+  if (!deployerSecret) {
+    throw new Error('DEPLOYER_SECRET_KEY not set');
+  }
+
+  const deployerKeypair = Keypair.fromSecret(deployerSecret);
+  const deployerAddress = deployerKeypair.publicKey();
+  
+  // Register pools in batch using register_custom_pools_batch function
+  const vaultContract = new StellarSdk.Contract(contractAddress);
+  
+  const tokenAddresses = customPools.map(p => StellarSdk.Address.fromString(p.token).toScVal());
+  const poolAddresses = customPools.map(p => StellarSdk.Address.fromString(p.pool).toScVal());
+  
+  const deployerAccount = await servers.horizonServer.loadAccount(deployerAddress);
+  
+  const operation = vaultContract.call(
+    'register_custom_pools_batch',
+    StellarSdk.Address.fromString(deployerAddress).toScVal(),
+    StellarSdk.xdr.ScVal.scvVec(tokenAddresses),
+    StellarSdk.xdr.ScVal.scvVec(poolAddresses)
+  );
+  
+  let transaction = new StellarSdk.TransactionBuilder(deployerAccount, {
+    fee: StellarSdk.BASE_FEE,
+    networkPassphrase: servers.networkPassphrase,
+  })
+    .addOperation(operation)
+    .setTimeout(300)
+    .build();
+  
+  // Simulate and prepare transaction
+  const simulationResponse = await servers.sorobanServer.simulateTransaction(transaction);
+  
+  if (StellarSdk.rpc.Api.isSimulationError(simulationResponse)) {
+    console.warn(`[Auto-Register Pools] Simulation failed: ${simulationResponse.error}`);
+    return; // Don't fail, pools can be registered manually later
+  }
+  
+  transaction = StellarSdk.rpc.assembleTransaction(transaction, simulationResponse).build();
+  transaction.sign(deployerKeypair);
+  
+  // Submit transaction via Soroban RPC
+  const sendResponse = await servers.sorobanServer.sendTransaction(transaction);
+  console.log(`[Auto-Register Pools] Transaction sent: ${sendResponse.hash}`);
+  
+  // Wait for confirmation
+  let attempts = 0;
+  const maxAttempts = 10;
+  let getResponse = await servers.sorobanServer.getTransaction(sendResponse.hash);
+  
+  while (getResponse.status === 'NOT_FOUND' && attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    getResponse = await servers.sorobanServer.getTransaction(sendResponse.hash);
+    attempts++;
+  }
+  
+  if (getResponse.status === 'SUCCESS') {
+    console.log(`[Auto-Register Pools] ✅ Successfully registered ${customPools.length} custom pools`);
+  } else {
+    console.warn(`[Auto-Register Pools] Status: ${getResponse.status}`);
+  }
+}
+
 // Mount suggestions routes at /vaults/:vaultId/suggestions
 router.use('/', suggestionsRoutes);
 
@@ -1068,22 +1154,92 @@ router.post('/submit-initialize', async (req: Request, res: Response) => {
     const transaction = StellarSdk.TransactionBuilder.fromXDR(
       signedXDR,
       servers.networkPassphrase
-    );
+    ) as StellarSdk.Transaction;
 
     console.log(`[Submit Initialize] Submitting initialization transaction...`);
+    console.log(`[Submit Initialize] Transaction operations:`, transaction.operations.length);
+    console.log(`[Submit Initialize] Transaction fee:`, transaction.fee);
 
-    // Submit via Horizon
+    // Submit via Soroban RPC (not Horizon) for contract invocations
     let txHash: string;
     try {
-      const submitResult = await servers.horizonServer.submitTransaction(transaction);
-      txHash = submitResult.hash;
-      console.log(`[Submit Initialize] ✅ Transaction submitted successfully: ${txHash}`);
+      // Use Soroban RPC server to send the transaction
+      const sendResponse = await servers.sorobanServer.sendTransaction(transaction);
+      
+      console.log(`[Submit Initialize] Send response status:`, sendResponse.status);
+      
+      if (sendResponse.status === 'ERROR') {
+        console.error(`[Submit Initialize] Transaction error:`, sendResponse);
+        return res.status(500).json({
+          success: false,
+          error: 'Transaction failed',
+          details: sendResponse,
+        });
+      }
+
+      txHash = sendResponse.hash;
+      console.log(`[Submit Initialize] Transaction sent: ${txHash}`);
+      console.log(`[Submit Initialize] Waiting for transaction confirmation...`);
+
+      // Wait for transaction to be confirmed
+      let getResponse = await servers.sorobanServer.getTransaction(txHash);
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds timeout
+
+      while (getResponse.status === 'NOT_FOUND' && attempts < maxAttempts) {
+        console.log(`[Submit Initialize] Waiting... (${attempts + 1}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        getResponse = await servers.sorobanServer.getTransaction(txHash);
+        attempts++;
+      }
+
+      if (getResponse.status === 'NOT_FOUND') {
+        return res.status(408).json({
+          success: false,
+          error: 'Transaction confirmation timeout',
+          transactionHash: txHash,
+        });
+      }
+
+      if (getResponse.status === 'FAILED') {
+        console.error(`[Submit Initialize] Transaction failed:`, getResponse);
+        return res.status(500).json({
+          success: false,
+          error: 'Transaction failed on-chain',
+          details: getResponse,
+          transactionHash: txHash,
+        });
+      }
+
+      console.log(`[Submit Initialize] ✅ Transaction confirmed: ${txHash}`);
+      console.log(`[Submit Initialize] Status:`, getResponse.status);
+
+      // AUTO-REGISTER CUSTOM TOKEN POOLS
+      // This allows users to immediately use custom tokens without manual setup
+      try {
+        console.log(`[Submit Initialize] Auto-registering custom token pools...`);
+        await autoRegisterCustomPools(contractAddress, network, servers);
+        console.log(`[Submit Initialize] ✅ Custom pools registered`);
+      } catch (poolError: any) {
+        // Don't fail initialization if pool registration fails
+        // Pools can be registered manually later
+        console.warn(`[Submit Initialize] ⚠️  Custom pool registration failed:`, poolError.message);
+      }
+
     } catch (submitError: any) {
       console.error(`[Submit Initialize] Error submitting transaction:`, submitError);
+      
+      // Provide detailed error information
+      const errorDetails = {
+        message: submitError.message,
+        response: submitError?.response?.data,
+        extras: submitError?.response?.data?.extras,
+      };
+      
       return res.status(500).json({
         success: false,
         error: 'Failed to submit initialization transaction',
-        details: submitError?.response?.data || submitError.message,
+        details: errorDetails,
       });
     }
 
