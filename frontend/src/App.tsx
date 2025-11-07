@@ -16,7 +16,35 @@ import { Toaster } from "./components/ui";
 
 import AppLayout from "./layouts/AppLayout";
 import DocsLayout from "./layouts/DocsLayout";
-import * as DocPages from "./pages/docs";
+
+// Documentation Pages
+import DocsOverview from "./pages/docs/Overview";
+import WhatIsSyft from "./pages/docs/WhatIsSyft";
+import KeyFeatures from "./pages/docs/KeyFeatures";
+import Architecture from "./pages/docs/Architecture";
+import GettingStarted from "./pages/docs/GettingStarted";
+import Prerequisites from "./pages/docs/Prerequisites";
+import Installation from "./pages/docs/Installation";
+import QuickStart from "./pages/docs/QuickStart";
+import PlatformFeatures from "./pages/docs/PlatformFeatures";
+import VaultBuilderDoc from "./pages/docs/VaultBuilderDoc";
+import TerminalAIDoc from "./pages/docs/TerminalAIDoc";
+import DashboardDoc from "./pages/docs/DashboardDoc";
+import MarketplaceDoc from "./pages/docs/MarketplaceDoc";
+import AnalyticsDoc from "./pages/docs/AnalyticsDoc";
+import BacktestingDoc from "./pages/docs/BacktestingDoc";
+import SmartContracts from "./pages/docs/SmartContracts";
+import ContractArchitecture from "./pages/docs/ContractArchitecture";
+import VaultFactoryDoc from "./pages/docs/VaultFactoryDoc";
+import NFTContractDoc from "./pages/docs/NFTContractDoc";
+import DeploymentDoc from "./pages/docs/DeploymentDoc";
+import AIFeatures from "./pages/docs/AIFeatures";
+import GPT5Nano from "./pages/docs/GPT5Nano";
+import RunwareAI from "./pages/docs/RunwareAI";
+import TavilySearch from "./pages/docs/TavilySearch";
+import Security from "./pages/docs/Security";
+import SecurityOverview from "./pages/docs/SecurityOverview";
+import BestPractices from "./pages/docs/BestPractices";
 
 // Redirect component for vault details
 const VaultRedirect = () => {
@@ -46,43 +74,43 @@ function App() {
         {/* Docs Page Route */}
         <Route path="/docs" element={<DocsLayout />}>
           {/* Overview */}
-          <Route index element={<DocPages.DocsOverview />} />
-          <Route path="what-is-syft" element={<DocPages.WhatIsSyft />} />
-          <Route path="key-features" element={<DocPages.KeyFeatures />} />
-          <Route path="architecture" element={<DocPages.Architecture />} />
+          <Route index element={<DocsOverview />} />
+          <Route path="what-is-syft" element={<WhatIsSyft />} />
+          <Route path="key-features" element={<KeyFeatures />} />
+          <Route path="architecture" element={<Architecture />} />
           
           {/* Getting Started */}
-          <Route path="getting-started" element={<DocPages.GettingStarted />} />
-          <Route path="getting-started/prerequisites" element={<DocPages.Prerequisites />} />
-          <Route path="getting-started/installation" element={<DocPages.Installation />} />
-          <Route path="getting-started/quick-start" element={<DocPages.QuickStart />} />
+          <Route path="getting-started" element={<GettingStarted />} />
+          <Route path="getting-started/prerequisites" element={<Prerequisites />} />
+          <Route path="getting-started/installation" element={<Installation />} />
+          <Route path="getting-started/quick-start" element={<QuickStart />} />
           
           {/* Platform Features */}
-          <Route path="platform" element={<DocPages.PlatformFeatures />} />
-          <Route path="platform/vault-builder" element={<DocPages.VaultBuilderDoc />} />
-          <Route path="platform/terminal-ai" element={<DocPages.TerminalAIDoc />} />
-          <Route path="platform/dashboard" element={<DocPages.DashboardDoc />} />
-          <Route path="platform/marketplace" element={<DocPages.MarketplaceDoc />} />
-          <Route path="platform/analytics" element={<DocPages.AnalyticsDoc />} />
-          <Route path="platform/backtesting" element={<DocPages.BacktestingDoc />} />
+          <Route path="platform" element={<PlatformFeatures />} />
+          <Route path="platform/vault-builder" element={<VaultBuilderDoc />} />
+          <Route path="platform/terminal-ai" element={<TerminalAIDoc />} />
+          <Route path="platform/dashboard" element={<DashboardDoc />} />
+          <Route path="platform/marketplace" element={<MarketplaceDoc />} />
+          <Route path="platform/analytics" element={<AnalyticsDoc />} />
+          <Route path="platform/backtesting" element={<BacktestingDoc />} />
           
           {/* Smart Contracts */}
-          <Route path="smart-contracts" element={<DocPages.SmartContracts />} />
-          <Route path="smart-contracts/architecture" element={<DocPages.ContractArchitecture />} />
-          <Route path="smart-contracts/vault-factory" element={<DocPages.VaultFactoryDoc />} />
-          <Route path="smart-contracts/nft-contract" element={<DocPages.NFTContractDoc />} />
-          <Route path="smart-contracts/deployment" element={<DocPages.DeploymentDoc />} />
+          <Route path="smart-contracts" element={<SmartContracts />} />
+          <Route path="smart-contracts/architecture" element={<ContractArchitecture />} />
+          <Route path="smart-contracts/vault-factory" element={<VaultFactoryDoc />} />
+          <Route path="smart-contracts/nft-contract" element={<NFTContractDoc />} />
+          <Route path="smart-contracts/deployment" element={<DeploymentDoc />} />
           
           {/* AI Features */}
-          <Route path="ai-features" element={<DocPages.AIFeatures />} />
-          <Route path="ai-features/gpt-5-nano" element={<DocPages.GPT5Nano />} />
-          <Route path="ai-features/runware-ai" element={<DocPages.RunwareAI />} />
-          <Route path="ai-features/tavily-search" element={<DocPages.TavilySearch />} />
+          <Route path="ai-features" element={<AIFeatures />} />
+          <Route path="ai-features/gpt-5-nano" element={<GPT5Nano />} />
+          <Route path="ai-features/runware-ai" element={<RunwareAI />} />
+          <Route path="ai-features/tavily-search" element={<TavilySearch />} />
           
           {/* Security */}
-          <Route path="security" element={<DocPages.Security />} />
-          <Route path="security/overview" element={<DocPages.SecurityOverview />} />
-          <Route path="security/best-practices" element={<DocPages.BestPractices />} />
+          <Route path="security" element={<Security />} />
+          <Route path="security/overview" element={<SecurityOverview />} />
+          <Route path="security/best-practices" element={<BestPractices />} />
         </Route>
 
         {/* Redirects for old routes */}
