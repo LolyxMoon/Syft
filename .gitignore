@@ -44,5 +44,5 @@ packages/*
 src/contracts/*
 !src/contracts/util.ts
 
-docs
+/docs
 client-sdk-web
