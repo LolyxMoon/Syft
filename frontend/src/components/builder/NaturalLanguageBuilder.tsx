@@ -203,7 +203,7 @@ export function NaturalLanguageBuilder({
 
     loadCurrentSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletAddress]); // Re-run when wallet address changes
+  }, []); // Run only on mount - wallet address is checked inside the function
 
   // Focus input on mount
   useEffect(() => {

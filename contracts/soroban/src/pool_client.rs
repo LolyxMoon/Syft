@@ -101,11 +101,16 @@ pub fn swap_via_pool(
         return Err(VaultError::SlippageTooHigh);
     }
     
-    // Approve the pool to spend from_token from the vault
-    // This is required because the pool will call transfer_from on the token contract
-    crate::token_client::approve_pool(
+    // CRITICAL FIX FOR SOROSWAP:
+    // Soroswap (like Uniswap V2) requires you to transfer tokens TO the pool BEFORE calling swap
+    // The pool then calculates the input amount based on its balance increase
+    // If we don't transfer first, the pool's balance check will fail with Error #112
+    
+    // Transfer input tokens from vault to pool
+    crate::token_client::transfer_tokens(
         env,
         from_token,
+        &vault_address,
         pool_address,
         amount_in,
     )?;
@@ -120,14 +125,14 @@ pub fn swap_via_pool(
     
     // CRITICAL: Authorize all sub-contract calls made by the pool
     // The pool's swap function will:
-    // 1. Call transfer_from on the input token to pull tokens from vault to pool
+    // 1. Check its balance to confirm tokens were received
     // 2. Call transfer on the output token to send tokens from pool to vault
     // We need to authorize the vault for these cross-contract calls
     // For SDK 21.7.0, pass an empty Vec (NOT vec![env])
     env.authorize_as_current_contract(soroban_sdk::Vec::new(env));
     
     // Call swap on the pool to execute the swap
-    // The pool will pull tokens from vault (using our approval) and send output tokens back
+    // The pool uses the tokens we already transferred and sends output tokens back
     pool_client.swap(
         &amount0_out,
         &amount1_out,
