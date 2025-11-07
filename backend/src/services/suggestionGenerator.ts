@@ -80,12 +80,31 @@ IMPORTANT CONTEXT - STELLAR NETWORK VAULTS:
 - Rebalancing rules can trigger on: time intervals, allocation drift, price changes, or custom conditions
 - The vault aims to optimize yield while managing risk through automated rebalancing
 
+⭐ AVAILABLE CUSTOM TOKENS WITH LIQUIDITY POOLS:
+We have 10 custom Soroban tokens with dedicated liquidity pools (10,000 XLM each) available for testnet vaults:
+1. AQX (Aquatic Exchange Token) - CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3
+2. VLTK (Vault Token) - CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME
+3. SLX (Stellar Lux Token) - CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5
+4. WRX (Wormhole Exchange Token) - CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE
+5. SIXN (Sixty-Nine Token) - CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O
+6. MBIUS (Mobius Token) - CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP
+7. TRIO (Triangle Token) - CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL
+8. RELIO (Reliable Token) - CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H
+9. TRI (Trinity Token) - CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW
+10. NUMER (Numerator Token) - CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR
+
+These tokens have real liquidity and can be used for:
+- Portfolio diversification (spreading across multiple assets)
+- Rebalancing strategies (trading between XLM and custom tokens)
+- Liquidity provision (adding to XLM/token pools)
+- Testing advanced multi-token vault strategies
+
 VAULT BUILDER CAPABILITIES - WHAT IT CAN DO:
 The vault builder has a visual interface with the following components:
 
 1. ASSET ALLOCATION:
    - Add assets with target allocation percentages (e.g., "Add 40% USDC", "Add 60% XLM")
-   - Support for any Stellar-based tokens (XLM, USDC, AQUA, yXLM, etc.)
+   - Support for Stellar-based tokens: XLM, USDC, and the 10 custom tokens listed above
    - Allocations must total 100%
 
 2. REBALANCING RULES (Conditions + Actions):
@@ -120,12 +139,17 @@ DO NOT suggest:
 - Complex multi-step strategies requiring external protocols
 - Any action not listed in "AVAILABLE ACTIONS" above
 
-VALID SUGGESTION EXAMPLES:
+VALID SUGGESTION EXAMPLES (INCLUDING CUSTOM TOKENS):
 ✅ "Add 20% AQUA to improve diversification"
+✅ "Diversify with custom tokens: Add 15% AQX and 10% VLTK for better risk distribution"
+✅ "Add 12% SLX (Stellar Lux Token) to gain exposure to the custom token ecosystem"
+✅ "Create a multi-token strategy with 20% RELIO, 15% TRIO, and 15% MBIUS"
 ✅ "Set up weekly rebalancing to maintain target allocations"
 ✅ "Add 10% of vault assets to Soroswap USDC-XLM liquidity pool"
+✅ "Provide liquidity to XLM/AQX pool for additional yield potential"
 ✅ "Stake 30% of XLM holdings via StellarStake to earn staking rewards"
 ✅ "Add a rule to rebalance when allocation drifts by more than 15%"
+✅ "Balance your portfolio across 5-6 custom tokens (e.g., WRX, SIXN, NUMER, TRI) for maximum diversification"
 
 INVALID SUGGESTION EXAMPLES:
 ❌ "Lend 5% of USDC to Blend for additional yield"
