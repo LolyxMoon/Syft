@@ -680,14 +680,82 @@ Stellar testnet has VERY LIMITED liquidity pools. Most swaps will fail with "No 
 Known working swaps on testnet:
 - XLM ↔ USDC (issuer: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5) ✅
 
-If user requests swap to "random token" or any non-USDC asset:
+⭐ CUSTOM TOKENS WITH REAL LIQUIDITY POOLS (10,000 XLM EACH):
+We have 10 custom tokens with dedicated liquidity pools for testing vault auto-swap functionality:
+
+1. AQX (Aquatic Exchange Token)
+   - Token: CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3
+   - Pool: CD7U5F4EKUC7UM72F3D5G4UPS6DJ54RNNPSHKJBK7KCRX4N3MNNBDGES
+   - XLM ↔ AQX swaps fully supported ✅
+
+2. VLTK (Vault Token)
+   - Token: CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME
+   - Pool: CCPV4CJUVHJ7DHN7UTHXORHOBVBP7ALNYU5QBXA6MJBFVS2Z5JWQHJRC
+   - XLM ↔ VLTK swaps fully supported ✅
+
+3. SLX (Stellar Lux Token)
+   - Token: CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5
+   - Pool: CBIM5CPY2T3KM6BDH6KVQNTPZ244VF6SJYB6DHB25UU6XGUWDNGICQMA
+   - XLM ↔ SLX swaps fully supported ✅
+
+4. WRX (Wormhole Exchange Token)
+   - Token: CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE
+   - Pool: CCYBUIBFOWROWGLZWJWWVOWJSDVYF4XX3PW6U7Z4SWZVG64LPTWUT3S4
+   - XLM ↔ WRX swaps fully supported ✅
+
+5. SIXN (Sixty-Nine Token)
+   - Token: CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O
+   - Pool: CCOQIJJM6VWFH6YA4QU2D3GX5YUEJOWDLZP4EPTIIL5AFLMRZKTBNRJW
+   - XLM ↔ SIXN swaps fully supported ✅
+
+6. MBIUS (Mobius Token)
+   - Token: CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP
+   - Pool: CBERM7NGHSHHKDNOFE7DAMYLHYKK2M5JJBP4QSYL65OMSYGKBN3M2GUE
+   - XLM ↔ MBIUS swaps fully supported ✅
+
+7. TRIO (Triangle Token)
+   - Token: CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL
+   - Pool: CBP6CNZQIJHP66L6NY7YJVZ4GBC773XKNRLG4TMD7D773HQ5LZ46OEZ4
+   - XLM ↔ TRIO swaps fully supported ✅
+
+8. RELIO (Reliable Token)
+   - Token: CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H
+   - Pool: CDPGBKILVQXIDSVOUHQ4YOK5P7PNZVPSVM7GNSJX3JI5NQRNTSGOKEGN
+   - XLM ↔ RELIO swaps fully supported ✅
+
+9. TRI (Trinity Token)
+   - Token: CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW
+   - Pool: CAQ2366OMMX74H7QB4MQTEMH3RVSLNU4O5Y2HMJ5AWT2M4ONZR7IE47Y
+   - XLM ↔ TRI swaps fully supported ✅
+
+10. NUMER (Numerator Token)
+    - Token: CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR
+    - Pool: CA6KURSAHVBAOZXPD3M5CQLWNDCJ6IWEH2A3XCCVPAXI2DDVVBESAVB5
+    - XLM ↔ NUMER swaps fully supported ✅
+
+HOW TO SWAP TO CUSTOM TOKENS:
+When user requests to swap XLM to any of these tokens (AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER):
+1. Use the custom token CONTRACT ADDRESS (e.g., CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3 for AQX)
+2. Call swap_assets with fromAsset: "XLM", toAsset: "<TOKEN_ADDRESS>", amount: "<amount>"
+3. The swap will use the dedicated liquidity pool with 10,000 XLM liquidity
+4. Slippage tolerance: 0.5% (0.005) recommended
+5. User will need to establish trustline first if not already done
+
+Example: "Swap 100 XLM to RELIO"
+→ swap_assets(fromAsset: "XLM", toAsset: "CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H", amount: "100", slippage: "0.005")
+
+If user requests swap to "random token" or any other non-listed asset:
 1. Inform them that testnet has limited liquidity
-2. Suggest swapping to USDC as the only reliable option
-3. Explain that mainnet has many more trading pairs
+2. Suggest swapping to USDC or one of the 10 custom tokens above
+3. Explain that these custom tokens have real liquidity pools for testing
 4. DO NOT attempt swaps to tokens without confirmed liquidity pools
 
 Example response:
-"Stellar testnet has limited liquidity pools. The most reliable swap on testnet is XLM ↔ USDC. Would you like me to swap your XLM to USDC instead? On mainnet, there are many more token pairs available."
+"Stellar testnet has limited liquidity pools. I can swap your XLM to:
+- USDC (stablecoin) ✅
+- 10 custom tokens with real liquidity: AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER ✅
+
+Which one would you like to swap to?"
 
 CRITICAL - LIQUIDITY POOL TRUSTLINES:
 Before adding liquidity to ANY pool, you MUST establish a trustline for the pool shares:
