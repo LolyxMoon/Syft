@@ -15,6 +15,8 @@ import Terminal from "./pages/Terminal";
 import { Toaster } from "./components/ui";
 
 import AppLayout from "./layouts/AppLayout";
+import DocsLayout from "./layouts/DocsLayout";
+import * as DocPages from "./pages/docs";
 
 // Redirect component for vault details
 const VaultRedirect = () => {
@@ -40,6 +42,48 @@ function App() {
             </div>
           }
         />
+
+        {/* Docs Page Route */}
+        <Route path="/docs" element={<DocsLayout />}>
+          {/* Overview */}
+          <Route index element={<DocPages.DocsOverview />} />
+          <Route path="what-is-syft" element={<DocPages.WhatIsSyft />} />
+          <Route path="key-features" element={<DocPages.KeyFeatures />} />
+          <Route path="architecture" element={<DocPages.Architecture />} />
+          
+          {/* Getting Started */}
+          <Route path="getting-started" element={<DocPages.GettingStarted />} />
+          <Route path="getting-started/prerequisites" element={<DocPages.Prerequisites />} />
+          <Route path="getting-started/installation" element={<DocPages.Installation />} />
+          <Route path="getting-started/quick-start" element={<DocPages.QuickStart />} />
+          
+          {/* Platform Features */}
+          <Route path="platform" element={<DocPages.PlatformFeatures />} />
+          <Route path="platform/vault-builder" element={<DocPages.VaultBuilderDoc />} />
+          <Route path="platform/terminal-ai" element={<DocPages.TerminalAIDoc />} />
+          <Route path="platform/dashboard" element={<DocPages.DashboardDoc />} />
+          <Route path="platform/marketplace" element={<DocPages.MarketplaceDoc />} />
+          <Route path="platform/analytics" element={<DocPages.AnalyticsDoc />} />
+          <Route path="platform/backtesting" element={<DocPages.BacktestingDoc />} />
+          
+          {/* Smart Contracts */}
+          <Route path="smart-contracts" element={<DocPages.SmartContracts />} />
+          <Route path="smart-contracts/architecture" element={<DocPages.ContractArchitecture />} />
+          <Route path="smart-contracts/vault-factory" element={<DocPages.VaultFactoryDoc />} />
+          <Route path="smart-contracts/nft-contract" element={<DocPages.NFTContractDoc />} />
+          <Route path="smart-contracts/deployment" element={<DocPages.DeploymentDoc />} />
+          
+          {/* AI Features */}
+          <Route path="ai-features" element={<DocPages.AIFeatures />} />
+          <Route path="ai-features/gpt-5-nano" element={<DocPages.GPT5Nano />} />
+          <Route path="ai-features/runware-ai" element={<DocPages.RunwareAI />} />
+          <Route path="ai-features/tavily-search" element={<DocPages.TavilySearch />} />
+          
+          {/* Security */}
+          <Route path="security" element={<DocPages.Security />} />
+          <Route path="security/overview" element={<DocPages.SecurityOverview />} />
+          <Route path="security/best-practices" element={<DocPages.BestPractices />} />
+        </Route>
 
         {/* Redirects for old routes */}
         <Route path="/builder" element={<Navigate to="/app/builder" replace />} />

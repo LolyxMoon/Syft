@@ -23,7 +23,7 @@ export const LandingHeader = () => {
     { href: '#features', label: 'Features' },
     { href: '#how-it-works', label: 'How It Works' },
     { href: '/app/vaults', label: 'Vaults' },
-    { href: '#docs', label: 'Docs' },
+    { href: '/docs', label: 'Docs' },
   ];
 
   const handleNavClick = (href: string, e: React.MouseEvent) => {
