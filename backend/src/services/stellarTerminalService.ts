@@ -24,6 +24,22 @@ const FRIENDBOT_URL = 'https://friendbot.stellar.org';
 const horizonServer = new Horizon.Server(HORIZON_URL);
 const sorobanServer = new StellarSdk.rpc.Server(SOROBAN_RPC_URL);
 
+// Custom token liquidity pools (XLM pairs with 10,000 XLM liquidity each)
+const CUSTOM_TOKEN_POOLS: { [tokenAddress: string]: string } = {
+  'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3': 'CD7U5F4EKUC7UM72F3D5G4UPS6DJ54RNNPSHKJBK7KCRX4N3MNNBDGES', // AQX
+  'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME': 'CCPV4CJUVHJ7DHN7UTHXORHOBVBP7ALNYU5QBXA6MJBFVS2Z5JWQHJRC', // VLTK
+  'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5': 'CBIM5CPY2T3KM6BDH6KVQNTPZ244VF6SJYB6DHB25UU6XGUWDNGICQMA', // SLX
+  'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE': 'CCYBUIBFOWROWGLZWJWWVOWJSDVYF4XX3PW6U7Z4SWZVG64LPTWUT3S4', // WRX
+  'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O': 'CCOQIJJM6VWFH6YA4QU2D3GX5YUEJOWDLZP4EPTIIL5AFLMRZKTBNRJW', // SIXN
+  'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP': 'CBERM7NGHSHHKDNOFE7DAMYLHYKK2M5JJBP4QSYL65OMSYGKBN3M2GUE', // MBIUS
+  'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL': 'CBP6CNZQIJHP66L6NY7YJVZ4GBC773XKNRLG4TMD7D773HQ5LZ46OEZ4', // TRIO
+  'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H': 'CDPGBKILVQXIDSVOUHQ4YOK5P7PNZVPSVM7GNSJX3JI5NQRNTSGOKEGN', // RELIO
+  'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW': 'CAQ2366OMMX74H7QB4MQTEMH3RVSLNU4O5Y2HMJ5AWT2M4ONZR7IE47Y', // TRI
+  'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR': 'CA6KURSAHVBAOZXPD3M5CQLWNDCJ6IWEH2A3XCCVPAXI2DDVVBESAVB5', // NUMER
+};
+
+const XLM_ADDRESS = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
+
 /**
  * Stellar Terminal Service
  * Provides all blockchain operations for the AI Terminal
@@ -751,6 +767,16 @@ export class StellarTerminalService {
         return { success: false, error: 'Session not found. Please connect your wallet first.' };
       }
 
+      // Check if this is a custom token pool swap (XLM <-> Custom Token)
+      const isXLMToCustom = (fromAsset === 'XLM' || fromAsset.toLowerCase() === 'native') && CUSTOM_TOKEN_POOLS[toAsset];
+      const isCustomToXLM = CUSTOM_TOKEN_POOLS[fromAsset] && (toAsset === 'XLM' || toAsset.toLowerCase() === 'native');
+
+      if (isXLMToCustom || isCustomToXLM) {
+        // Use custom pool swap
+        return this.swapThroughCustomPool(sessionId, fromAsset, toAsset, amount, slippage);
+      }
+
+      // Otherwise, use native DEX path payment
       const sourceAccount = await horizonServer.loadAccount(session.publicKey);
       const sourceKeypair = session.secretKey ? Keypair.fromSecret(session.secretKey) : null;
 
@@ -910,6 +936,154 @@ export class StellarTerminalService {
       return {
         success: false,
         error: error.message || 'Swap failed',
+      };
+    }
+  }
+
+  /**
+   * Swap through custom liquidity pools (for our 10 custom tokens)
+   * These pools have 10,000 XLM liquidity each and support XLM <-> Token swaps
+   */
+  async swapThroughCustomPool(
+    sessionId: string,
+    fromAsset: string,
+    toAsset: string,
+    amount: string,
+    slippage: string = '0.5'
+  ): Promise<any> {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found. Please connect your wallet first.' };
+      }
+
+      // Determine which is the custom token and which is XLM
+      const isXLMToCustom = (fromAsset === 'XLM' || fromAsset.toLowerCase() === 'native');
+      const customTokenAddress = isXLMToCustom ? toAsset : fromAsset;
+      const poolAddress = CUSTOM_TOKEN_POOLS[customTokenAddress];
+
+      if (!poolAddress) {
+        return { 
+          success: false, 
+          error: `No liquidity pool found for this token. Available pools: AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER` 
+        };
+      }
+
+      const sourceAccount = await horizonServer.loadAccount(session.publicKey);
+
+      // Check if user has trustline for the custom token (if receiving it)
+      if (isXLMToCustom) {
+        const balances = sourceAccount.balances;
+        const hasTrustline = balances.some(
+          (balance: any) => balance.asset_code && balance.asset_issuer === customTokenAddress
+        );
+
+        // If no trustline, need to establish it first
+        if (!hasTrustline) {
+          const trustlineOp = Operation.changeTrust({
+            asset: new Asset('TOKEN', customTokenAddress), // Code doesn't matter for SAC
+            limit: '922337203685.4775807', // Max int64 / 10^7
+          });
+
+          const trustlineTx = new TransactionBuilder(sourceAccount, {
+            fee: BASE_FEE,
+            networkPassphrase: Networks.TESTNET,
+          })
+            .addOperation(trustlineOp)
+            .setTimeout(300)
+            .build();
+
+          return {
+            success: true,
+            message: `To receive this custom token, you need to establish a trustline first.\n\nSign the trustline transaction, then I'll automatically proceed with your swap.`,
+            action: {
+              type: 'setup_trustline',
+              title: 'Setup Trustline Required',
+              description: `Establish trustline for custom token before swapping`,
+              xdr: trustlineTx.toXDR(),
+              details: {
+                tokenAddress: customTokenAddress,
+                network: 'testnet',
+                reason: 'Required to receive swapped custom tokens',
+              },
+              followUpAction: {
+                type: 'swap_assets',
+                params: {
+                  fromAsset,
+                  toAsset,
+                  amount,
+                  slippage,
+                },
+              },
+            },
+          };
+        }
+      }
+
+      // Build the swap transaction using Soroban contract call
+      const poolContract = new Contract(poolAddress);
+      
+      // Convert amount to stroops (7 decimals)
+      const amountStroops = Math.floor(parseFloat(amount) * 10_000_000);
+      
+      // Calculate minimum output with slippage
+      // Simplified: assume 1:1 ratio, apply 0.3% fee and slippage
+      const feeMultiplier = 0.997; // 0.3% fee
+      const slippageMultiplier = 1 - parseFloat(slippage) / 100;
+      const estimatedOutput = amountStroops * feeMultiplier;
+      const minOutput = Math.floor(estimatedOutput * slippageMultiplier);
+
+      // Build contract call parameters
+      const userAddress = Address.fromString(session.publicKey);
+      const tokenInAddress = isXLMToCustom ? Address.fromString(XLM_ADDRESS) : Address.fromString(customTokenAddress);
+      const amountInScVal = nativeToScVal(amountStroops, { type: 'i128' });
+      const minOutScVal = nativeToScVal(minOutput, { type: 'i128' });
+
+      // Build the transaction
+      const swapTx = new TransactionBuilder(sourceAccount, {
+        fee: (parseInt(BASE_FEE) * 100000).toString(), // Higher fee for Soroban
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(
+          poolContract.call(
+            'swap',
+            userAddress.toScVal(),
+            tokenInAddress.toScVal(),
+            amountInScVal,
+            minOutScVal
+          )
+        )
+        .setTimeout(300)
+        .build();
+
+      // Prepare and simulate the transaction
+      const preparedTx = await sorobanServer.prepareTransaction(swapTx);
+
+      return {
+        success: true,
+        message: `Ready to swap ${amount} ${isXLMToCustom ? 'XLM' : 'custom token'} for ~${(estimatedOutput / 10_000_000).toFixed(7)} ${isXLMToCustom ? 'custom token' : 'XLM'} through custom liquidity pool.`,
+        action: {
+          type: 'swap_assets',
+          title: 'Custom Pool Swap',
+          description: `Swap ${amount} ${fromAsset} for ${toAsset} (0.3% fee)`,
+          xdr: preparedTx.toXDR(),
+          details: {
+            from_asset: fromAsset,
+            to_asset: toAsset,
+            from_amount: amount,
+            estimated_output: (estimatedOutput / 10_000_000).toFixed(7),
+            min_output: (minOutput / 10_000_000).toFixed(7),
+            slippage: `${slippage}%`,
+            pool: poolAddress,
+            network: 'testnet',
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error('[swapThroughCustomPool] Error:', error);
+      return {
+        success: false,
+        error: error.message || 'Custom pool swap failed',
       };
     }
   }
