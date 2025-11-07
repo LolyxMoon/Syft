@@ -656,14 +656,30 @@ export async function buildRebalanceStepTransaction(
     // Create contract instance
     const contract = new StellarSdk.Contract(vault.contract_address);
 
-    // Convert step to ScVal
-    const stepScVal = StellarSdk.nativeToScVal({
-      from_token: step.from_token,
-      to_token: step.to_token,
-      amount_in: BigInt(step.amount_in),
-      min_amount_out: BigInt(step.min_amount_out),
-      pool_address: step.pool_address,
-    }, { type: 'RebalanceStep' });
+    // Manually construct RebalanceStep struct as a Map
+    // This is necessary because nativeToScVal doesn't handle custom Rust structs properly
+    const stepScVal = StellarSdk.xdr.ScVal.scvMap([
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("from_token"),
+        val: StellarSdk.nativeToScVal(step.from_token, { type: "address" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("to_token"),
+        val: StellarSdk.nativeToScVal(step.to_token, { type: "address" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("amount_in"),
+        val: StellarSdk.nativeToScVal(step.amount_in, { type: "i128" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("min_amount_out"),
+        val: StellarSdk.nativeToScVal(step.min_amount_out, { type: "i128" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.nativeToScVal("pool_address"),
+        val: StellarSdk.nativeToScVal(step.pool_address, { type: "address" })
+      })
+    ]);
 
     // Build execute_rebalance_step operation
     const operation = contract.call('execute_rebalance_step', stepScVal);
