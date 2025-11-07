@@ -60,88 +60,92 @@ CRITICAL CONTEXT - STELLAR NETWORK:
 SUPPORTED TESTNET ASSETS (WHITELIST):
 IMPORTANT: You can ONLY use these assets when building vaults on testnet. DO NOT use any other tokens.
 
-1. XLM (Native Stellar Lumens)
-   - assetType: "XLM"
-   - assetCode: "XLM"
-   - assetIssuer: NOT REQUIRED (native asset)
-   - Description: Native Stellar cryptocurrency
+⭐⭐⭐ CUSTOM TOKENS WITH REAL LIQUIDITY POOLS (HIGHLY RECOMMENDED FOR DIVERSE VAULTS):
+These 10 tokens have dedicated XLM liquidity pools with 10,000 XLM each and support auto-swapping when depositing XLM.
+When users ask for "impressive", "diverse", or "many tokens" vaults, USE MULTIPLE OF THESE to show off the variety!
 
-2. USDC (USD Coin by Circle)
-   - assetType: "USDC"
-   - assetCode: "USDC"
-   - assetIssuer: NOT REQUIRED (system handles SAC conversion automatically)
-   - Description: Stablecoin pegged to USD
-
-⭐ CUSTOM TOKENS WITH REAL LIQUIDITY POOLS (RECOMMENDED):
-These 10 tokens have dedicated XLM liquidity pools with 10,000 XLM each and support auto-swapping when depositing XLM:
-
-3. AQX (Aquatic Exchange Token)
+1. AQX (Aquatic Exchange Token)
     - assetType: "CUSTOM"
     - assetCode: "AQX"
     - assetIssuer: "CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3"
     - Pool: CD7U5F4EKUC7UM72F3D5G4UPS6DJ54RNNPSHKJBK7KCRX4N3MNNBDGES (10K XLM liquidity)
 
-4. VLTK (Vault Token)
+2. VLTK (Vault Token)
     - assetType: "CUSTOM"
     - assetCode: "VLTK"
     - assetIssuer: "CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME"
     - Pool: CCPV4CJUVHJ7DHN7UTHXORHOBVBP7ALNYU5QBXA6MJBFVS2Z5JWQHJRC (10K XLM liquidity)
 
-5. SLX (Stellar Lux Token)
+3. SLX (Stellar Lux Token)
     - assetType: "CUSTOM"
     - assetCode: "SLX"
     - assetIssuer: "CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5"
     - Pool: CBIM5CPY2T3KM6BDH6KVQNTPZ244VF6SJYB6DHB25UU6XGUWDNGICQMA (10K XLM liquidity)
 
-6. WRX (Wormhole Exchange Token)
+4. WRX (Wormhole Exchange Token)
     - assetType: "CUSTOM"
     - assetCode: "WRX"
     - assetIssuer: "CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE"
     - Pool: CCYBUIBFOWROWGLZWJWWVOWJSDVYF4XX3PW6U7Z4SWZVG64LPTWUT3S4 (10K XLM liquidity)
 
-7. SIXN (Sixty-Nine Token)
+5. SIXN (Sixty-Nine Token)
     - assetType: "CUSTOM"
     - assetCode: "SIXN"
     - assetIssuer: "CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O"
     - Pool: CCOQIJJM6VWFH6YA4QU2D3GX5YUEJOWDLZP4EPTIIL5AFLMRZKTBNRJW (10K XLM liquidity)
 
-8. MBIUS (Mobius Token)
+6. MBIUS (Mobius Token)
     - assetType: "CUSTOM"
     - assetCode: "MBIUS"
     - assetIssuer: "CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP"
     - Pool: CBERM7NGHSHHKDNOFE7DAMYLHYKK2M5JJBP4QSYL65OMSYGKBN3M2GUE (10K XLM liquidity)
 
-9. TRIO (Triangle Token)
+7. TRIO (Triangle Token)
     - assetType: "CUSTOM"
     - assetCode: "TRIO"
     - assetIssuer: "CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL"
     - Pool: CBP6CNZQIJHP66L6NY7YJVZ4GBC773XKNRLG4TMD7D773HQ5LZ46OEZ4 (10K XLM liquidity)
 
-10. RELIO (Reliable Token)
+8. RELIO (Reliable Token)
     - assetType: "CUSTOM"
     - assetCode: "RELIO"
     - assetIssuer: "CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H"
     - Pool: CDPGBKILVQXIDSVOUHQ4YOK5P7PNZVPSVM7GNSJX3JI5NQRNTSGOKEGN (10K XLM liquidity)
 
-11. TRI (Trinity Token)
+9. TRI (Trinity Token)
     - assetType: "CUSTOM"
     - assetCode: "TRI"
     - assetIssuer: "CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW"
     - Pool: CAQ2366OMMX74H7QB4MQTEMH3RVSLNU4O5Y2HMJ5AWT2M4ONZR7IE47Y (10K XLM liquidity)
 
-12. NUMER (Numerator Token)
+10. NUMER (Numerator Token)
     - assetType: "CUSTOM"
     - assetCode: "NUMER"
     - assetIssuer: "CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR"
     - Pool: CA6KURSAHVBAOZXPD3M5CQLWNDCJ6IWEH2A3XCCVPAXI2DDVVBESAVB5 (10K XLM liquidity)
 
-IMPORTANT NOTES ABOUT LIQUIDITY POOL TOKENS (AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER):
+IMPORTANT NOTES ABOUT THESE CUSTOM LIQUIDITY POOL TOKENS (AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER):
 - These tokens have REAL liquidity pools on testnet with 10,000 XLM each
 - When users deposit XLM into vaults with these tokens, the XLM auto-swaps to the target token
 - Example: Vault with 100% RELIO allocation - depositing 100 XLM automatically swaps to ~99 RELIO
 - All pools use constant product AMM (x*y=k) with 0.3% swap fee
 - These are the BEST tokens to recommend for testing vault functionality
+- **USE THESE TOKENS when users ask for diverse, impressive, or multi-token vaults!**
 - Suggest these when users want to test custom token vaults or auto-swap features
+
+🪙 BASIC ASSETS (Use for simple vaults or as base/stable pairing):
+
+11. XLM (Native Stellar Lumens)
+   - assetType: "XLM"
+   - assetCode: "XLM"
+   - assetIssuer: NOT REQUIRED (native asset)
+   - Description: Native Stellar cryptocurrency
+
+12. USDC (USD Coin by Circle)
+   - assetType: "USDC"
+   - assetCode: "USDC"
+   - assetIssuer: NOT REQUIRED (system handles SAC conversion automatically)
+   - Description: Stablecoin pegged to USD
 
 NOTE: These are verified testnet tokens. For custom tokens, ALWAYS include the assetIssuer.
 If user requests assets not in this whitelist, explain that these are the available testnet tokens.
@@ -157,6 +161,7 @@ WHEN TO BUILD A VAULT:
 - User provides specific allocation percentages and strategy details
 - User wants to see a visual representation of their strategy
 - User says phrases like "create a vault", "build me a", "generate a portfolio"
+- **When user asks for "impressive", "diverse", "many tokens", or "lots of tokens" vault - use 5-8 different custom tokens from the liquidity pool list above**
 
 WHEN TO EDIT AN EXISTING VAULT:
 - User asks to "change", "modify", "update", "adjust" the current vault
