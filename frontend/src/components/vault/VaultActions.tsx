@@ -199,8 +199,9 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       
       // Step 1: Build unsigned transaction from backend
       console.log(`[VaultActions] 🎯 Optimal routing calculated, building transaction...`);
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const buildResponse = await fetch(
-        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/build-deposit`,
+        `${backendUrl}/api/vaults/${vaultId}/build-deposit`,
         {
           method: 'POST',
           headers: {
@@ -236,7 +237,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       // Step 3: Submit signed transaction
       const submitResponse = await fetch(
-        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/submit-deposit`,
+        `${backendUrl}/api/vaults/${vaultId}/submit-deposit`,
         {
           method: 'POST',
           headers: {
@@ -276,7 +277,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
           // Submit rebalance transaction
           const submitRebalanceResponse = await fetch(
-            `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/submit-rebalance`,
+            `${backendUrl}/api/vaults/${vaultId}/submit-rebalance`,
             {
               method: 'POST',
               headers: {
@@ -368,8 +369,9 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       
       // Step 1: Build unsigned transaction from backend
       console.log(`[VaultActions] Building unsigned withdrawal transaction...`);
+      const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
       const buildResponse = await fetch(
-        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/build-withdraw`,
+        `${backendUrl}/api/vaults/${vaultId}/build-withdraw`,
         {
           method: 'POST',
           headers: {
@@ -402,7 +404,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       // Step 3: Submit signed transaction
       const submitResponse = await fetch(
-        `https://syft-f6ad696f49ee.herokuapp.com/api/vaults/${vaultId}/submit-withdraw`,
+        `${backendUrl}/api/vaults/${vaultId}/submit-withdraw`,
         {
           method: 'POST',
           headers: {

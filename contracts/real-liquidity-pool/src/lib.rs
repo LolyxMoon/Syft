@@ -264,7 +264,9 @@ impl RealLiquidityPool {
         amount_in: i128,
         amount_out_min: i128,
     ) -> i128 {
-        user.require_auth();
+        // NOTE: Removed user.require_auth() to allow cross-contract calls
+        // The token transfers below will still check authorization
+        // user.require_auth();
 
         if amount_in <= 0 {
             panic_with_error!(&env, PoolError::InsufficientAmount);

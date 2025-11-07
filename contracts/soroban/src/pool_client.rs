@@ -101,12 +101,11 @@ pub fn swap_via_pool(
         return Err(VaultError::SlippageTooHigh);
     }
     
-    // Transfer tokens to the pool
-    // This is the key difference from router - we transfer directly to pool
-    crate::token_client::transfer_tokens(
+    // Approve the pool to spend from_token from the vault
+    // This is required because the pool will call transfer_from on the token contract
+    crate::token_client::approve_pool(
         env,
         from_token,
-        &vault_address,
         pool_address,
         amount_in,
     )?;
@@ -119,13 +118,16 @@ pub fn swap_via_pool(
         (amount_out_safe, 0)  // Swapping token1 -> token0
     };
     
-    // CRITICAL: The pool's swap function will transfer tokens back to the vault
-    // We need to authorize this cross-contract call
-    // However, we can't use require_auth here because we're already in a contract context
-    // The pool should handle the transfer internally without needing vault authorization
-    // since the pool is sending tokens TO the vault, not FROM the vault
+    // CRITICAL: Authorize all sub-contract calls made by the pool
+    // The pool's swap function will:
+    // 1. Call transfer_from on the input token to pull tokens from vault to pool
+    // 2. Call transfer on the output token to send tokens from pool to vault
+    // We need to authorize the vault for these cross-contract calls
+    // For SDK 21.7.0, pass an empty Vec (NOT vec![env])
+    env.authorize_as_current_contract(soroban_sdk::Vec::new(env));
     
-    // Call swap on the pool to get our tokens back to vault
+    // Call swap on the pool to execute the swap
+    // The pool will pull tokens from vault (using our approval) and send output tokens back
     pool_client.swap(
         &amount0_out,
         &amount1_out,

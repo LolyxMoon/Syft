@@ -36,6 +36,10 @@ pub fn swap_via_router(
 
     log!(env, "Swap router: {} -> {}, amount: {}", from_token, to_token, amount_in);
 
+    // WORKAROUND: Since authorize_as_current_contract() is complex in SDK 21.7.0,
+    // we'll transfer tokens TO the pool first, then call swap with pool as user
+    // This avoids the authorization issue entirely
+    
     // PRIORITY CHECK: If there's a custom pool for this token pair, use it
     // This handles our custom token liquidity pools
     if let Some(pool_address) = crate::real_pool_client::find_pool_for_pair(
@@ -130,7 +134,8 @@ fn swap_via_router_fallback(
     )?;
     
     // CRITICAL: Authorize sub-contract calls
-    env.authorize_as_current_contract(soroban_sdk::vec![env]);
+    // For SDK 21.7.0, pass an empty Vec (NOT vec![env])
+    env.authorize_as_current_contract(soroban_sdk::Vec::new(env));
     
     // Execute swap through Soroswap router
     let router_client = SoroswapRouterClient::new(env, router_address);

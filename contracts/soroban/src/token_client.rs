@@ -85,6 +85,26 @@ pub fn approve_router(
     Ok(())
 }
 
+/// Approve pool to spend vault's tokens for swaps
+pub fn approve_pool(
+    env: &Env,
+    token_address: &Address,
+    pool: &Address,
+    amount: i128,
+) -> Result<(), VaultError> {
+    if amount <= 0 {
+        return Err(VaultError::InvalidAmount);
+    }
+
+    let token_client = token::TokenClient::new(env, token_address);
+    let vault_address = env.current_contract_address();
+    let expiration_ledger = env.ledger().sequence() + 100;
+    
+    token_client.approve(&vault_address, pool, &amount, &expiration_ledger);
+    
+    Ok(())
+}
+
 /// Check if router has sufficient allowance
 #[allow(dead_code)]
 pub fn check_allowance(

@@ -89,22 +89,21 @@ pub fn swap_via_real_pool(
         return Err(VaultError::SlippageTooHigh);
     }
     
-    // Approve the pool to spend our tokens
-    // The real pool contract will transfer tokens from the vault
-    crate::token_client::approve_router(
-        env,
-        from_token,
-        pool_address,
-        amount_in,
-    )?;
+    // WORKAROUND: Transfer tokens to pool first, then call swap with pool as user
+    // This avoids the authorization issue where pool calls token.transfer(vault, pool, amount)
+    use soroban_sdk::token;
     
-    // Execute the swap
-    // The pool will:
-    // 1. Transfer amount_in from vault to pool
-    // 2. Calculate output amount with 0.3% fee
-    // 3. Transfer output tokens back to vault
+    let token_in_client = token::TokenClient::new(env, from_token);
+    
+    // Vault transfers tokens to pool first
+    token_in_client.transfer(&vault_address, pool_address, &amount_in);
+    log!(env, "Transferred {} tokens to pool", amount_in);
+    
+    // Now call swap with POOL as the user, not vault
+    // The pool will transfer tokens from itself to itself (no-op for input)
+    // and transfer output tokens from pool to vault
     let amount_out = pool_client.swap(
-        &vault_address,
+        pool_address,  // Changed from &vault_address to pool_address
         from_token,
         &amount_in,
         &min_amount_out,

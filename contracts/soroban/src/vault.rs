@@ -38,6 +38,11 @@ impl VaultContract {
         env.storage().instance().set(&CONFIG, &config);
         env.storage().instance().set(&STATE, &state);
 
+        // AUTO-REGISTER KNOWN CUSTOM POOLS ON TESTNET
+        // This allows all vaults to immediately use custom tokens without manual setup
+        // These pools are pre-deployed on testnet with liquidity
+        Self::register_known_custom_pools(&env);
+
         Ok(())
     }
 
@@ -866,6 +871,50 @@ impl VaultContract {
         }
         
         Ok(())
+    }
+
+    /// Register known custom pools on testnet (called automatically during initialization)
+    /// This pre-registers all known token/pool pairs so vaults can immediately use custom tokens
+    fn register_known_custom_pools(env: &Env) {
+        use soroban_sdk::String;
+        
+        // Custom token/pool pairs on testnet (XLM pairs with 10 custom tokens)
+        // Format: (Token Address, Pool Address)
+        let known_pools = [
+            // AQX - XLM/AQX Pool
+            ("CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3", "CDNN77W7A4X3IKVENIKRQMUVBODUF3WRLUZYJ4WQYVNML6SVAORUVXFN"),
+            // VLTK - XLM/VLTK Pool
+            ("CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME", "CDV2HI43TPWV36KJS6X6GLXDTZQFWFQI2H3DFD4O47LRTHA3A3KKTAEI"),
+            // SLX - XLM/SLX Pool
+            ("CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5", "CC47IJVCOHTNGKBQZFABNMPSAKFRGSXXXVOH3256L6K4WLAQJDJG2DDS"),
+            // WRX - XLM/WRX Pool
+            ("CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE", "CD6Z46SJGJH6QADZAG5TXQJKCGAW5VP2JSOFRZ3UGOZFHXTZ4AS62E24"),
+            // SIXN - XLM/SIXN Pool
+            ("CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O", "CDC2NAQ6RNVZHQ4Q2BBPO4FRZMJDCUCKX5P67W772I5HLTBKRJQLJKOO"),
+            // MBIUS - XLM/MBIUS Pool
+            ("CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP", "CAM2UB4364HCDFIVQGW2YIONWMMCNZ43MXXVUD43X5ZP3PWAXBW5ABBK"),
+            // TRIO - XLM/TRIO Pool
+            ("CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL", "CDL44UJMRKE5LZG2SVMNM3T2TSTBDGZUD4MJF3X5DBTYO2A4XU2UGKU2"),
+            // RELIO - XLM/RELIO Pool (NEW - with authorization fix)
+            ("CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H", "CASJCSMSDGJQFK65YSYPDNWIA5G6N2HZ4AF2QEPO4DPU3ZANUYRGAH2U"),
+            // TRI - XLM/TRI Pool
+            ("CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW", "CAT3BC6DPFZHQBLDIZKRGIIYIWQTN6S6TGJUNXXLIYHBUDI3T7VPEOUA"),
+            // NUMER - XLM/NUMER Pool
+            ("CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR", "CAKFDKYUVLM2ZJURHAIA4W626IZR3Y76KPEDTEK7NZIS5TMSFCYCKOM6"),
+        ];
+        
+        // Register each pool
+        for (token_str, pool_str) in known_pools.iter() {
+            let token_string = String::from_str(env, token_str);
+            let pool_string = String::from_str(env, pool_str);
+            
+            let token_addr = Address::from_string(&token_string);
+            let pool_addr = Address::from_string(&pool_string);
+            
+            crate::real_pool_client::register_custom_pool(env, &token_addr, &pool_addr);
+        }
+        
+        log!(env, "Registered {} known custom token pools", known_pools.len() as u32);
     }
 
     /// Trigger a rebalance based on configured rules (only rebalance actions)
