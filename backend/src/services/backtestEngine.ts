@@ -398,29 +398,61 @@ async function fetchAllAssetPrices(
       // If common tokens didn't work, try to resolve the actual token symbol
       if (!foundData) {
         console.log(`[Backtest] No match with common tokens, attempting to resolve contract symbol...`);
-        const tokenSymbol = await getTokenSymbol(asset.assetCode, 'mainnet');
-        
-        if (tokenSymbol) {
-          console.log(`[Backtest] ✓ Resolved to token symbol: ${tokenSymbol}`);
+        try {
+          const tokenSymbol = await getTokenSymbol(asset.assetCode, 'mainnet');
           
-          const coinGeckoPrices = await getHistoricalPricesFromCoinGecko(
-            tokenSymbol,
-            startTime,
-            endTime,
-            resolution
-          );
+          if (tokenSymbol) {
+            console.log(`[Backtest] ✓ Resolved to token symbol: ${tokenSymbol}`);
+            
+            const coinGeckoPrices = await getHistoricalPricesFromCoinGecko(
+              tokenSymbol,
+              startTime,
+              endTime,
+              resolution
+            );
 
-          if (coinGeckoPrices && coinGeckoPrices.length > 0) {
-            console.log(`[Backtest] ✓ Using CoinGecko historical data for ${tokenSymbol}`);
-            priceData.set(asset.assetCode, coinGeckoPrices);
-            foundData = true;
+            if (coinGeckoPrices && coinGeckoPrices.length > 0) {
+              console.log(`[Backtest] ✓ Using CoinGecko historical data for ${tokenSymbol}`);
+              priceData.set(asset.assetCode, coinGeckoPrices);
+              foundData = true;
+            }
           }
+        } catch (symbolError: any) {
+          console.warn(`[Backtest] Failed to resolve token symbol: ${symbolError.message}`);
         }
       }
       
       // Last resort: use mock data
       if (!foundData) {
         console.warn(`[Backtest] No price data available from CoinGecko, using mock data for ${asset.assetCode.slice(0, 12)}...`);
+        const mockPrices = generateMockPriceData(asset.assetCode, new Date(startTime).getTime(), new Date(endTime).getTime(), resolution);
+        priceData.set(asset.assetCode, mockPrices);
+        usedMockData = true;
+      }
+      
+      continue;
+    }
+    
+    // Check if it's a custom token (short code without issuer, not XLM/native)
+    // These are tokens like AQX, RELIO, etc. that don't have CoinGecko data or issuers
+    if (asset.assetCode !== 'XLM' && asset.assetCode !== 'native' && !asset.assetIssuer && asset.assetCode.length <= 12) {
+      console.log(`[Backtest] Asset ${asset.assetCode} appears to be a custom token without issuer.`);
+      
+      // Try CoinGecko first in case it's a known token
+      const { getHistoricalPricesFromCoinGecko } = await import('./priceService.js');
+      const coinGeckoPrices = await getHistoricalPricesFromCoinGecko(
+        asset.assetCode,
+        startTime,
+        endTime,
+        resolution
+      );
+      
+      if (coinGeckoPrices && coinGeckoPrices.length > 0) {
+        console.log(`[Backtest] ✓ Using CoinGecko historical data for ${asset.assetCode}`);
+        priceData.set(asset.assetCode, coinGeckoPrices);
+      } else {
+        // Use mock data for custom tokens
+        console.warn(`[Backtest] Custom token ${asset.assetCode} has no price data available, using mock data`);
         const mockPrices = generateMockPriceData(asset.assetCode, new Date(startTime).getTime(), new Date(endTime).getTime(), resolution);
         priceData.set(asset.assetCode, mockPrices);
         usedMockData = true;

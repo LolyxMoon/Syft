@@ -206,6 +206,17 @@ export async function getTokenPrice(assetCodeOrAddress: string): Promise<number 
       'EURC': 'euro-coin',
       'yUSDC': 'yusd-stablecoin',
       'BLND': 'blend', // if available
+      // Custom token mappings to CoinGecko IDs
+      'AQX': 'aquarius',
+      'VLTK': 'bankroll-vault',
+      'SLX': 'slimex',
+      'WRX': 'wazirx',
+      'SIXN': 'six',
+      'MBIUS': 'mobius',
+      'TRIO': 'trio-ordinals',
+      'RELIO': 'relign',
+      'TRI': 'tellor-tributes',
+      'NUMER': 'numeraire',
     };
 
     let coinGeckoId = symbolToCoinGeckoId[assetCodeOrAddress.toUpperCase()];
@@ -300,6 +311,17 @@ export async function getHistoricalPricesFromCoinGecko(
       'EURC': 'euro-coin',
       'yUSDC': 'yusd-stablecoin',
       'BLND': 'blend',
+      // Custom token mappings to CoinGecko IDs
+      'AQX': 'aquarius',
+      'VLTK': 'bankroll-vault',
+      'SLX': 'slimex',
+      'WRX': 'wazirx',
+      'SIXN': 'six',
+      'MBIUS': 'mobius',
+      'TRIO': 'trio-ordinals',
+      'RELIO': 'relign',
+      'TRI': 'tellor-tributes',
+      'NUMER': 'numeraire',
     };
 
     const coinGeckoId = symbolToCoinGeckoId[assetCodeOrAddress.toUpperCase()];

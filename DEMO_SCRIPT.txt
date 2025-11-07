@@ -74,10 +74,6 @@ just natural language."
 
 [Wait for execution]
 
-"Done. Now let's check what we have."
-
-[Type: "Show me my balance"]
-
 "Perfect. Now here's where it gets interesting. Let's say I want to 
 create a custom asset, set up liquidity, and even mint an NFT - all 
 through conversation."
@@ -86,7 +82,7 @@ through conversation."
 
 [Wait for execution]
 
-"XLM swapped to USDC with simple natural language."
+"Great! Now I can swap my coins without navigating to different dapps, cut out the hassle."
 
 [Type: "Mint me a Stellar-themed NFT with a cosmic vault design"]
 
