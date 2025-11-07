@@ -224,7 +224,9 @@ async function autoRegisterCustomPools(
   _network: string | undefined,
   servers: any
 ): Promise<void> {
-  console.log(`[Auto-Register Pools] Starting for vault ${contractAddress}`);
+  console.log(`[Auto-Register Pools] ======= STARTING =======`);
+  console.log(`[Auto-Register Pools] Vault: ${contractAddress}`);
+  console.log(`[Auto-Register Pools] Network: ${_network}`);
   
   // Custom token pools on testnet (from CUSTOM_TOKENS.env and LIQUIDITY_POOLS.env)
   const customPools = [
@@ -239,22 +241,32 @@ async function autoRegisterCustomPools(
     { token: 'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW', pool: 'CAT3BC6DPFZHQBLDIZKRGIIYIWQTN6S6TGJUNXXLIYHBUDI3T7VPEOUA' }, // TRI
     { token: 'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR', pool: 'CAKFDKYUVLM2ZJURHAIA4W626IZR3Y76KPEDTEK7NZIS5TMSFCYCKOM6' }, // NUMER
   ];
+  
+  console.log(`[Auto-Register Pools] Will register ${customPools.length} pools`);
 
   const deployerSecret = process.env.DEPLOYER_SECRET_KEY;
   if (!deployerSecret) {
+    console.error(`[Auto-Register Pools] ERROR: DEPLOYER_SECRET_KEY not set`);
     throw new Error('DEPLOYER_SECRET_KEY not set');
   }
+  
+  console.log(`[Auto-Register Pools] Deployer secret found: ${deployerSecret.substring(0, 4)}...`);
 
   const deployerKeypair = Keypair.fromSecret(deployerSecret);
   const deployerAddress = deployerKeypair.publicKey();
+  console.log(`[Auto-Register Pools] Deployer address: ${deployerAddress}`);
   
   // Register pools in batch using register_custom_pools_batch function
   const vaultContract = new StellarSdk.Contract(contractAddress);
+  console.log(`[Auto-Register Pools] Created contract instance`);
   
   const tokenAddresses = customPools.map(p => StellarSdk.Address.fromString(p.token).toScVal());
   const poolAddresses = customPools.map(p => StellarSdk.Address.fromString(p.pool).toScVal());
+  console.log(`[Auto-Register Pools] Prepared ${tokenAddresses.length} token addresses and ${poolAddresses.length} pool addresses`);
   
+  console.log(`[Auto-Register Pools] Loading deployer account from Horizon...`);
   const deployerAccount = await servers.horizonServer.loadAccount(deployerAddress);
+  console.log(`[Auto-Register Pools] Deployer account loaded, sequence: ${deployerAccount.sequence}`);
   
   const operation = vaultContract.call(
     'register_custom_pools_batch',
@@ -272,35 +284,49 @@ async function autoRegisterCustomPools(
     .build();
   
   // Simulate and prepare transaction
+  console.log(`[Auto-Register Pools] Simulating transaction...`);
   const simulationResponse = await servers.sorobanServer.simulateTransaction(transaction);
   
   if (StellarSdk.rpc.Api.isSimulationError(simulationResponse)) {
-    console.warn(`[Auto-Register Pools] Simulation failed: ${simulationResponse.error}`);
+    console.error(`[Auto-Register Pools] ❌ Simulation failed: ${simulationResponse.error}`);
+    console.error(`[Auto-Register Pools] Simulation response:`, JSON.stringify(simulationResponse, null, 2));
     return; // Don't fail, pools can be registered manually later
   }
   
+  console.log(`[Auto-Register Pools] ✅ Simulation successful`);
+  console.log(`[Auto-Register Pools] Assembling transaction...`);
   transaction = StellarSdk.rpc.assembleTransaction(transaction, simulationResponse).build();
   transaction.sign(deployerKeypair);
+  console.log(`[Auto-Register Pools] Transaction signed`);
   
   // Submit transaction via Soroban RPC
+  console.log(`[Auto-Register Pools] Submitting transaction to network...`);
   const sendResponse = await servers.sorobanServer.sendTransaction(transaction);
-  console.log(`[Auto-Register Pools] Transaction sent: ${sendResponse.hash}`);
+  console.log(`[Auto-Register Pools] Transaction sent with hash: ${sendResponse.hash}`);
   
   // Wait for confirmation
+  console.log(`[Auto-Register Pools] Polling for transaction confirmation...`);
   let attempts = 0;
   const maxAttempts = 10;
   let getResponse = await servers.sorobanServer.getTransaction(sendResponse.hash);
   
   while (getResponse.status === 'NOT_FOUND' && attempts < maxAttempts) {
+    console.log(`[Auto-Register Pools] Attempt ${attempts + 1}/${maxAttempts}: Transaction not found yet, waiting...`);
     await new Promise(resolve => setTimeout(resolve, 1000));
     getResponse = await servers.sorobanServer.getTransaction(sendResponse.hash);
     attempts++;
   }
   
+  console.log(`[Auto-Register Pools] Final status after ${attempts} attempts: ${getResponse.status}`);
+  
   if (getResponse.status === 'SUCCESS') {
-    console.log(`[Auto-Register Pools] ✅ Successfully registered ${customPools.length} custom pools`);
+    console.log(`[Auto-Register Pools] ✅✅✅ Successfully registered ${customPools.length} custom pools! ✅✅✅`);
+    console.log(`[Auto-Register Pools] Registered tokens:`, customPools.map(p => p.token).join(', '));
+  } else if (getResponse.status === 'FAILED') {
+    console.error(`[Auto-Register Pools] ❌ Transaction FAILED`);
+    console.error(`[Auto-Register Pools] Full response:`, JSON.stringify(getResponse, null, 2));
   } else {
-    console.warn(`[Auto-Register Pools] Status: ${getResponse.status}`);
+    console.warn(`[Auto-Register Pools] ⚠️ Unexpected status: ${getResponse.status}`);
   }
 }
 
@@ -1216,14 +1242,23 @@ router.post('/submit-initialize', async (req: Request, res: Response) => {
 
       // AUTO-REGISTER CUSTOM TOKEN POOLS
       // This allows users to immediately use custom tokens without manual setup
+      console.log(`[Submit Initialize] 🔄 Starting auto-registration of custom token pools...`);
+      console.log(`[Submit Initialize] Vault address: ${contractAddress}`);
+      console.log(`[Submit Initialize] Network: ${network}`);
+      
       try {
-        console.log(`[Submit Initialize] Auto-registering custom token pools...`);
+        // Wait a bit for the vault to be fully initialized on-chain
+        console.log(`[Submit Initialize] Waiting 2 seconds for vault to settle...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        console.log(`[Submit Initialize] Now registering custom pools...`);
         await autoRegisterCustomPools(contractAddress, network, servers);
-        console.log(`[Submit Initialize] ✅ Custom pools registered`);
+        console.log(`[Submit Initialize] ✅ Custom pools registered successfully`);
       } catch (poolError: any) {
         // Don't fail initialization if pool registration fails
         // Pools can be registered manually later
-        console.warn(`[Submit Initialize] ⚠️  Custom pool registration failed:`, poolError.message);
+        console.error(`[Submit Initialize] ❌ Custom pool registration failed:`, poolError);
+        console.error(`[Submit Initialize] Error details:`, JSON.stringify(poolError, null, 2));
       }
 
     } catch (submitError: any) {
