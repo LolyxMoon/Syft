@@ -301,17 +301,91 @@ CRITICAL: Every node MUST have ALL required fields populated. Do not leave any d
      }
    }
    
-   FOR CUSTOM TOKENS (XTAR, XRP, ARST, AQUA, EURC, BTC, BRL, RYAW, JAHV, VOEZ, JORV):
+   FOR CUSTOM TOKENS (AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER):
    {
      "id": "asset-2",
      "type": "asset",
      "position": { "x": 100, "y": 400 },
      "data": {
        "assetType": "CUSTOM",         // REQUIRED - must be "CUSTOM" for custom tokens
-       "assetCode": "AQUA",           // REQUIRED - token code from whitelist
-       "assetIssuer": "CD56OXOMAZ55LIKCYVFXH5CP2AKCLYMPMBFRN5XIJVOTWOVY2KFGLZVJ",  // REQUIRED - exact issuer address
+       "assetCode": "AQX",            // REQUIRED - token code from whitelist (AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER)
+       "assetIssuer": "CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3",  // REQUIRED - exact issuer address from whitelist above
        "allocation": 25,              // REQUIRED - percentage (must sum to 100%)
-       "label": "AQUA"                // REQUIRED - display name
+       "label": "AQX"                 // REQUIRED - display name (same as assetCode)
+     }
+   }
+   
+   EXAMPLE - Diverse 6-token vault:
+   {
+     "id": "asset-0",
+     "type": "asset",
+     "position": { "x": 100, "y": 100 },
+     "data": {
+       "assetType": "CUSTOM",
+       "assetCode": "AQX",
+       "assetIssuer": "CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3",
+       "allocation": 20,
+       "label": "AQX"
+     }
+   },
+   {
+     "id": "asset-1",
+     "type": "asset",
+     "position": { "x": 100, "y": 200 },
+     "data": {
+       "assetType": "CUSTOM",
+       "assetCode": "VLTK",
+       "assetIssuer": "CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME",
+       "allocation": 20,
+       "label": "VLTK"
+     }
+   },
+   {
+     "id": "asset-2",
+     "type": "asset",
+     "position": { "x": 100, "y": 300 },
+     "data": {
+       "assetType": "CUSTOM",
+       "assetCode": "SLX",
+       "assetIssuer": "CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5",
+       "allocation": 15,
+       "label": "SLX"
+     }
+   },
+   {
+     "id": "asset-3",
+     "type": "asset",
+     "position": { "x": 100, "y": 400 },
+     "data": {
+       "assetType": "CUSTOM",
+       "assetCode": "WRX",
+       "assetIssuer": "CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE",
+       "allocation": 15,
+       "label": "WRX"
+     }
+   },
+   {
+     "id": "asset-4",
+     "type": "asset",
+     "position": { "x": 100, "y": 500 },
+     "data": {
+       "assetType": "CUSTOM",
+       "assetCode": "SIXN",
+       "assetIssuer": "CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O",
+       "allocation": 15,
+       "label": "SIXN"
+     }
+   },
+   {
+     "id": "asset-5",
+     "type": "asset",
+     "position": { "x": 100, "y": 600 },
+     "data": {
+       "assetType": "CUSTOM",
+       "assetCode": "MBIUS",
+       "assetIssuer": "CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP",
+       "allocation": 15,
+       "label": "MBIUS"
      }
    }
    
@@ -440,7 +514,7 @@ CRITICAL: Every node MUST have ALL required fields populated. Do not leave any d
      "animated": true          // Optional - makes edge animated
    }
 
-COMPLETE EXAMPLE:
+COMPLETE EXAMPLE - Diverse 5-token vault with weekly rebalancing:
 {
   "type": "build",
   "nodes": [
@@ -449,27 +523,65 @@ COMPLETE EXAMPLE:
       "type": "asset",
       "position": { "x": 100, "y": 100 },
       "data": {
-        "assetType": "XLM",
-        "assetCode": "XLM",
-        "allocation": 60,
-        "label": "XLM"
+        "assetType": "CUSTOM",
+        "assetCode": "AQX",
+        "assetIssuer": "CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3",
+        "allocation": 25,
+        "label": "AQX"
       }
     },
     {
       "id": "asset-1",
       "type": "asset",
-      "position": { "x": 100, "y": 250 },
+      "position": { "x": 100, "y": 200 },
       "data": {
-        "assetType": "USDC",
-        "assetCode": "USDC",
-        "allocation": 40,
-        "label": "USDC"
+        "assetType": "CUSTOM",
+        "assetCode": "VLTK",
+        "assetIssuer": "CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME",
+        "allocation": 20,
+        "label": "VLTK"
+      }
+    },
+    {
+      "id": "asset-2",
+      "type": "asset",
+      "position": { "x": 100, "y": 300 },
+      "data": {
+        "assetType": "CUSTOM",
+        "assetCode": "SLX",
+        "assetIssuer": "CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5",
+        "allocation": 20,
+        "label": "SLX"
+      }
+    },
+    {
+      "id": "asset-3",
+      "type": "asset",
+      "position": { "x": 100, "y": 400 },
+      "data": {
+        "assetType": "CUSTOM",
+        "assetCode": "WRX",
+        "assetIssuer": "CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE",
+        "allocation": 20,
+        "label": "WRX"
+      }
+    },
+    {
+      "id": "asset-4",
+      "type": "asset",
+      "position": { "x": 100, "y": 500 },
+      "data": {
+        "assetType": "CUSTOM",
+        "assetCode": "MBIUS",
+        "assetIssuer": "CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP",
+        "allocation": 15,
+        "label": "MBIUS"
       }
     },
     {
       "id": "condition-0",
       "type": "condition",
-      "position": { "x": 500, "y": 175 },
+      "position": { "x": 500, "y": 300 },
       "data": {
         "conditionType": "time_based",
         "timeUnit": "days",
@@ -481,22 +593,26 @@ COMPLETE EXAMPLE:
     {
       "id": "action-0",
       "type": "action",
-      "position": { "x": 900, "y": 175 },
+      "position": { "x": 900, "y": 300 },
       "data": {
         "actionType": "rebalance",
-        "label": "Rebalance Portfolio"
+        "label": "Rebalance Portfolio",
+        "description": "Rebalance to target allocations"
       }
     }
   ],
   "edges": [
     { "id": "edge-0", "source": "asset-0", "target": "condition-0", "animated": true },
     { "id": "edge-1", "source": "asset-1", "target": "condition-0", "animated": true },
-    { "id": "edge-2", "source": "condition-0", "target": "action-0", "animated": true }
+    { "id": "edge-2", "source": "asset-2", "target": "condition-0", "animated": true },
+    { "id": "edge-3", "source": "asset-3", "target": "condition-0", "animated": true },
+    { "id": "edge-4", "source": "asset-4", "target": "condition-0", "animated": true },
+    { "id": "edge-5", "source": "condition-0", "target": "action-0", "animated": true }
   ],
-  "explanation": "This vault holds 60% XLM and 40% USDC, rebalancing weekly to maintain target allocations.",
+  "explanation": "This vault holds a diverse selection of 5 custom tokens (AQX 25%, VLTK 20%, SLX 20%, WRX 20%, MBIUS 15%), rebalancing weekly to maintain target allocations.",
   "suggestions": [
-    "Consider adding a price-change condition for more reactive rebalancing",
-    "You might want to stake a portion of XLM for additional yield"
+    "Consider adding more tokens for even greater diversification",
+    "You might want to add a price-change condition for more reactive rebalancing"
   ]
 }
 
@@ -506,11 +622,11 @@ NODE POSITIONING:
 - Actions at right (x: 800-1000, y: spaced by 150)
 
 IMPORTANT RULES (when building):
-1. **CRITICAL: ONLY use whitelisted testnet assets** - XLM, USDC, XTAR, XRP, ARST, AQUA, EURC, BTC, BRL, RYAW, JAHV, VOEZ, JORV
+1. **CRITICAL: ONLY use whitelisted testnet assets** - XLM, USDC, AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER
 2. **Use correct assetType**:
    - "XLM" for native XLM
    - "USDC" for USDC stablecoin
-   - "CUSTOM" for all other tokens (XTAR, XRP, ARST, AQUA, EURC, BTC, BRL, RYAW, JAHV, VOEZ, JORV)
+   - "CUSTOM" for all custom tokens (AQX, VLTK, SLX, WRX, SIXN, MBIUS, TRIO, RELIO, TRI, NUMER)
 3. **NEVER include assetIssuer for XLM or USDC** - System handles addresses automatically
 4. **ALWAYS include assetIssuer for CUSTOM tokens** - Use exact issuer address from whitelist
 5. **Allocations MUST sum to 100%**
@@ -732,21 +848,20 @@ Be conversational and helpful. Build vaults only when the user is ready and has 
       if (assetNodes.length === 0) {
         console.warn('[NLVaultGenerator] No asset nodes found in response');
       } else {
-        // Define testnet whitelist
+        // Define testnet whitelist with our 10 custom tokens
         const TESTNET_ASSETS = new Map([
           ['XLM', { assetType: 'XLM', requiresIssuer: false }],
           ['USDC', { assetType: 'USDC', requiresIssuer: false }],
-          ['XTAR', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CCSV3Y6QKAPRZCPLCMC5W7OCS5BFPKMYFK5GC25SSSS44U2WA4Y7QRKE' }],
-          ['XRP', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CBFM34O7P6YJG2DCS3C7AJI6WDKD2JPMPPA7RTVYGC7ZYEPKDLGEIFP5' }],
-          ['ARST', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CB3TIJR2B5NZFKZLBUE5LAASV7WIRDKS24VPIYUXXEHM7XN3X2JXFHZY' }],
-          ['AQUA', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CD56OXOMAZ55LIKCYVFXH5CP2AKCLYMPMBFRN5XIJVOTWOVY2KFGLZVJ' }],
-          ['EURC', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CAUL6I3KR55BAOSOE23VRR5FUFD2EEBWF3DHGWUZN7N3ZGVR4QQU6DQM' }],
-          ['BTC', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CBFX54THH4KKRDDOMV5G6TNGDPHXEUAXM7SGTOOXTZKODACI7O5ND6U7' }],
-          ['BRL', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CAG6QUTOUL3M4HPOPFYYDGJQODY7I3WUYKO2DFYDHIRHLD4HHPGIHWBJ' }],
-          ['RYAW', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CBIWPSUKAYOE5ORIDLYNPFMWWNIZSA5LQVDNXYTW7HI4H5TIU64DGJ7F' }],
-          ['JAHV', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CAZKRTMRBEMSMRCGC4C6YDUU22H5AVQZ5HAASR4PGWITXPDDBB3BTGHI' }],
-          ['VOEZ', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CDUCWV4VK6MXD3JMYFQUQ2KUHHGTMR7RAS6C2SPF7EHHUEGKFCRO3ZZF' }],
-          ['JORV', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CAT5EZTZVB4V4O7E5ZA2HQJTL7MZPWDJWQZIJYPMTAY6DMRWOIK5AMCD' }]
+          ['AQX', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3' }],
+          ['VLTK', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME' }],
+          ['SLX', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5' }],
+          ['WRX', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE' }],
+          ['SIXN', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O' }],
+          ['MBIUS', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP' }],
+          ['TRIO', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL' }],
+          ['RELIO', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H' }],
+          ['TRI', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW' }],
+          ['NUMER', { assetType: 'CUSTOM', requiresIssuer: true, assetIssuer: 'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR' }]
         ]);
 
         // Validate and fix asset nodes
