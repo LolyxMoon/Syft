@@ -25,6 +25,13 @@ export interface StrategyAnalysis {
   diversificationScore: number; // 0-100
   efficiencyScore: number; // 0-100
   timestamp: string;
+  // CRITICAL: Include actual vault composition so AI can see what assets are in the vault
+  currentAssets?: Array<{
+    assetCode: string;
+    percentage: number;
+    assetId?: string;
+  }>;
+  rebalancingRules?: any[];
 }
 
 export class StrategyAnalyzer {
@@ -79,6 +86,9 @@ export class StrategyAnalyzer {
     // Determine risk level
     const riskLevel = this.determineRiskLevel(issues, config);
 
+    // Extract current assets for AI context
+    const currentAssets = this.extractCurrentAssets(config);
+
     return {
       vaultId,
       overallScore,
@@ -89,7 +99,51 @@ export class StrategyAnalyzer {
       diversificationScore,
       efficiencyScore,
       timestamp: new Date().toISOString(),
+      currentAssets, // Include actual vault composition
+      rebalancingRules: config.rules || [],
     };
+  }
+
+  /**
+   * Extract current asset allocations from config
+   */
+  private extractCurrentAssets(config: VaultConfig): Array<{
+    assetCode: string;
+    percentage: number;
+    assetId?: string;
+  }> {
+    const assets = config.assets || [];
+    const rules: any[] = (config as any).rules || [];
+    const rebalanceRule: any = rules.find((r: any) => r.action === 'rebalance' && r.target_allocation);
+    
+    if (rebalanceRule && Array.isArray(rebalanceRule.target_allocation)) {
+      // Use target_allocation from rebalance rule (basis points format)
+      return assets.map((asset: any, index: number) => {
+        const basisPoints = rebalanceRule.target_allocation[index] || 0;
+        const percentage = basisPoints / 10000;
+        
+        return {
+          assetCode: typeof asset === 'string' ? asset : (asset.code || asset.assetCode),
+          assetId: typeof asset === 'string' ? asset : asset.assetId,
+          percentage: percentage,
+        };
+      });
+    } else {
+      // Fallback to asset.allocation field
+      return assets.map((asset: any) => {
+        if (typeof asset === 'string') {
+          return {
+            assetCode: asset,
+            percentage: 100 / assets.length, // Equal distribution fallback
+          };
+        }
+        return {
+          assetCode: asset.code || asset.assetCode,
+          assetId: asset.assetId,
+          percentage: asset.allocation || asset.percentage || (100 / assets.length),
+        };
+      });
+    }
   }
 
   /**

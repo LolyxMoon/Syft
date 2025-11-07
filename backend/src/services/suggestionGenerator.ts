@@ -158,9 +158,14 @@ INVALID SUGGESTION EXAMPLES:
 ❌ "Use flash loans to arbitrage price differences"
 ❌ "Implement stop-loss by selling when price drops 10%"
 
+CRITICAL - YOU MUST ANALYZE THIS SPECIFIC VAULT:
+The Strategy Analysis below contains the ACTUAL current vault configuration including all assets and their allocations.
+DO NOT make up a different vault configuration. DO NOT suggest assets that aren't in the current vault unless explicitly recommending to add new ones.
+Your suggestions MUST be based on the ACTUAL vault data provided in the Strategy Analysis section.
+
 Based on the following data about this Stellar vault, generate 3-5 specific, actionable suggestions to improve its performance:
 
-Strategy Analysis:
+Strategy Analysis (CURRENT VAULT STATE - USE THIS DATA):
 {analysis}
 
 Social Sentiment Data:

@@ -298,8 +298,8 @@ actionable recommendations."
 • Data-driven rationale
 • Step-by-step implementation guide
 
-Click 'Apply Suggestion' and it auto-fills the Vault Builder with 
-improvements. One-click optimization."
+Click 'Apply Suggestion' and it auto-fills the AI Chat with 
+improvements. You just need to click send for the optimization."
 
 
 ═══════════════════════════════════════════════════════════════════════

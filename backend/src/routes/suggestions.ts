@@ -75,21 +75,31 @@ async function generateAndCacheSuggestions(vaultId: string, userPreferences?: an
 
   // Helper to convert contract address to asset code
   const getAssetCodeFromAddress = (address: string, _network: string): string => {
-    const nativeXLMAddresses: { [key: string]: string } = {
-      'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-      'futurenet': 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT',
-      'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-      'public': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+    // Token address to code mapping (testnet)
+    const tokenRegistry: { [address: string]: string } = {
+      // Native XLM
+      'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC': 'XLM',
+      'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT': 'XLM',
+      'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA': 'XLM',
+      
+      // USDC (testnet)
+      'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA': 'USDC',
+      
+      // 10 Custom Tokens (from CUSTOM_TOKENS.env)
+      'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3': 'AQX',
+      'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME': 'VLTK',
+      'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5': 'SLX',
+      'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE': 'WRX',
+      'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O': 'SIXN',
+      'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP': 'MBIUS',
+      'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL': 'TRIO',
+      'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H': 'RELIO',
+      'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW': 'TRI',
+      'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR': 'NUMER',
     };
     
-    // Check if it's Native XLM
-    if (Object.values(nativeXLMAddresses).includes(address)) {
-      return 'XLM';
-    }
-    
-    // For other assets, return the address (would need a full registry for mainnet)
-    // In production, you'd query the asset issuer and code
-    return address;
+    // Return the token code if found in registry, otherwise return the address
+    return tokenRegistry[address] || address;
   };
 
   // Enrich config with real allocation data from blockchain state
