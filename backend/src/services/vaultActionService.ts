@@ -656,32 +656,33 @@ export async function buildRebalanceStepTransaction(
     // Create contract instance
     const contract = new StellarSdk.Contract(vault.contract_address);
 
-    // Convert step to native object format that nativeToScVal can handle
-    // The struct fields must match the Rust #[contracttype] RebalanceStep definition
-    const stepObject = {
-      amount_in: BigInt(step.amount_in),
-      from_token: step.from_token,
-      to_token: step.to_token,
-      min_amount_out: BigInt(step.min_amount_out),
-      pool_address: step.pool_address,
-    };
+    // Manually construct RebalanceStep struct as a Map with proper ScVal types
+    // CRITICAL: Keys must be sorted alphabetically for Soroban struct deserialization
+    // The key difference from before: we need ScSymbol keys, not ScString keys
+    const stepScVal = StellarSdk.xdr.ScVal.scvMap([
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.xdr.ScVal.scvSymbol("amount_in"),  // Use scvSymbol for struct field keys
+        val: StellarSdk.nativeToScVal(BigInt(step.amount_in), { type: "i128" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.xdr.ScVal.scvSymbol("from_token"),
+        val: StellarSdk.Address.fromString(step.from_token).toScVal()
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.xdr.ScVal.scvSymbol("min_amount_out"),
+        val: StellarSdk.nativeToScVal(BigInt(step.min_amount_out), { type: "i128" })
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.xdr.ScVal.scvSymbol("pool_address"),
+        val: StellarSdk.Address.fromString(step.pool_address).toScVal()
+      }),
+      new StellarSdk.xdr.ScMapEntry({
+        key: StellarSdk.xdr.ScVal.scvSymbol("to_token"),
+        val: StellarSdk.Address.fromString(step.to_token).toScVal()
+      })
+    ]);
 
-    console.log(`[Build Rebalance Step] Converting step object to ScVal...`);
-    console.log(`[Build Rebalance Step] Step object:`, stepObject);
-
-    // Use nativeToScVal with explicit type structure for custom struct
-    // This properly handles Soroban contracttype structs
-    const stepScVal = StellarSdk.nativeToScVal(stepObject, {
-      type: {
-        amount_in: ['i128'],
-        from_token: ['address'],
-        to_token: ['address'],
-        min_amount_out: ['i128'],
-        pool_address: ['address'],
-      }
-    });
-
-    console.log(`[Build Rebalance Step] ScVal created successfully`);
+    console.log(`[Build Rebalance Step] ScVal struct created with Symbol keys (required for contracttype)`);
 
     // Build execute_rebalance_step operation
     const operation = contract.call('execute_rebalance_step', stepScVal);
