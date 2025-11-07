@@ -811,6 +811,63 @@ impl VaultContract {
         Ok(())
     }
 
+    /// Register a custom token liquidity pool
+    /// This allows the vault to trade custom tokens through their dedicated pools
+    pub fn register_custom_pool(
+        env: Env,
+        caller: Address,
+        token_address: Address,
+        pool_address: Address,
+    ) -> Result<(), VaultError> {
+        caller.require_auth();
+        
+        let config: VaultConfig = env.storage().instance().get(&CONFIG)
+            .ok_or(VaultError::NotInitialized)?;
+        
+        // Only owner can register custom pools
+        if caller != config.owner {
+            return Err(VaultError::Unauthorized);
+        }
+        
+        // Register the pool mapping
+        crate::real_pool_client::register_custom_pool(&env, &token_address, &pool_address);
+        
+        Ok(())
+    }
+
+    /// Register multiple custom token liquidity pools in batch
+    /// This is more gas-efficient for registering many pools at once
+    pub fn register_custom_pools_batch(
+        env: Env,
+        caller: Address,
+        token_addresses: soroban_sdk::Vec<Address>,
+        pool_addresses: soroban_sdk::Vec<Address>,
+    ) -> Result<(), VaultError> {
+        caller.require_auth();
+        
+        let config: VaultConfig = env.storage().instance().get(&CONFIG)
+            .ok_or(VaultError::NotInitialized)?;
+        
+        // Only owner can register custom pools
+        if caller != config.owner {
+            return Err(VaultError::Unauthorized);
+        }
+        
+        // Verify arrays have same length
+        if token_addresses.len() != pool_addresses.len() {
+            return Err(VaultError::InvalidConfiguration);
+        }
+        
+        // Register each pool mapping
+        for i in 0..token_addresses.len() {
+            let token_addr = token_addresses.get(i).ok_or(VaultError::InvalidConfiguration)?;
+            let pool_addr = pool_addresses.get(i).ok_or(VaultError::InvalidConfiguration)?;
+            crate::real_pool_client::register_custom_pool(&env, &token_addr, &pool_addr);
+        }
+        
+        Ok(())
+    }
+
     /// Trigger a rebalance based on configured rules (only rebalance actions)
     /// Can be called by anyone, and will execute rebalancing immediately
     pub fn trigger_rebalance(env: Env) -> Result<(), VaultError> {

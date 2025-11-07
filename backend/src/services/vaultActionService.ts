@@ -299,7 +299,12 @@ export async function buildDepositTransaction(
       if (errorMsg.includes('Error(WasmVm, MissingValue)')) {
         throw new Error(
           `Contract state error: The vault or token contract is missing required data. ` +
-          `This vault may not be properly initialized. Please contact the vault owner.`
+          `This usually means:\n` +
+          `1. The vault was deployed but not initialized (missing CONFIG or STATE storage)\n` +
+          `2. A custom token in the vault wasn't properly initialized\n` +
+          `3. The vault contract doesn't have permission to read from a token\n\n` +
+          `If you're the vault owner, try re-deploying the vault through VaultBuilder. ` +
+          `If this is an existing vault, please contact the vault owner to reinitialize it.`
         );
       }
 

@@ -1,6 +1,9 @@
 // Real Liquidity Pool interface for custom tokens
 // This interfaces with our custom real-liquidity-pool contract
-use soroban_sdk::{contractclient, Address, Env};
+use soroban_sdk::{contractclient, Address, Env, Symbol, symbol_short};
+
+// Storage key for custom token pool mappings
+const CUSTOM_POOL: Symbol = symbol_short!("CUST_POOL");
 
 /// Real Liquidity Pool interface
 /// Our custom AMM pool with simplified interface
@@ -42,10 +45,14 @@ pub fn swap_via_real_pool(
     min_amount_out: i128,
 ) -> Result<i128, crate::errors::VaultError> {
     use crate::errors::VaultError;
+    use soroban_sdk::{symbol_short, log};
     
     if amount_in <= 0 {
         return Err(VaultError::InvalidAmount);
     }
+
+    // Log swap attempt for debugging
+    log!(env, "Custom pool swap: {} -> {}, amount: {}", from_token, to_token, amount_in);
 
     let pool_client = RealPoolClient::new(env, pool_address);
     let vault_address = env.current_contract_address();
@@ -57,7 +64,29 @@ pub fn swap_via_real_pool(
     // Verify tokens match
     if (from_token != &token_a && from_token != &token_b) || 
        (to_token != &token_a && to_token != &token_b) {
+        log!(env, "Token mismatch! Pool tokens: {} and {}", token_a, token_b);
         return Err(VaultError::InvalidConfiguration);
+    }
+    
+    // Get reserves before swap for logging
+    let (reserve_a, reserve_b) = pool_client.get_reserves();
+    log!(env, "Pool reserves: {} / {}", reserve_a, reserve_b);
+    
+    // Calculate expected output
+    let expected_output = calculate_real_pool_output(
+        env,
+        pool_address,
+        from_token,
+        to_token,
+        amount_in,
+    )?;
+    
+    log!(env, "Expected output: {}", expected_output);
+    
+    // Verify expected output meets minimum
+    if expected_output < min_amount_out {
+        log!(env, "Slippage too high! Expected: {}, Min: {}", expected_output, min_amount_out);
+        return Err(VaultError::SlippageTooHigh);
     }
     
     // Approve the pool to spend our tokens
@@ -79,6 +108,14 @@ pub fn swap_via_real_pool(
         from_token,
         &amount_in,
         &min_amount_out,
+    );
+    
+    log!(env, "Swap successful! Output: {}", amount_out);
+    
+    // Emit event for successful swap
+    env.events().publish(
+        (symbol_short!("swap"), symbol_short!("custom")),
+        (from_token, to_token, amount_in, amount_out)
     );
     
     Ok(amount_out)
@@ -143,55 +180,56 @@ pub fn calculate_real_pool_output(
     Ok(amount_out)
 }
 
-/// Map of custom token addresses to their XLM pool addresses
-/// XLM Address: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+/// Register a custom token pool mapping
+/// This should be called during vault initialization or by owner
+pub fn register_custom_pool(env: &Env, token_address: &Address, pool_address: &Address) {
+    env.storage().instance().set(&(CUSTOM_POOL, token_address), pool_address);
+}
+
+/// Get the custom pool address for a token (if registered)
+/// Returns None if no custom pool is registered for this token
 pub fn get_custom_token_pool(env: &Env, token_address: &Address) -> Option<Address> {
-    use soroban_sdk::String;
-    
-    // Custom token addresses (Strkey format will be converted)
-    let token_str = token_address.to_string();
-    
-    // Map custom tokens to their pool addresses
-    // Note: In production, this should be stored in contract storage
-    let pool_address_str = if token_str == String::from_str(env, "CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3") {
-        // AQX -> Pool
-        "CDNN77W7A4X3IKVENIKRQMUVBODUF3WRLUZYJ4WQYVNML6SVAORUVXFN"
-    } else if token_str == String::from_str(env, "CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME") {
-        // VLTK -> Pool
-        "CDV2HI43TPWV36KJS6X6GLXDTZQFWFQI2H3DFD4O47LRTHA3A3KKTAEI"
-    } else if token_str == String::from_str(env, "CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5") {
-        // SLX -> Pool
-        "CC47IJVCOHTNGKBQZFABNMPSAKFRGSXXXVOH3256L6K4WLAQJDJG2DDS"
-    } else if token_str == String::from_str(env, "CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE") {
-        // WRX -> Pool
-        "CD6Z46SJGJH6QADZAG5TXQJKCGAW5VP2JSOFRZ3UGOZFHXTZ4AS62E24"
-    } else if token_str == String::from_str(env, "CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O") {
-        // SIXN -> Pool
-        "CDC2NAQ6RNVZHQ4Q2BBPO4FRZMJDCUCKX5P67W772I5HLTBKRJQLJKOO"
-    } else if token_str == String::from_str(env, "CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP") {
-        // MBIUS -> Pool
-        "CAM2UB4364HCDFIVQGW2YIONWMMCNZ43MXXVUD43X5ZP3PWAXBW5ABBK"
-    } else if token_str == String::from_str(env, "CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL") {
-        // TRIO -> Pool
-        "CDL44UJMRKE5LZG2SVMNM3T2TSTBDGZUD4MJF3X5DBTYO2A4XU2UGKU2"
-    } else if token_str == String::from_str(env, "CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H") {
-        // RELIO -> Pool
-        "CAKKECWO4LPCX5B4O4KENUKPBKFOJJL5HJXOC237TLU2LPKP3DDTGWLL"
-    } else if token_str == String::from_str(env, "CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW") {
-        // TRI -> Pool
-        "CAT3BC6DPFZHQBLDIZKRGIIYIWQTN6S6TGJUNXXLIYHBUDI3T7VPEOUA"
-    } else if token_str == String::from_str(env, "CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR") {
-        // NUMER -> Pool
-        "CAKFDKYUVLM2ZJURHAIA4W626IZR3Y76KPEDTEK7NZIS5TMSFCYCKOM6"
-    } else {
-        return None;
-    };
-    
-    let pool_str = String::from_str(env, pool_address_str);
-    Some(Address::from_string(&pool_str))
+    env.storage().instance().get(&(CUSTOM_POOL, token_address))
 }
 
 /// Check if a token is a custom token with a real liquidity pool
 pub fn is_custom_token(env: &Env, token_address: &Address) -> bool {
     get_custom_token_pool(env, token_address).is_some()
+}
+
+/// Find the appropriate pool for a token pair
+/// This checks both tokens and returns the custom pool if either is a custom token
+/// Assumes the other token in the pair is XLM (the base pair for custom tokens)
+pub fn find_pool_for_pair(
+    env: &Env,
+    token_a: &Address,
+    token_b: &Address,
+) -> Option<Address> {
+    // Check if token_a has a custom pool
+    if let Some(pool) = get_custom_token_pool(env, token_a) {
+        // Verify this pool actually contains both tokens
+        let pool_client = RealPoolClient::new(env, &pool);
+        let pool_token_a = pool_client.token_a();
+        let pool_token_b = pool_client.token_b();
+        
+        if (token_a == &pool_token_a || token_a == &pool_token_b) &&
+           (token_b == &pool_token_a || token_b == &pool_token_b) {
+            return Some(pool);
+        }
+    }
+    
+    // Check if token_b has a custom pool
+    if let Some(pool) = get_custom_token_pool(env, token_b) {
+        // Verify this pool actually contains both tokens
+        let pool_client = RealPoolClient::new(env, &pool);
+        let pool_token_a = pool_client.token_a();
+        let pool_token_b = pool_client.token_b();
+        
+        if (token_a == &pool_token_a || token_a == &pool_token_b) &&
+           (token_b == &pool_token_a || token_b == &pool_token_b) {
+            return Some(pool);
+        }
+    }
+    
+    None
 }
