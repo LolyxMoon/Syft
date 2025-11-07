@@ -64,6 +64,7 @@ router.post('/sessions', async (req: Request, res: Response) => {
     });
 
     console.log('[Chat API] Created session:', session.sessionId);
+    console.log('[Chat API] Session data:', JSON.stringify(session, null, 2));
 
     res.json({
       success: true,

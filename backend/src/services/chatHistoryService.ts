@@ -67,6 +67,13 @@ export class ChatHistoryService {
   static async createSession(params: CreateSessionParams): Promise<ChatSession> {
     const sessionId = `session_${randomUUID()}`;
 
+    console.log('[ChatHistory] Creating session:', {
+      sessionId,
+      userId: params.userId,
+      vaultId: params.vaultId,
+      network: params.network,
+    });
+
     const { data, error } = await supabase
       .from('chat_sessions')
       .insert({
@@ -80,9 +87,11 @@ export class ChatHistoryService {
       .single();
 
     if (error) {
+      console.error('[ChatHistory] Failed to create session:', error);
       throw new Error(`Failed to create chat session: ${error.message}`);
     }
 
+    console.log('[ChatHistory] Session created successfully:', data);
     return this.mapSessionRow(data);
   }
 
@@ -145,6 +154,8 @@ export class ChatHistoryService {
   static async addMessage(params: CreateMessageParams): Promise<ChatMessage> {
     const messageId = `msg_${randomUUID()}`;
 
+    console.log('[ChatHistory] Looking up session:', params.sessionId);
+
     // First, get the session UUID from session_id
     const { data: sessionData, error: sessionError } = await supabase
       .from('chat_sessions')
@@ -154,9 +165,18 @@ export class ChatHistoryService {
 
     if (sessionError || !sessionData) {
       console.error('[ChatHistory] Session not found:', params.sessionId, sessionError);
+      
+      // Debug: List all sessions to see what's in the database
+      const { data: allSessions } = await supabase
+        .from('chat_sessions')
+        .select('session_id')
+        .limit(10);
+      
+      console.log('[ChatHistory] Recent sessions in DB:', allSessions?.map(s => s.session_id));
       throw new Error(`Session not found: ${params.sessionId}`);
     }
 
+    console.log('[ChatHistory] Found session UUID:', sessionData.id);
     const sessionUuid = sessionData.id;
 
     // Get current message count for sequence number

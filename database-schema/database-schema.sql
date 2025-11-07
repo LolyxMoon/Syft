@@ -105,6 +105,39 @@ CREATE TABLE public.marketplace_listings (
   CONSTRAINT marketplace_listings_pkey PRIMARY KEY (id),
   CONSTRAINT marketplace_listings_nft_id_fkey FOREIGN KEY (nft_id) REFERENCES public.vault_nfts(id)
 );
+CREATE TABLE public.nft_profit_stats (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  nft_id text NOT NULL UNIQUE,
+  vault_id uuid NOT NULL,
+  holder_wallet_address text NOT NULL,
+  total_distributions_count integer DEFAULT 0,
+  total_profit_received numeric DEFAULT 0,
+  last_distribution_amount numeric,
+  last_distribution_at timestamp with time zone,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT nft_profit_stats_pkey PRIMARY KEY (id),
+  CONSTRAINT nft_profit_stats_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id)
+);
+CREATE TABLE public.profit_distributions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  vault_id uuid NOT NULL,
+  distribution_type text NOT NULL CHECK (distribution_type = ANY (ARRAY['nft_holder'::text, 'vault_subscriber'::text])),
+  transaction_hash text,
+  contract_address text NOT NULL,
+  recipient_wallet_address text NOT NULL,
+  recipient_nft_id text,
+  recipient_subscription_id uuid,
+  token_address text NOT NULL,
+  token_symbol text,
+  amount numeric NOT NULL CHECK (amount > 0::numeric),
+  profit_share_percentage numeric CHECK (profit_share_percentage IS NULL OR profit_share_percentage > 0::numeric AND profit_share_percentage <= 100::numeric),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])),
+  error_message text,
+  initiated_at timestamp with time zone NOT NULL DEFAULT now(),
+  completed_at timestamp with time zone,
+  CONSTRAINT profit_distributions_pkey PRIMARY KEY (id),
+  CONSTRAINT profit_distributions_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id)
+);
 CREATE TABLE public.quests (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   quest_key text NOT NULL UNIQUE CHECK (length(quest_key) > 0),
@@ -123,6 +156,47 @@ CREATE TABLE public.quests (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT quests_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.subscription_profit_stats (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  subscription_id uuid NOT NULL UNIQUE,
+  original_vault_id uuid NOT NULL,
+  subscriber_wallet_address text NOT NULL,
+  total_distributions_count integer DEFAULT 0,
+  total_profit_shared numeric DEFAULT 0,
+  last_distribution_amount numeric,
+  last_distribution_at timestamp with time zone,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT subscription_profit_stats_pkey PRIMARY KEY (id),
+  CONSTRAINT subscription_profit_stats_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.vault_subscriptions(id),
+  CONSTRAINT subscription_profit_stats_original_vault_id_fkey FOREIGN KEY (original_vault_id) REFERENCES public.vaults(id)
+);
+CREATE TABLE public.terminal_conversations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  session_id text NOT NULL UNIQUE,
+  wallet_address text,
+  title text NOT NULL,
+  message_count integer DEFAULT 0,
+  token_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT terminal_conversations_pkey PRIMARY KEY (id),
+  CONSTRAINT terminal_conversations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.terminal_messages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL,
+  role text NOT NULL CHECK (role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text, 'tool'::text])),
+  content text NOT NULL,
+  function_called text,
+  function_result jsonb,
+  message_type text DEFAULT 'text'::text,
+  tool_call_id text,
+  timestamp timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT terminal_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT terminal_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.terminal_conversations(id)
 );
 CREATE TABLE public.user_onboarding (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -201,8 +275,10 @@ CREATE TABLE public.vault_nfts (
   last_transfer_at timestamp with time zone,
   total_profits_earned numeric DEFAULT 0,
   last_profit_distribution timestamp with time zone,
+  last_profit_distribution_id uuid,
   CONSTRAINT vault_nfts_pkey PRIMARY KEY (id),
-  CONSTRAINT vault_nfts_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id)
+  CONSTRAINT vault_nfts_vault_id_fkey FOREIGN KEY (vault_id) REFERENCES public.vaults(id),
+  CONSTRAINT vault_nfts_last_profit_distribution_id_fkey FOREIGN KEY (last_profit_distribution_id) REFERENCES public.profit_distributions(id)
 );
 CREATE TABLE public.vault_performance (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -242,10 +318,12 @@ CREATE TABLE public.vault_subscriptions (
   total_profits_shared numeric DEFAULT 0,
   last_profit_share_at timestamp with time zone,
   subscribed_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_profit_distribution_id uuid,
   CONSTRAINT vault_subscriptions_pkey PRIMARY KEY (id),
   CONSTRAINT vault_subscriptions_original_vault_id_fkey FOREIGN KEY (original_vault_id) REFERENCES public.vaults(id),
   CONSTRAINT vault_subscriptions_subscribed_vault_id_fkey FOREIGN KEY (subscribed_vault_id) REFERENCES public.vaults(id),
-  CONSTRAINT vault_subscriptions_subscriber_wallet_address_fkey FOREIGN KEY (subscriber_wallet_address) REFERENCES public.users(wallet_address)
+  CONSTRAINT vault_subscriptions_subscriber_wallet_address_fkey FOREIGN KEY (subscriber_wallet_address) REFERENCES public.users(wallet_address),
+  CONSTRAINT vault_subscriptions_last_profit_distribution_id_fkey FOREIGN KEY (last_profit_distribution_id) REFERENCES public.profit_distributions(id)
 );
 CREATE TABLE public.vault_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
