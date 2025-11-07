@@ -32,6 +32,7 @@ impl VaultContract {
             total_shares: 0,
             total_value: 0,
             last_rebalance: 0,
+            last_deposit_token: None, // No deposits yet
         };
 
         // Store configuration and state
@@ -133,6 +134,7 @@ impl VaultContract {
             .ok_or(VaultError::InvalidAmount)?;
         state.total_value = state.total_value.checked_add(final_amount)
             .ok_or(VaultError::InvalidAmount)?;
+        state.last_deposit_token = Some(deposit_token.clone()); // Track deposit token for rebalancing
 
         // Update user position (position was already fetched at the start)
         position.shares = position.shares.checked_add(shares)
@@ -713,6 +715,7 @@ impl VaultContract {
                 total_shares: 0,
                 total_value: 0,
                 last_rebalance: 0,
+                last_deposit_token: None,
             })
     }
 
@@ -1096,6 +1099,9 @@ impl VaultContract {
         let config: VaultConfig = env.storage().instance().get(&CONFIG)
             .ok_or(VaultError::NotInitialized)?;
 
+        let state: VaultState = env.storage().instance().get(&STATE)
+            .ok_or(VaultError::NotInitialized)?;
+
         // For multi-asset vaults, calculate rebalance plan
         if config.assets.len() <= 1 {
             // Single asset vault, no rebalancing needed
@@ -1134,7 +1140,7 @@ impl VaultContract {
             }
         }
         
-        // Calculate actual total value from real balances
+        // Calculate actual total value from real balances (tracked assets only)
         let mut actual_total_value: i128 = 0;
         for i in 0..config.assets.len() {
             if let Some(asset) = config.assets.get(i) {
@@ -1145,11 +1151,13 @@ impl VaultContract {
         }
         
         // Calculate the rebalance plan
+        // Pass both the tracked total and vault TVL, plus the deposit token for unallocated funds
         crate::rebalance::calculate_rebalance_plan(
             &env,
             &config.assets,
             &target_allocation,
-            actual_total_value,
+            state.total_value, // Use TVL from state (includes deposit token)
+            state.last_deposit_token.clone(), // Pass deposit token for swapping unallocated funds
         )
     }
 

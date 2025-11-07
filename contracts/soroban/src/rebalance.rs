@@ -1057,6 +1057,7 @@ pub fn calculate_rebalance_plan(
     assets: &Vec<Address>,
     target_allocation: &Vec<i128>,
     total_value: i128,
+    deposit_token: Option<Address>, // Token used for last deposit (e.g., XLM)
 ) -> Result<crate::types::RebalancePlan, VaultError> {
     use soroban_sdk::symbol_short;
     
@@ -1086,11 +1087,14 @@ pub fn calculate_rebalance_plan(
     // Calculate current balances and target amounts
     let mut current_balances: Vec<i128> = Vec::new(env);
     let mut target_amounts: Vec<i128> = Vec::new(env);
+    let mut actual_total_balance: i128 = 0;
     
     for i in 0..assets.len() {
         if let (Some(asset), Some(target_pct)) = (assets.get(i), target_allocation.get(i)) {
             let current_balance = crate::token_client::get_vault_balance(env, &asset);
             current_balances.push_back(current_balance);
+            actual_total_balance = actual_total_balance.checked_add(current_balance)
+                .ok_or(VaultError::InvalidAmount)?;
             
             let target_amount = total_value
                 .checked_mul(target_pct)
@@ -1106,7 +1110,93 @@ pub fn calculate_rebalance_plan(
         }
     }
     
-    // Build swap steps
+    // Check if we have unallocated funds (deposited in a non-tracked token like XLM)
+    let unallocated_balance = total_value.checked_sub(actual_total_balance)
+        .ok_or(VaultError::InvalidAmount)?;
+    
+    if unallocated_balance > 0 {
+        env.events().publish(
+            (symbol_short!("unalloc"),),
+            unallocated_balance
+        );
+        
+        // We have funds in the deposit token that need to be swapped to target assets
+        // Create swap steps from deposit_token to each target asset based on allocation
+        if let Some(source_token) = deposit_token {
+            let mut steps: Vec<crate::types::RebalanceStep> = Vec::new(env);
+            let min_swap_threshold = 1000i128;
+            
+            // For each target asset, create a swap from deposit_token
+            for i in 0..assets.len() {
+                if let (Some(target_asset), Some(target_amount)) = (
+                    assets.get(i),
+                    target_amounts.get(i)
+                ) {
+                    // Skip if target amount is negligible
+                    if target_amount < min_swap_threshold {
+                        continue;
+                    }
+                    
+                    // Find pool for deposit_token -> target_asset
+                    let pool_address = {
+                        // Try to find custom pool for the target asset
+                        if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &target_asset) {
+                            Some(custom_pool)
+                        } else if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &source_token) {
+                            Some(custom_pool)
+                        } else {
+                            None
+                        }
+                    };
+                    
+                    let pool_address = match pool_address {
+                        Some(addr) => addr,
+                        None => {
+                            env.events().publish(
+                                (symbol_short!("no_pool"),),
+                                (source_token.clone(), target_asset.clone())
+                            );
+                            continue; // Skip this asset if no pool found
+                        }
+                    };
+                    
+                    // Calculate amount to swap (target amount from unallocated balance)
+                    let amount_to_swap = target_amount;
+                    
+                    if amount_to_swap < min_swap_threshold {
+                        continue;
+                    }
+                    
+                    // Calculate minimum output with 5% slippage
+                    let min_amount_out = (amount_to_swap * 95) / 100;
+                    
+                    // Create swap step
+                    let step = crate::types::RebalanceStep {
+                        from_token: source_token.clone(),
+                        to_token: target_asset.clone(),
+                        amount_in: amount_to_swap,
+                        min_amount_out,
+                        pool_address: pool_address.clone(),
+                    };
+                    
+                    steps.push_back(step);
+                    
+                    env.events().publish(
+                        (symbol_short!("plan_step"),),
+                        (source_token.clone(), target_asset.clone(), amount_to_swap)
+                    );
+                }
+            }
+            
+            // Return plan with deposit token swap steps
+            return Ok(crate::types::RebalancePlan {
+                steps: steps.clone(),
+                total_steps: steps.len() as u32,
+            });
+        }
+    }
+    
+    // Build swap steps for normal rebalancing (when all funds are in tracked assets)
     let mut steps: Vec<crate::types::RebalanceStep> = Vec::new(env);
     let min_swap_threshold = 1000i128; // Minimum difference to warrant a swap
     

@@ -20,6 +20,7 @@ pub struct VaultState {
     pub total_shares: i128,
     pub total_value: i128,
     pub last_rebalance: u64,
+    pub last_deposit_token: Option<Address>, // Track which token was last deposited (for rebalancing)
 }
 
 #[contracttype]

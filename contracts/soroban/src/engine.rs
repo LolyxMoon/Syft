@@ -52,6 +52,7 @@ fn evaluate_time_condition(env: &Env, rule: &RebalanceRule) -> bool {
             total_shares: 0,
             total_value: 0,
             last_rebalance: 0,
+            last_deposit_token: None,
         });
     
     // If last_rebalance is 0, this is the first trigger - always allow
@@ -87,6 +88,7 @@ fn evaluate_allocation_condition(env: &Env, _rule: &RebalanceRule) -> bool {
             total_shares: 0,
             total_value: 0,
             last_rebalance: 0,
+            last_deposit_token: None,
         });
     
     // Always allow rebalancing if vault has deposits

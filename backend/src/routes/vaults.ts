@@ -1638,33 +1638,31 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
       console.log(`[Submit Deposit] Asset count: ${vault?.config?.assets?.length || 0}`);
       
       if (hasMultipleAssets) {
-        console.log(`[Submit Deposit] 🎯 Multi-asset vault detected - rebalance required after deposit`);
+        console.log(`[Submit Deposit] 🎯 Multi-asset vault detected, getting rebalance plan...`);
         console.log(`[Submit Deposit] Target allocation:`, JSON.stringify(vault.config.assets, null, 2));
         
-        // IMPORTANT: After a fresh deposit, the vault has all funds in the deposited token
-        // We need to trigger force_rebalance to swap into the target allocation
-        // The get_rebalance_plan would return empty because there's nothing TO rebalance yet
-        // (all balances are 0 except the deposited token)
-        // So we always set needsRebalance=true for multi-asset vaults after deposit
-        needsRebalance = true;
+        // Import the rebalance helper
+        const { getRebalancePlan } = await import('../services/vaultActionService.js');
         
-        // Create a placeholder rebalance plan indicating that force_rebalance is needed
-        rebalancePlan = {
-          total_steps: 1, // Indicate that rebalancing is needed
-          steps: [], // Empty because force_rebalance will calculate steps dynamically
-          message: 'Multi-asset vault - force_rebalance will distribute deposit into target allocation'
-        };
+        // Get rebalance plan from contract (list of swap steps)
+        rebalancePlan = await getRebalancePlan(
+          vaultId,
+          userAddress,
+          network
+        );
         
-        console.log(`[Submit Deposit] ✅ Rebalance needed (multi-asset vault):`);
-        console.log(`[Submit Deposit]   - Will use force_rebalance to distribute deposit`);
-        console.log(`[Submit Deposit]   - Contract will calculate optimal swap path internally`);
+        needsRebalance = rebalancePlan && rebalancePlan.total_steps > 0;
+        
+        console.log(`[Submit Deposit] ✅ Rebalance plan received:`);
+        console.log(`[Submit Deposit]   - Total steps: ${rebalancePlan?.total_steps || 0}`);
+        console.log(`[Submit Deposit]   - Steps:`, JSON.stringify(rebalancePlan?.steps || [], null, 2));
       } else {
         console.log(`[Submit Deposit] ℹ️  Single-asset vault or no assets configured, skipping auto-rebalance`);
       }
     } catch (rebalanceError) {
-      console.error('[Submit Deposit] ❌ Failed to check rebalance requirements:', rebalanceError);
+      console.error('[Submit Deposit] ❌ Failed to get rebalance plan:', rebalanceError);
       console.error('[Submit Deposit] Error details:', rebalanceError instanceof Error ? rebalanceError.message : String(rebalanceError));
-      // Don't fail the deposit if rebalance check fails - just log it
+      // Don't fail the deposit if rebalance plan fails - just log it
       // The user can manually trigger rebalance later
     }
 
