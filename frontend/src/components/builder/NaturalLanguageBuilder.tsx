@@ -171,18 +171,37 @@ export function NaturalLanguageBuilder({
           });
           setMessages([getWelcomeMessage()]);
         } else if (storedSessionId) {
-          console.log('[Chat] Loading session from localStorage:', storedSessionId);
+          console.log('[Chat] Found stored session, verifying with backend:', storedSessionId);
           
-          // Load from localStorage first for instant display
-          const cachedMessages = loadMessagesFromLocalStorage(storedSessionId);
-          if (cachedMessages && cachedMessages.length > 0) {
-            console.log('[Chat] Loaded cached messages, displaying immediately');
-            setMessages(cachedMessages);
-            setCurrentSessionId(storedSessionId);
+          // Verify session exists in backend before using it
+          const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
+          const verifyResponse = await fetch(`${backendUrl}/api/chat/sessions/${storedSessionId}`);
+          
+          if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json();
+            if (verifyData.success) {
+              console.log('[Chat] Session verified in backend, loading messages');
+              
+              // Load from localStorage first for instant display
+              const cachedMessages = loadMessagesFromLocalStorage(storedSessionId);
+              if (cachedMessages && cachedMessages.length > 0) {
+                console.log('[Chat] Loaded cached messages, displaying immediately');
+                setMessages(cachedMessages);
+                setCurrentSessionId(storedSessionId);
+              }
+              
+              // Then sync with backend in the background
+              await loadSession(storedSessionId);
+            } else {
+              console.log('[Chat] Session not found in backend, clearing localStorage');
+              localStorage.removeItem('syft_current_chat_session');
+              setMessages([getWelcomeMessage()]);
+            }
+          } else {
+            console.log('[Chat] Session verification failed, clearing localStorage');
+            localStorage.removeItem('syft_current_chat_session');
+            setMessages([getWelcomeMessage()]);
           }
-          
-          // Then verify/sync with backend in the background
-          await loadSession(storedSessionId);
         } else {
           // No stored session, show welcome message
           console.log('[Chat] No stored session, showing welcome message');
@@ -195,6 +214,8 @@ export function NaturalLanguageBuilder({
         }
       } catch (error) {
         console.error('[Chat] Error loading session:', error);
+        // Clear invalid session data
+        localStorage.removeItem('syft_current_chat_session');
         setMessages([getWelcomeMessage()]);
       } finally {
         setIsLoadingSession(false);
