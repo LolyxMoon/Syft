@@ -319,11 +319,10 @@ impl RealLiquidityPool {
 
         // Execute swap: transfer tokens
         let pool_address = env.current_contract_address();
-        let token_in_client = token::TokenClient::new(&env, &token_in);
         let token_out_client = token::TokenClient::new(&env, &token_out);
 
-        // Transfer input token from user to pool
-        token_in_client.transfer(&user, &pool_address, &amount_in);
+        // NOTE: Input tokens should already be in the pool (pre-transferred by caller)
+        // We only need to transfer output tokens from pool to user
         
         // Transfer output token from pool to user
         token_out_client.transfer(&pool_address, &user, &amount_out);

@@ -99,11 +99,11 @@ pub fn swap_via_real_pool(
     token_in_client.transfer(&vault_address, pool_address, &amount_in);
     log!(env, "Transferred {} tokens to pool", amount_in);
     
-    // Now call swap with POOL as the user, not vault
-    // The pool will transfer tokens from itself to itself (no-op for input)
-    // and transfer output tokens from pool to vault
+    // Call swap with VAULT as the user so output tokens go to vault
+    // Input tokens are already in the pool from the transfer above
+    // Output tokens will be transferred from pool to vault
     let amount_out = pool_client.swap(
-        pool_address,  // Changed from &vault_address to pool_address
+        &vault_address,  // Vault receives the output tokens
         from_token,
         &amount_in,
         &min_amount_out,
