@@ -66,3 +66,20 @@ pub struct LiquidityPosition {
     pub amount_b_provided: i128,  // Original amount of token B
     pub timestamp: u64,           // When liquidity was provided
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RebalanceStep {
+    pub from_token: Address,      // Token to sell
+    pub to_token: Address,        // Token to buy
+    pub amount_in: i128,          // Amount to swap
+    pub min_amount_out: i128,     // Minimum amount to receive (with slippage)
+    pub pool_address: Address,    // Pool to use for swap
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RebalancePlan {
+    pub steps: Vec<RebalanceStep>, // Ordered list of swaps to execute
+    pub total_steps: u32,          // Total number of steps
+}

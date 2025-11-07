@@ -1614,9 +1614,9 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
 
     await syncVaultState(vaultId);
 
-    // Check if auto-rebalance is needed and return unsigned rebalance XDR
-    // The user must sign this in a separate transaction
-    let rebalanceXDR: string | undefined;
+    // Check if auto-rebalance is needed and return rebalance plan
+    // The user will sign each step separately to avoid budget limits
+    let rebalancePlan: any = null;
     let needsRebalance = false;
     
     try {
@@ -1631,58 +1631,52 @@ router.post('/:vaultId/submit-deposit', async (req: Request, res: Response) => {
       
       console.log(`[Submit Deposit] Vault config:`, JSON.stringify(vault?.config, null, 2));
       
-      // Auto-rebalance after deposit if:
-      // - Vault has multiple assets (to maintain target allocation)
-      // Note: We use force_rebalance which bypasses scheduled rule checks
-      // This is different from scheduled rebalancing - post-deposit rebalancing
-      // should always happen to maintain proper asset allocation
+      // Auto-rebalance after deposit if vault has multiple assets
       const hasMultipleAssets = vault?.config?.assets && vault.config.assets.length > 1;
       
       console.log(`[Submit Deposit] Has multiple assets: ${hasMultipleAssets}`);
       console.log(`[Submit Deposit] Asset count: ${vault?.config?.assets?.length || 0}`);
       
       if (hasMultipleAssets) {
-        console.log(`[Submit Deposit] 🎯 Multi-asset vault detected, building rebalance transaction...`);
+        console.log(`[Submit Deposit] 🎯 Multi-asset vault detected, getting rebalance plan...`);
         console.log(`[Submit Deposit] Target allocation:`, JSON.stringify(vault.config.assets, null, 2));
         
         // Import the rebalance helper
-        const { buildRebalanceTransaction } = await import('../services/vaultActionService.js');
+        const { getRebalancePlan } = await import('../services/vaultActionService.js');
         
-        // Build rebalance transaction (force_rebalance, not trigger_rebalance)
-        // force_rebalance bypasses rule checks and rebalances immediately
-        const result = await buildRebalanceTransaction(
+        // Get rebalance plan from contract (list of swap steps)
+        rebalancePlan = await getRebalancePlan(
           vaultId,
           userAddress,
-          network,
-          true // force = true to skip rule checks
+          network
         );
         
-        rebalanceXDR = result.xdr;
-        needsRebalance = true;
+        needsRebalance = rebalancePlan && rebalancePlan.total_steps > 0;
         
-        console.log(`[Submit Deposit] ✅ Rebalance transaction built successfully`);
-        console.log(`[Submit Deposit] Rebalance XDR length: ${rebalanceXDR?.length || 0} chars`);
+        console.log(`[Submit Deposit] ✅ Rebalance plan received:`);
+        console.log(`[Submit Deposit]   - Total steps: ${rebalancePlan?.total_steps || 0}`);
+        console.log(`[Submit Deposit]   - Steps:`, JSON.stringify(rebalancePlan?.steps || [], null, 2));
       } else {
         console.log(`[Submit Deposit] ℹ️  Single-asset vault or no assets configured, skipping auto-rebalance`);
       }
     } catch (rebalanceError) {
-      console.error('[Submit Deposit] ❌ Failed to build rebalance transaction:', rebalanceError);
+      console.error('[Submit Deposit] ❌ Failed to get rebalance plan:', rebalanceError);
       console.error('[Submit Deposit] Error details:', rebalanceError instanceof Error ? rebalanceError.message : String(rebalanceError));
-      // Don't fail the deposit if rebalance build fails - just log it
+      // Don't fail the deposit if rebalance plan fails - just log it
       // The user can manually trigger rebalance later
     }
 
     console.log(`[Submit Deposit] 📦 Returning response:`);
     console.log(`[Submit Deposit]   - Transaction Hash: ${txHash}`);
     console.log(`[Submit Deposit]   - Needs Rebalance: ${needsRebalance}`);
-    console.log(`[Submit Deposit]   - Has Rebalance XDR: ${!!rebalanceXDR}`);
+    console.log(`[Submit Deposit]   - Rebalance Steps: ${rebalancePlan?.total_steps || 0}`);
     
     return res.json({
       success: true,
       data: {
         transactionHash: txHash,
         needsRebalance,
-        rebalanceXDR, // Return unsigned XDR for user to sign
+        rebalancePlan, // Return the plan with steps for batch execution
       },
     });
   } catch (error) {
@@ -1827,6 +1821,125 @@ router.post('/:vaultId/submit-rebalance', async (req: Request, res: Response) =>
     });
   } catch (error) {
     console.error('Error in POST /api/vaults/:vaultId/submit-rebalance:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+});
+
+/**
+ * POST /api/vaults/:vaultId/build-rebalance-step
+ * Build unsigned transaction for a single rebalance step (batch rebalancing)
+ */
+router.post('/:vaultId/build-rebalance-step', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const { userAddress, step, network } = req.body;
+
+    if (!userAddress || !step) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userAddress, step',
+      });
+    }
+
+    console.log(`[Build Rebalance Step] Building step for vault ${vaultId}...`);
+    console.log(`[Build Rebalance Step] Step:`, step);
+
+    // Import the rebalance helper
+    const { buildRebalanceStepTransaction } = await import('../services/vaultActionService.js');
+    
+    // Build transaction for this specific step
+    const { xdr, contractAddress } = await buildRebalanceStepTransaction(
+      vaultId,
+      userAddress,
+      step,
+      network
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        xdr,
+        contractAddress,
+        step,
+      },
+    });
+  } catch (error) {
+    console.error('Error in POST /api/vaults/:vaultId/build-rebalance-step:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+});
+
+/**
+ * POST /api/vaults/:vaultId/submit-rebalance-step
+ * Submit signed rebalance step transaction (batch rebalancing)
+ */
+router.post('/:vaultId/submit-rebalance-step', async (req: Request, res: Response) => {
+  try {
+    const { vaultId } = req.params;
+    const { signedXDR, network, stepIndex, totalSteps } = req.body;
+
+    if (!signedXDR) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: signedXDR',
+      });
+    }
+
+    console.log(`[Submit Rebalance Step] Submitting step ${stepIndex + 1}/${totalSteps}...`);
+
+    const servers = getNetworkServers(network);
+    const transaction = StellarSdk.TransactionBuilder.fromXDR(signedXDR, servers.networkPassphrase);
+    
+    let txResponse;
+    try {
+      txResponse = await servers.horizonServer.submitTransaction(transaction);
+    } catch (submitError: any) {
+      console.error(`[Submit Rebalance Step] Transaction submission failed:`, submitError);
+      
+      if (submitError?.response?.data) {
+        console.error(`[Submit Rebalance Step] Error details:`, JSON.stringify(submitError.response.data, null, 2));
+      }
+      
+      throw submitError;
+    }
+    
+    const txHash = txResponse.hash;
+    console.log(`[Submit Rebalance Step] ✅ Step ${stepIndex + 1}/${totalSteps} completed: ${txHash}`);
+
+    // Only invalidate cache and sync after the last step
+    if (stepIndex === totalSteps - 1) {
+      console.log(`[Submit Rebalance Step] Last step completed, syncing vault state...`);
+      
+      const { data: vault } = await supabase
+        .from('vaults')
+        .select('contract_address')
+        .eq('vault_id', vaultId)
+        .single();
+
+      if (vault?.contract_address) {
+        invalidateVaultCache(vault.contract_address);
+      }
+
+      await syncVaultState(vaultId);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        transactionHash: txHash,
+        stepIndex,
+        totalSteps,
+        isLastStep: stepIndex === totalSteps - 1,
+      },
+    });
+  } catch (error) {
+    console.error('Error in POST /api/vaults/:vaultId/submit-rebalance-step:', error);
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error',

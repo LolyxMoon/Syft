@@ -46,6 +46,7 @@ pub trait LiquidityPoolInterface {
 
 /// Add liquidity to a liquidity pool
 /// This adds both tokens to the pool and receives LP tokens
+#[allow(dead_code)]
 pub fn add_liquidity_to_pool(
     env: &Env,
     pool_address: &Address,

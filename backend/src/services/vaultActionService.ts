@@ -532,6 +532,184 @@ export async function buildRebalanceTransaction(
 }
 
 /**
+ * Get rebalance plan from contract (list of swap steps needed)
+ * This calculates what swaps are needed without executing them
+ */
+export async function getRebalancePlan(
+  vaultId: string,
+  userAddress: string,
+  network?: string
+): Promise<{
+  steps: Array<{
+    from_token: string;
+    to_token: string;
+    amount_in: string;
+    min_amount_out: string;
+    pool_address: string;
+  }>;
+  total_steps: number;
+}> {
+  try {
+    console.log(`[Get Rebalance Plan] Getting rebalance plan for vault ${vaultId}...`);
+
+    // Get vault from database
+    const { data: vault, error } = await supabase
+      .from('vaults')
+      .select('*')
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (error || !vault) {
+      throw new Error('Vault not found');
+    }
+
+    // Get network-specific servers
+    const servers = getNetworkServers(network);
+    
+    // Load user account (needed for transaction building)
+    const userAccount = await servers.horizonServer.loadAccount(userAddress);
+
+    // Create contract instance
+    const contract = new StellarSdk.Contract(vault.contract_address);
+
+    // Build get_rebalance_plan operation
+    const operation = contract.call('get_rebalance_plan');
+
+    // Build transaction
+    let transaction = new StellarSdk.TransactionBuilder(userAccount, {
+      fee: StellarSdk.BASE_FEE,
+      networkPassphrase: servers.network === 'futurenet' 
+        ? StellarSdk.Networks.FUTURENET
+        : servers.network === 'mainnet' || servers.network === 'public'
+        ? StellarSdk.Networks.PUBLIC
+        : StellarSdk.Networks.TESTNET,
+    })
+      .addOperation(operation)
+      .setTimeout(300)
+      .build();
+
+    console.log(`[Get Rebalance Plan] Simulating get_rebalance_plan...`);
+
+    // Simulate transaction to get the plan
+    const simulationResponse = await servers.sorobanServer.simulateTransaction(transaction);
+    
+    if (StellarSdk.rpc.Api.isSimulationError(simulationResponse)) {
+      console.error(`[Get Rebalance Plan] Simulation error:`, simulationResponse);
+      throw new Error(`Failed to get rebalance plan: ${simulationResponse.error || 'Unknown error'}`);
+    }
+
+    // Extract result from simulation
+    const result = simulationResponse.result;
+    if (!result) {
+      throw new Error('No result from simulation');
+    }
+
+    // Parse the RebalancePlan struct from the contract
+    const planValue = result.retval;
+    const plan = StellarSdk.scValToNative(planValue);
+
+    console.log(`[Get Rebalance Plan] Plan received:`, JSON.stringify(plan, null, 2));
+
+    return plan;
+  } catch (error) {
+    console.error('Error getting rebalance plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Build transaction to execute a single rebalance step
+ */
+export async function buildRebalanceStepTransaction(
+  vaultId: string,
+  userAddress: string,
+  step: {
+    from_token: string;
+    to_token: string;
+    amount_in: string;
+    min_amount_out: string;
+    pool_address: string;
+  },
+  network?: string
+): Promise<{ xdr: string; contractAddress: string }> {
+  try {
+    console.log(`[Build Rebalance Step] Building step transaction...`);
+    console.log(`[Build Rebalance Step] Step:`, step);
+
+    // Get vault from database
+    const { data: vault, error } = await supabase
+      .from('vaults')
+      .select('*')
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (error || !vault) {
+      throw new Error('Vault not found');
+    }
+
+    // Get network-specific servers
+    const servers = getNetworkServers(network);
+    
+    // Load user account
+    const userAccount = await servers.horizonServer.loadAccount(userAddress);
+
+    // Create contract instance
+    const contract = new StellarSdk.Contract(vault.contract_address);
+
+    // Convert step to ScVal
+    const stepScVal = StellarSdk.nativeToScVal({
+      from_token: step.from_token,
+      to_token: step.to_token,
+      amount_in: BigInt(step.amount_in),
+      min_amount_out: BigInt(step.min_amount_out),
+      pool_address: step.pool_address,
+    }, { type: 'RebalanceStep' });
+
+    // Build execute_rebalance_step operation
+    const operation = contract.call('execute_rebalance_step', stepScVal);
+
+    // Build transaction
+    let transaction = new StellarSdk.TransactionBuilder(userAccount, {
+      fee: StellarSdk.BASE_FEE,
+      networkPassphrase: servers.network === 'futurenet' 
+        ? StellarSdk.Networks.FUTURENET
+        : servers.network === 'mainnet' || servers.network === 'public'
+        ? StellarSdk.Networks.PUBLIC
+        : StellarSdk.Networks.TESTNET,
+    })
+      .addOperation(operation)
+      .setTimeout(300)
+      .build();
+
+    console.log(`[Build Rebalance Step] Simulating execute_rebalance_step...`);
+
+    // Simulate transaction to get resource footprint
+    const simulationResponse = await servers.sorobanServer.simulateTransaction(transaction);
+    
+    if (StellarSdk.rpc.Api.isSimulationError(simulationResponse)) {
+      console.error(`[Build Rebalance Step] Simulation error:`, simulationResponse);
+      throw new Error(`Rebalance step simulation failed: ${simulationResponse.error || 'Unknown error'}`);
+    }
+
+    // Assemble transaction with simulation results
+    transaction = StellarSdk.rpc.assembleTransaction(
+      transaction,
+      simulationResponse
+    ).build();
+
+    console.log(`[Build Rebalance Step] Step transaction built successfully`);
+
+    return {
+      xdr: transaction.toXDR(),
+      contractAddress: vault.contract_address,
+    };
+  } catch (error) {
+    console.error('Error building rebalance step transaction:', error);
+    throw error;
+  }
+}
+
+/**
  * Build unsigned withdrawal transaction for user to sign
  */
 export async function buildWithdrawalTransaction(

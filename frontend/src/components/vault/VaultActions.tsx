@@ -22,6 +22,10 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
   const [amount, setAmount] = useState('');
   const [shares, setShares] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [rebalanceProgress, setRebalanceProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [userShares, setUserShares] = useState<string | null>(null);
   const [loadingShares, setLoadingShares] = useState(false);
   const [resolvedAssetNames, setResolvedAssetNames] = useState<string[]>([]);
@@ -260,55 +264,108 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
 
       console.log(`[VaultActions] ✅ Deposit successful! TX: ${submitData.data.transactionHash}`);
 
-      // Check if rebalance is needed (backend now returns this info)
+      // Check if batch rebalancing is needed (backend now returns a plan)
       let rebalanceSuccess = false;
-      if (submitData.data.needsRebalance && submitData.data.rebalanceXDR) {
+      if (submitData.data.needsRebalance && submitData.data.rebalancePlan) {
         try {
-          console.log(`[VaultActions] 🔄 Rebalance needed - optimizing asset allocation across protocols...`);
-          console.log(`[VaultActions] Requesting signature for rebalance transaction...`);
+          const plan = submitData.data.rebalancePlan;
+          console.log(`[VaultActions] 🔄 Rebalance needed - ${plan.total_steps} swap(s) required`);
+          console.log(`[VaultActions] Executing batch rebalancing to optimize allocation...`);
           
-          // Sign rebalance transaction (XDR already built by backend)
-          const { wallet } = await import('../../util/wallet');
-          const { signedTxXdr: rebalanceSignedXdr } = await wallet.signTransaction(submitData.data.rebalanceXDR, {
-            networkPassphrase: networkPassphrase || 'Test SDF Network ; September 2015',
-          });
+          // Set initial progress
+          setRebalanceProgress({ current: 0, total: plan.total_steps });
+          
+          // Execute each step separately (batch processing)
+          for (let i = 0; i < plan.steps.length; i++) {
+            const step = plan.steps[i];
+            console.log(`[VaultActions] 📊 Step ${i + 1}/${plan.total_steps}: Swapping tokens...`);
+            
+            // Update progress
+            setRebalanceProgress({ current: i + 1, total: plan.total_steps });
+            
+            try {
+              // Build transaction for this step
+              const buildStepResponse = await fetch(
+                `${backendUrl}/api/vaults/${vaultId}/build-rebalance-step`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    userAddress: address,
+                    step: step,
+                    network: normalizedNetwork,
+                  }),
+                }
+              );
 
-          console.log(`[VaultActions] Rebalance transaction signed, submitting...`);
+              const buildStepData = await buildStepResponse.json();
 
-          // Submit rebalance transaction
-          const submitRebalanceResponse = await fetch(
-            `${backendUrl}/api/vaults/${vaultId}/submit-rebalance`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                signedXDR: rebalanceSignedXdr,
-                network: normalizedNetwork,
-              }),
+              if (!buildStepResponse.ok || !buildStepData.success) {
+                throw new Error(buildStepData.error || `Failed to build step ${i + 1}`);
+              }
+
+              console.log(`[VaultActions] Step ${i + 1}: Requesting signature...`);
+
+              // Sign this step
+              const { wallet } = await import('../../util/wallet');
+              const { signedTxXdr: stepSignedXdr } = await wallet.signTransaction(
+                buildStepData.data.xdr,
+                {
+                  networkPassphrase: networkPassphrase || 'Test SDF Network ; September 2015',
+                }
+              );
+
+              console.log(`[VaultActions] Step ${i + 1}: Transaction signed, submitting...`);
+
+              // Submit this step
+              const submitStepResponse = await fetch(
+                `${backendUrl}/api/vaults/${vaultId}/submit-rebalance-step`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    signedXDR: stepSignedXdr,
+                    network: normalizedNetwork,
+                    stepIndex: i,
+                    totalSteps: plan.total_steps,
+                  }),
+                }
+              );
+
+              const submitStepData = await submitStepResponse.json();
+
+              if (!submitStepResponse.ok || !submitStepData.success) {
+                throw new Error(submitStepData.error || `Failed to submit step ${i + 1}`);
+              }
+
+              console.log(`[VaultActions] ✅ Step ${i + 1}/${plan.total_steps} complete! TX: ${submitStepData.data.transactionHash}`);
+            } catch (stepError) {
+              console.error(`[VaultActions] ❌ Step ${i + 1} failed:`, stepError);
+              // Continue with remaining steps even if one fails
+              console.warn(`[VaultActions] Continuing with remaining ${plan.total_steps - i - 1} step(s)...`);
             }
-          );
-
-          const submitRebalanceData = await submitRebalanceResponse.json();
-          console.log(`[VaultActions] Rebalance submit response:`, submitRebalanceData);
-
-          if (submitRebalanceResponse.ok && submitRebalanceData.success) {
-            console.log(`[VaultActions] ✅ Portfolio optimization complete!`);
-            rebalanceSuccess = true;
-          } else {
-            console.error(`[VaultActions] ❌ Rebalance submit failed:`, submitRebalanceData.error);
-            console.warn(`[VaultActions] Your deposit was successful, but rebalancing failed. You can manually trigger rebalancing from the vault details page.`);
           }
+
+          console.log(`[VaultActions] ✅ Batch rebalancing complete!`);
+          rebalanceSuccess = true;
+          
+          // Clear progress
+          setRebalanceProgress(null);
         } catch (rebalanceError) {
-          console.error(`[VaultActions] ❌ Auto-rebalance exception:`, rebalanceError);
+          console.error(`[VaultActions] ❌ Batch rebalance exception:`, rebalanceError);
           console.warn(`[VaultActions] Your deposit was successful, but rebalancing encountered an error. You can manually trigger rebalancing from the vault details page.`);
+          // Clear progress on error
+          setRebalanceProgress(null);
           // Don't fail the deposit if rebalance fails
         }
       } else {
-        console.log(`[VaultActions] No rebalance needed for this vault (single-asset or no assets configured)`);
+        console.log(`[VaultActions] No rebalance needed for this vault (single-asset or no swaps required)`);
         console.log(`[VaultActions] needsRebalance:`, submitData.data.needsRebalance);
-        console.log(`[VaultActions] has rebalanceXDR:`, !!submitData.data.rebalanceXDR);
+        console.log(`[VaultActions] has rebalancePlan:`, !!submitData.data.rebalancePlan);
       }
 
       setMessage({
@@ -592,12 +649,35 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
           <p className="text-sm text-neutral-400 mt-2">
             💡 Your deposit will be automatically swapped and rebalanced according to the target allocation
           </p>
+          
+          {/* Batch Rebalance Progress */}
+          {rebalanceProgress && (
+            <div className="mt-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-primary-400">
+                  🔄 Rebalancing Assets ({rebalanceProgress.current}/{rebalanceProgress.total})
+                </span>
+                <span className="text-xs text-neutral-400">
+                  {Math.round((rebalanceProgress.current / rebalanceProgress.total) * 100)}%
+                </span>
+              </div>
+              <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-primary-500 h-full transition-all duration-500 ease-out"
+                  style={{ width: `${(rebalanceProgress.current / rebalanceProgress.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-xs text-neutral-400 mt-2">
+                Please sign each swap transaction to complete rebalancing...
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Note about auto-rebalance */}
         <div className="p-3 bg-primary-500/10 border border-primary-500/30 rounded-lg">
           <p className="text-sm text-primary-400">
-            💡 <strong>Auto-Rebalance:</strong> After depositing, you'll be prompted to sign a second transaction to rebalance assets to the target allocation. This requires two signatures due to Stellar platform limitations.
+            💡 <strong>Batch Rebalancing:</strong> After depositing to a multi-asset vault, you'll be prompted to sign multiple transactions (one per swap) to rebalance assets to the target allocation. This batch approach ensures reliability and avoids transaction size limits.
           </p>
         </div>
 

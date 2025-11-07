@@ -192,6 +192,7 @@ pub fn get_custom_token_pool(env: &Env, token_address: &Address) -> Option<Addre
 }
 
 /// Check if a token is a custom token with a real liquidity pool
+#[allow(dead_code)]
 pub fn is_custom_token(env: &Env, token_address: &Address) -> bool {
     get_custom_token_pool(env, token_address).is_some()
 }

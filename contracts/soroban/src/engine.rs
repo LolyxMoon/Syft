@@ -104,6 +104,7 @@ fn evaluate_price_condition(_env: &Env, rule: &RebalanceRule) -> bool {
 }
 
 /// Check if any rule should trigger rebalancing
+#[allow(dead_code)]
 pub fn should_rebalance(env: &Env) -> bool {
     let config: Result<crate::types::VaultConfig, crate::errors::VaultError> = 
         env.storage().instance().get(&symbol_short!("CONFIG"))

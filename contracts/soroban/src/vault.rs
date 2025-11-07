@@ -1083,6 +1083,99 @@ impl VaultContract {
         Ok(())
     }
 
+    /// Get a rebalance plan (list of swap steps) without executing
+    /// This is used for batch rebalancing where each step is executed separately
+    pub fn get_rebalance_plan(env: Env) -> Result<crate::types::RebalancePlan, VaultError> {
+        use soroban_sdk::{Vec as SdkVec, String};
+        
+        // Check vault is initialized
+        if !env.storage().instance().has(&CONFIG) {
+            return Err(VaultError::NotInitialized);
+        }
+
+        let config: VaultConfig = env.storage().instance().get(&CONFIG)
+            .ok_or(VaultError::NotInitialized)?;
+
+        // For multi-asset vaults, calculate rebalance plan
+        if config.assets.len() <= 1 {
+            // Single asset vault, no rebalancing needed
+            return Ok(crate::types::RebalancePlan {
+                steps: SdkVec::new(&env),
+                total_steps: 0,
+            });
+        }
+
+        // Get target allocation from existing rebalance rules
+        let mut target_allocation: SdkVec<i128> = SdkVec::new(&env);
+        
+        // Look for a rebalance rule to get target allocation
+        let mut found_allocation = false;
+        for i in 0..config.rules.len() {
+            if let Some(rule) = config.rules.get(i) {
+                if rule.action == String::from_str(&env, "rebalance") && 
+                   rule.target_allocation.len() == config.assets.len() {
+                    // Use this rule's target allocation
+                    for j in 0..rule.target_allocation.len() {
+                        if let Some(alloc) = rule.target_allocation.get(j) {
+                            target_allocation.push_back(alloc);
+                        }
+                    }
+                    found_allocation = true;
+                    break;
+                }
+            }
+        }
+        
+        // If no rebalance rule found, default to equal distribution
+        if !found_allocation {
+            let equal_share = 100_0000 / (config.assets.len() as i128);
+            for _ in 0..config.assets.len() {
+                target_allocation.push_back(equal_share);
+            }
+        }
+        
+        // Calculate actual total value from real balances
+        let mut actual_total_value: i128 = 0;
+        for i in 0..config.assets.len() {
+            if let Some(asset) = config.assets.get(i) {
+                let balance = crate::token_client::get_vault_balance(&env, &asset);
+                actual_total_value = actual_total_value.checked_add(balance)
+                    .ok_or(VaultError::InvalidAmount)?;
+            }
+        }
+        
+        // Calculate the rebalance plan
+        crate::rebalance::calculate_rebalance_plan(
+            &env,
+            &config.assets,
+            &target_allocation,
+            actual_total_value,
+        )
+    }
+
+    /// Execute a single rebalance step from a plan
+    /// This is used for batch rebalancing where each step is executed separately
+    pub fn execute_rebalance_step(
+        env: Env,
+        step: crate::types::RebalanceStep,
+    ) -> Result<i128, VaultError> {
+        // Check vault is initialized
+        if !env.storage().instance().has(&CONFIG) {
+            return Err(VaultError::NotInitialized);
+        }
+
+        // Execute the step
+        let amount_out = crate::rebalance::execute_rebalance_step(&env, &step)?;
+
+        // Update last rebalance timestamp
+        let mut state: VaultState = env.storage().instance().get(&STATE)
+            .ok_or(VaultError::NotInitialized)?;
+        state.last_rebalance = env.ledger().timestamp();
+        env.storage().instance().set(&STATE, &state);
+
+        Ok(amount_out)
+    }
+
     /// Get the current staking position for the vault
     pub fn get_staking_position(env: Env) -> Result<crate::types::StakingPosition, VaultError> {
         use soroban_sdk::String;

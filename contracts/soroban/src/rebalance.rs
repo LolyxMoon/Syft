@@ -872,8 +872,20 @@ pub fn force_rebalance_to_allocation(
         true
     );
     
-    // Execute swaps to reach target allocation
+    // OPTIMIZED: Execute swaps to reach target allocation with budget-aware approach
+    // Limit to maximum 3 swaps per rebalance to avoid budget exceeded
+    let max_swaps = 3u32;
+    let mut swap_count = 0u32;
+    
     for i in 0..assets.len() {
+        if swap_count >= max_swaps {
+            env.events().publish(
+                (symbol_short!("max_swap"),),
+                swap_count
+            );
+            break; // Stop after max swaps to conserve budget
+        }
+        
         if let (Some(asset), Some(current), Some(target)) = (
             assets.get(i),
             current_balances.get(i),
@@ -881,8 +893,8 @@ pub fn force_rebalance_to_allocation(
         ) {
             let diff = target - current;
             
-            // Skip if difference is negligible
-            if diff.abs() < 100 {
+            // Skip if difference is negligible (increased threshold to reduce swaps)
+            if diff.abs() < 1000 {
                 continue;
             }
             
@@ -893,7 +905,9 @@ pub fn force_rebalance_to_allocation(
                     (asset.clone(), diff)
                 );
                 
-                // Find an asset we have excess of to sell
+                // Find the FIRST asset we have excess of to sell (don't iterate all)
+                // This reduces contract calls significantly
+                
                 for j in 0..assets.len() {
                     if i == j {
                         continue;
@@ -904,24 +918,39 @@ pub fn force_rebalance_to_allocation(
                         current_balances.get(j),
                         target_amounts.get(j)
                     ) {
-                        if source_current > source_target {
+                        if source_current > source_target + 1000 { // Add threshold check
                             // This asset has excess, use it as source
                             let excess = source_current - source_target;
                             
-                            // Get the factory address to find the pool
-                            let factory_address = crate::swap_router::get_soroswap_factory_address_internal(env);
+                            // OPTIMIZED: Try custom pool ONLY, skip factory lookup to save budget
+                            // Most custom tokens use XLM pools which are registered
+                            let pool_address = {
+                                // Check if source is a custom token with XLM pool
+                                if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &source_asset) {
+                                    env.events().publish(
+                                        (symbol_short!("src_cust"),),
+                                        custom_pool.clone()
+                                    );
+                                    Some(custom_pool)
+                                } 
+                                // Check if target is a custom token with XLM pool
+                                else if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &asset) {
+                                    env.events().publish(
+                                        (symbol_short!("dst_cust"),),
+                                        custom_pool.clone()
+                                    );
+                                    Some(custom_pool)
+                                }
+                                else {
+                                    // Skip factory lookup to save budget - only use custom pools
+                                    None
+                                }
+                            };
                             
-                            // Try to find a direct pool between source and target
-                            let pool_address = match crate::pool_client::get_pool_for_pair(
-                                env,
-                                &factory_address,
-                                &source_asset,
-                                &asset,
-                            ) {
-                                Ok(addr) => addr,
-                                Err(_) => {
-                                    // No direct pool exists between these assets
-                                    // Skip this pair and try next excess asset
+                            let _pool_address = match pool_address {
+                                Some(addr) => addr,
+                                None => {
+                                    // No custom pool found - skip this pair to conserve budget
                                     env.events().publish(
                                         (symbol_short!("no_pool"),),
                                         (source_asset.clone(), asset.clone())
@@ -930,34 +959,22 @@ pub fn force_rebalance_to_allocation(
                                 }
                             };
                             
-                            // Calculate how much source asset we need to sell to get 'diff' of target asset
-                            let amount_to_swap = match crate::pool_client::calculate_swap_input(
-                                env,
-                                &pool_address,
-                                &source_asset,
-                                &asset,
-                                diff, // How much we want to receive
-                            ) {
-                                Ok(amt) => amt,
-                                Err(e) => {
-                                    env.events().publish(
-                                        (symbol_short!("calc_err"),),
-                                        symbol_short!("failed")
-                                    );
-                                    return Err(e);
-                                }
+                            // Use simplified swap amount calculation (no get_reserves calls)
+                            // Assume we need roughly same amount of source as target (1:1 ratio estimate)
+                            // This avoids expensive pool queries
+                            let amount_to_swap = if diff > excess {
+                                excess
+                            } else {
+                                diff
                             };
-                            
-                            // Make sure we don't swap more than our excess
-                            let amount_to_swap = if amount_to_swap > excess { excess } else { amount_to_swap };
                             
                             env.events().publish(
                                 (symbol_short!("calc_swap"),),
-                                (excess, amount_to_swap)
+                                (diff, amount_to_swap)
                             );
                             
                             // Skip if amount is negligible
-                            if amount_to_swap < 100 {
+                            if amount_to_swap < 1000 {
                                 env.events().publish(
                                     (symbol_short!("skip_amt"),),
                                     amount_to_swap
@@ -965,26 +982,8 @@ pub fn force_rebalance_to_allocation(
                                 continue;
                             }
                             
-                            // Calculate expected output
-                            let expected_output = match crate::pool_client::calculate_swap_output(
-                                env,
-                                &pool_address,
-                                &source_asset,
-                                &asset,
-                                amount_to_swap,
-                            ) {
-                                Ok(amt) => amt,
-                                Err(e) => {
-                                    env.events().publish(
-                                        (symbol_short!("out_err"),),
-                                        symbol_short!("failed")
-                                    );
-                                    return Err(e);
-                                }
-                            };
-                            
-                            // Calculate minimum output with 5% slippage tolerance
-                            let min_amount_out = (expected_output * 95) / 100;
+                            // Use simplified minimum output (95% of input for conservative estimate)
+                            let min_amount_out = (amount_to_swap * 95) / 100;
                             
                             env.events().publish(
                                 (symbol_short!("swap_try"),),
@@ -1018,14 +1017,16 @@ pub fn force_rebalance_to_allocation(
                                         (symbol_short!("swapped"),),
                                         amt
                                     );
+                                    swap_count = swap_count + 1;
                                     amt
                                 },
-                                Err(e) => {
+                                Err(_e) => {
                                     env.events().publish(
                                         (symbol_short!("swap_err"),),
                                         symbol_short!("failed")
                                     );
-                                    return Err(e);
+                                    // Don't fail entire rebalance, just skip this swap
+                                    continue;
                                 }
                             };
                             
@@ -1041,5 +1042,245 @@ pub fn force_rebalance_to_allocation(
         }
     }
     
+    env.events().publish(
+        (symbol_short!("swap_done"),),
+        swap_count
+    );
+    
     Ok(())
+}
+
+/// Calculate a rebalance plan without executing it
+/// Returns a list of swap steps that need to be executed
+pub fn calculate_rebalance_plan(
+    env: &Env,
+    assets: &Vec<Address>,
+    target_allocation: &Vec<i128>,
+    total_value: i128,
+) -> Result<crate::types::RebalancePlan, VaultError> {
+    use soroban_sdk::symbol_short;
+    
+    // Validate target allocation matches number of assets
+    if target_allocation.len() != assets.len() {
+        return Err(VaultError::InvalidConfiguration);
+    }
+    
+    // Validate allocations sum to 100%
+    let mut total_allocation: i128 = 0;
+    for i in 0..target_allocation.len() {
+        if let Some(alloc) = target_allocation.get(i) {
+            total_allocation = total_allocation.checked_add(alloc)
+                .ok_or(VaultError::InvalidConfiguration)?;
+        }
+    }
+    
+    if total_allocation != 100_0000 && total_allocation != 0 {
+        return Err(VaultError::InvalidConfiguration);
+    }
+    
+    env.events().publish(
+        (symbol_short!("calc_plan"),),
+        total_value
+    );
+
+    // Calculate current balances and target amounts
+    let mut current_balances: Vec<i128> = Vec::new(env);
+    let mut target_amounts: Vec<i128> = Vec::new(env);
+    
+    for i in 0..assets.len() {
+        if let (Some(asset), Some(target_pct)) = (assets.get(i), target_allocation.get(i)) {
+            let current_balance = crate::token_client::get_vault_balance(env, &asset);
+            current_balances.push_back(current_balance);
+            
+            let target_amount = total_value
+                .checked_mul(target_pct)
+                .and_then(|v| v.checked_div(100_0000))
+                .ok_or(VaultError::InvalidAmount)?;
+            
+            target_amounts.push_back(target_amount);
+            
+            env.events().publish(
+                (symbol_short!("plan_tgt"),),
+                (asset.clone(), current_balance, target_amount)
+            );
+        }
+    }
+    
+    // Build swap steps
+    let mut steps: Vec<crate::types::RebalanceStep> = Vec::new(env);
+    let min_swap_threshold = 1000i128; // Minimum difference to warrant a swap
+    
+    for i in 0..assets.len() {
+        if let (Some(asset), Some(current), Some(target)) = (
+            assets.get(i),
+            current_balances.get(i),
+            target_amounts.get(i)
+        ) {
+            let diff = target - current;
+            
+            // Skip if difference is negligible
+            if diff.abs() < min_swap_threshold {
+                continue;
+            }
+            
+            if diff > 0 {
+                // Need to buy more of this asset
+                env.events().publish(
+                    (symbol_short!("plan_buy"),),
+                    (asset.clone(), diff)
+                );
+                
+                // Find an asset we have excess of to sell
+                for j in 0..assets.len() {
+                    if i == j {
+                        continue;
+                    }
+                    
+                    if let (Some(source_asset), Some(source_current), Some(source_target)) = (
+                        assets.get(j),
+                        current_balances.get(j),
+                        target_amounts.get(j)
+                    ) {
+                        if source_current > source_target + min_swap_threshold {
+                            let excess = source_current - source_target;
+                            
+                            // Find pool for this pair
+                            let pool_address = {
+                                if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &source_asset) {
+                                    Some(custom_pool)
+                                } else if let Some(custom_pool) = crate::real_pool_client::get_custom_token_pool(env, &asset) {
+                                    Some(custom_pool)
+                                } else {
+                                    None
+                                }
+                            };
+                            
+                            let pool_address = match pool_address {
+                                Some(addr) => addr,
+                                None => {
+                                    env.events().publish(
+                                        (symbol_short!("no_pool"),),
+                                        (source_asset.clone(), asset.clone())
+                                    );
+                                    continue;
+                                }
+                            };
+                            
+                            // Calculate swap amount (conservative: use smaller of diff or excess)
+                            let amount_to_swap = if diff > excess {
+                                excess
+                            } else {
+                                diff
+                            };
+                            
+                            if amount_to_swap < min_swap_threshold {
+                                continue;
+                            }
+                            
+                            // Calculate minimum output with 5% slippage
+                            let min_amount_out = (amount_to_swap * 95) / 100;
+                            
+                            // Create swap step
+                            let step = crate::types::RebalanceStep {
+                                from_token: source_asset.clone(),
+                                to_token: asset.clone(),
+                                amount_in: amount_to_swap,
+                                min_amount_out,
+                                pool_address: pool_address.clone(),
+                            };
+                            
+                            steps.push_back(step);
+                            
+                            env.events().publish(
+                                (symbol_short!("plan_step"),),
+                                (source_asset.clone(), asset.clone(), amount_to_swap)
+                            );
+                            
+                            // Update balances for next iteration
+                            current_balances.set(j, source_current - amount_to_swap);
+                            current_balances.set(i, current + min_amount_out); // Use min output for conservative planning
+                            
+                            break; // Found a source, move to next target
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    let total_steps = steps.len();
+    
+    env.events().publish(
+        (symbol_short!("plan_done"),),
+        total_steps
+    );
+    
+    let plan = crate::types::RebalancePlan {
+        steps,
+        total_steps,
+    };
+    
+    Ok(plan)
+}
+
+/// Execute a single rebalance step from a plan
+/// This allows batch processing where each step is a separate transaction
+pub fn execute_rebalance_step(
+    env: &Env,
+    step: &crate::types::RebalanceStep,
+) -> Result<i128, VaultError> {
+    use soroban_sdk::symbol_short;
+    
+    env.events().publish(
+        (symbol_short!("exec_step"),),
+        (step.from_token.clone(), step.to_token.clone(), step.amount_in)
+    );
+    
+    // Get router address from config
+    let config: crate::types::VaultConfig = env.storage().instance()
+        .get(&CONFIG)
+        .ok_or(VaultError::NotInitialized)?;
+    
+    let router_address = config.router_address
+        .ok_or(VaultError::InvalidConfiguration)?;
+    
+    // Verify vault has sufficient balance
+    let balance = crate::token_client::get_vault_balance(env, &step.from_token);
+    if balance < step.amount_in {
+        env.events().publish(
+            (symbol_short!("insuf_bal"),),
+            (balance, step.amount_in)
+        );
+        return Err(VaultError::InsufficientBalance);
+    }
+    
+    // Approve router to spend tokens
+    crate::token_client::approve_router(
+        env,
+        &step.from_token,
+        &router_address,
+        step.amount_in,
+    )?;
+    
+    env.events().publish(
+        (symbol_short!("approved"),),
+        step.amount_in
+    );
+    
+    // Execute swap through router
+    let amount_out = crate::swap_router::swap_via_router(
+        env,
+        &router_address,
+        &step.from_token,
+        &step.to_token,
+        step.amount_in,
+        step.min_amount_out,
+    )?;
+    
+    env.events().publish(
+        (symbol_short!("step_done"),),
+        amount_out
+    );
+    
+    Ok(amount_out)
 }
