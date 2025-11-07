@@ -10,8 +10,8 @@ import { getAssetAddress } from '../config/tokenAddresses.js';
 
 /**
  * Build unsigned deposit transaction for user to sign
- * @param depositToken - The token address the user is depositing (will be auto-swapped if not base token)
- * @param withRebalance - If true, includes a rebalance operation in the same transaction
+ * @param depositToken - The token address the user is depositing (will be auto-swapped to target allocation)
+ * @param withRebalance - DEPRECATED: No longer needed as deposit now swaps directly to target allocation
  */
 export async function buildDepositTransaction(
   vaultId: string,
@@ -19,7 +19,7 @@ export async function buildDepositTransaction(
   amount: string,
   network?: string,
   depositToken?: string,
-  withRebalance: boolean = true
+  _withRebalance: boolean = true // Deprecated - kept for API compatibility
 ): Promise<{ xdr: string; contractAddress: string }> {
   console.log(`[Build Deposit TX] ===== START =====`);
   console.log(`[Build Deposit TX] Vault: ${vaultId}`);
@@ -27,7 +27,7 @@ export async function buildDepositTransaction(
   console.log(`[Build Deposit TX] Amount: ${amount}`);
   console.log(`[Build Deposit TX] Network: ${network}`);
   console.log(`[Build Deposit TX] Deposit Token: ${depositToken}`);
-  console.log(`[Build Deposit TX] With Rebalance: ${withRebalance}`);
+  console.log(`[Build Deposit TX] NOTE: Rebalance now handled automatically within deposit`);
   
   try {
     // Get vault from database
@@ -70,7 +70,7 @@ export async function buildDepositTransaction(
     }
 
     console.log(`[Build Deposit TX] Using deposit token: ${tokenAddress}`);
-    console.log(`[Build Deposit TX] With auto-rebalance: ${withRebalance}`);
+    console.log(`[Build Deposit TX] Deposit will auto-swap to target allocation (no separate rebalance needed)`);
 
     // Build deposit operation using deposit_with_token
     const depositOperation = contract.call(
@@ -95,7 +95,7 @@ export async function buildDepositTransaction(
       .setTimeout(300)
       .build();
 
-    console.log(`[Build Deposit TX] Simulating batch transaction...`);
+    console.log(`[Build Deposit TX] Simulating deposit transaction (with built-in auto-rebalancing)...`);
 
     // Simulate transaction to get resource footprint
     const simulationResponse = await servers.sorobanServer.simulateTransaction(transaction);
@@ -357,7 +357,7 @@ export async function buildDepositTransaction(
       simulationResponse
     ).build();
 
-    console.log(`[Build Deposit TX] Batch transaction built successfully (${withRebalance ? 'with' : 'without'} rebalance)`);
+    console.log(`[Build Deposit TX] Transaction built successfully (with automatic allocation)`);
 
     return {
       xdr: transaction.toXDR(),

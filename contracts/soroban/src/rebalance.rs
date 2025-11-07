@@ -911,22 +911,121 @@ pub fn force_rebalance_to_allocation(
                             // Get the factory address to find the pool
                             let factory_address = crate::swap_router::get_soroswap_factory_address_internal(env);
                             
-                            // Get the pool for this token pair
-                            let pool_address = match crate::pool_client::get_pool_for_pair(
+                            // Try to find a direct pool between source and target
+                            let direct_pool_result = crate::pool_client::get_pool_for_pair(
                                 env,
                                 &factory_address,
                                 &source_asset,
                                 &asset,
-                            ) {
-                                Ok(addr) => addr,
-                                Err(e) => {
+                            );
+                            
+                            // If direct pool doesn't exist, we'll use a two-hop swap through XLM
+                            let use_two_hop_swap = direct_pool_result.is_err();
+                            
+                            if use_two_hop_swap {
+                                env.events().publish(
+                                    (symbol_short!("2hop_swap"),),
+                                    symbol_short!("needed")
+                                );
+                                
+                                // Get XLM token address (native wrapped XLM on testnet)
+                                use soroban_sdk::String;
+                                let xlm_address_str = String::from_str(env, "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC");
+                                let xlm_token = Address::from_string(&xlm_address_str);
+                                
+                                // Check if source or target is already XLM
+                                // If so, we only need a single hop instead of two
+                                if source_asset == xlm_token || asset == xlm_token {
                                     env.events().publish(
-                                        (symbol_short!("pool_err"),),
-                                        symbol_short!("notfound")
+                                        (symbol_short!("xlm_pair"),),
+                                        symbol_short!("skip2hop")
                                     );
-                                    return Err(e);
+                                    // One of them is XLM, but pool doesn't exist - this is an error
+                                    // Skip this pair and try other excess assets
+                                    continue;
                                 }
-                            };
+                                
+                                // Calculate how much to swap (use excess as starting point)
+                                let amount_to_swap = if excess > diff * 2 { diff * 2 } else { excess };
+                                
+                                // Skip if amount is negligible
+                                if amount_to_swap < 100 {
+                                    continue;
+                                }
+                                
+                                // Step 1: Swap source -> XLM
+                                env.events().publish(
+                                    (symbol_short!("hop1"),),
+                                    (source_asset.clone(), xlm_token.clone(), amount_to_swap)
+                                );
+                                
+                                crate::token_client::approve_router(
+                                    env,
+                                    &source_asset,
+                                    &router_address,
+                                    amount_to_swap,
+                                )?;
+                                
+                                let xlm_received = crate::swap_router::swap_via_router(
+                                    env,
+                                    &router_address,
+                                    &source_asset,
+                                    &xlm_token,
+                                    amount_to_swap,
+                                    0, // Accept any slippage for now
+                                )?;
+                                
+                                env.events().publish(
+                                    (symbol_short!("xlm_recv"),),
+                                    xlm_received
+                                );
+                                
+                                // Step 2: Swap XLM -> target asset
+                                env.events().publish(
+                                    (symbol_short!("hop2"),),
+                                    (xlm_token.clone(), asset.clone(), xlm_received)
+                                );
+                                
+                                crate::token_client::approve_router(
+                                    env,
+                                    &xlm_token,
+                                    &router_address,
+                                    xlm_received,
+                                )?;
+                                
+                                let final_received = crate::swap_router::swap_via_router(
+                                    env,
+                                    &router_address,
+                                    &xlm_token,
+                                    &asset,
+                                    xlm_received,
+                                    0, // Accept any slippage for now
+                                )?;
+                                
+                                env.events().publish(
+                                    (symbol_short!("2hop_done"),),
+                                    final_received
+                                );
+                                
+                                // Update balances after two-hop swap
+                                if let Some(mut src_balance) = current_balances.get(j) {
+                                    src_balance = src_balance.checked_sub(amount_to_swap)
+                                        .ok_or(VaultError::InvalidAmount)?;
+                                    current_balances.set(j, src_balance);
+                                }
+                                
+                                if let Some(mut dst_balance) = current_balances.get(i) {
+                                    dst_balance = dst_balance.checked_add(final_received)
+                                        .ok_or(VaultError::InvalidAmount)?;
+                                    current_balances.set(i, dst_balance);
+                                }
+                                
+                                // Continue to next asset pair
+                                continue;
+                            }
+                            
+                            // Direct pool exists - use single-hop swap
+                            let pool_address = direct_pool_result.unwrap();
                             
                             // Calculate how much source asset we need to sell to get 'diff' of target asset
                             let amount_to_swap = match crate::pool_client::calculate_swap_input(
