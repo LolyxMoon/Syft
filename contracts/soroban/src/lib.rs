@@ -11,6 +11,7 @@ mod token_client;
 mod swap_router;
 mod soroswap_router;
 mod pool_client;  // Direct pool interaction
+mod real_pool_client;  // Custom token pool interaction
 mod staking_client;  // Liquid staking integration
 mod liquidity_router;  // Liquidity provision
 // mod factory;  // Factory should be a separate contract

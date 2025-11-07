@@ -58,7 +58,8 @@ const AssetBlock = ({ id, data, selected }: AssetBlockProps) => {
   useEffect(() => {
     if (assetType === 'CUSTOM' && searchQuery.length >= 2) {
       const delaySearch = setTimeout(async () => {
-        const results = await searchTokens(searchQuery, network as any);
+        // Pass customOnly: true to only show our 10 custom tokens with real liquidity pools
+        const results = await searchTokens(searchQuery, network as any, true);
         setSearchResults(results);
         setShowSearchResults(true);
       }, 300);

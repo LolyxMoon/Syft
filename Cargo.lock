@@ -437,6 +437,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom-token"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk 21.7.7",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1119,6 +1126,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "real-liquidity-pool"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk 21.7.7",
 ]
 
 [[package]]

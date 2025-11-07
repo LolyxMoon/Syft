@@ -152,12 +152,27 @@ router.get('/validate/:address', async (req: Request, res: Response) => {
  */
 router.get('/popular', async (req: Request, res: Response) => {
   try {
-    const { network, limit } = req.query;
+    const { network, limit, customOnly } = req.query;
     // FORCE TESTNET ONLY - ignore user's network parameter
     const userNetwork = 'testnet';
     const resultLimit = parseInt(limit as string) || 100; // Default to 100 tokens
+    const onlyCustomTokens = customOnly === 'true';
     
-    console.log(`[Tokens API] Forcing testnet network only. Original request: ${network}, Using: ${userNetwork}`);
+    console.log(`[Tokens API] Forcing testnet network only. Original request: ${network}, Using: ${userNetwork}, Custom only: ${onlyCustomTokens}`);
+    
+    // Custom token addresses for filtering
+    const CUSTOM_TOKEN_ADDRESSES = [
+      'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3', // AQX
+      'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME', // VLTK
+      'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5', // SLX
+      'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE', // WRX
+      'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O', // SIXN
+      'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP', // MBIUS
+      'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL', // TRIO
+      'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H', // RELIO
+      'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW', // TRI
+      'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR', // NUMER
+    ];
     
     try {
       // Strategy: Fetch only from Soroswap testnet (curated, high-quality Soroban tokens)
@@ -196,6 +211,32 @@ router.get('/popular', async (req: Request, res: Response) => {
             });
           }
         }
+        
+        // Add our custom tokens with real liquidity pools
+        const customTokens = [
+          { symbol: 'AQX', name: 'Aquinox Token', address: 'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3' },
+          { symbol: 'VLTK', name: 'Velitok Token', address: 'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME' },
+          { symbol: 'SLX', name: 'Solarix Token', address: 'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5' },
+          { symbol: 'WRX', name: 'Wortex Token', address: 'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE' },
+          { symbol: 'SIXN', name: 'Sixion Token', address: 'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O' },
+          { symbol: 'MBIUS', name: 'Mobius Token', address: 'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP' },
+          { symbol: 'TRIO', name: 'Trionic Token', address: 'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL' },
+          { symbol: 'RELIO', name: 'Relion Token', address: 'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H' },
+          { symbol: 'TRI', name: 'Trion Token', address: 'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW' },
+          { symbol: 'NUMER', name: 'Numeris Token', address: 'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR' },
+        ];
+        
+        customTokens.forEach(token => {
+          tokens.push({
+            symbol: token.symbol,
+            name: token.name,
+            address: token.address,
+            decimals: 7,
+            type: 'token',
+            source: 'custom',
+            verified: true, // Our custom tokens with real liquidity pools
+          });
+        });
       } catch (err) {
         console.warn('Failed to fetch from Soroswap, continuing with Horizon...', err);
       }
@@ -267,13 +308,24 @@ router.get('/popular', async (req: Request, res: Response) => {
         return (b.accounts || 0) - (a.accounts || 0);
       });
       
+      // Filter to only custom tokens if requested
+      let finalTokens = tokens;
+      if (onlyCustomTokens) {
+        finalTokens = tokens.filter((token) => 
+          token.address && CUSTOM_TOKEN_ADDRESSES.includes(token.address)
+        );
+        console.log(`[Tokens API] Filtered to ${finalTokens.length} custom tokens with real liquidity pools`);
+      }
+      
       return res.json({
         success: true,
         network: 'testnet',
-        tokens: tokens.slice(0, resultLimit),
-        total: tokens.length,
-        sources: ['soroswap-testnet'],
-        note: '⚠️ TESTNET ONLY: Token list includes only Soroban testnet tokens (contract addresses starting with C). Classic Stellar assets are not supported.',
+        tokens: finalTokens.slice(0, resultLimit),
+        total: finalTokens.length,
+        sources: onlyCustomTokens ? ['custom-tokens'] : ['soroswap-testnet'],
+        note: onlyCustomTokens 
+          ? '✅ Custom tokens with real liquidity pools (XLM pairs)' 
+          : '⚠️ TESTNET ONLY: Token list includes only Soroban testnet tokens (contract addresses starting with C). Classic Stellar assets are not supported.',
       });
     } catch (fetchError) {
       // Fallback to hardcoded testnet list if API fails
@@ -294,6 +346,77 @@ router.get('/popular', async (req: Request, res: Response) => {
             address: 'CDWEFYYHMGEZEFC5TBUDXM3IJJ7K7W5BDGE765UIYQEV4JFWDOLSTOEK',
             decimals: 7,
             type: 'stablecoin',
+          },
+          // Custom tokens with real liquidity pools
+          {
+            symbol: 'AQX',
+            name: 'Aquinox Token',
+            address: 'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'VLTK',
+            name: 'Velitok Token',
+            address: 'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'SLX',
+            name: 'Solarix Token',
+            address: 'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'WRX',
+            name: 'Wortex Token',
+            address: 'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'SIXN',
+            name: 'Sixion Token',
+            address: 'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'MBIUS',
+            name: 'Mobius Token',
+            address: 'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'TRIO',
+            name: 'Trionic Token',
+            address: 'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'RELIO',
+            name: 'Relion Token',
+            address: 'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'TRI',
+            name: 'Trion Token',
+            address: 'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW',
+            decimals: 7,
+            type: 'token',
+          },
+          {
+            symbol: 'NUMER',
+            name: 'Numeris Token',
+            address: 'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR',
+            decimals: 7,
+            type: 'token',
           },
         ],
         futurenet: [

@@ -101,25 +101,51 @@ export async function validateTokenContract(
 }
 
 /**
+ * Our custom tokens with real liquidity pools
+ */
+const CUSTOM_TOKEN_ADDRESSES = [
+  'CAABHEKIZJ3ZKVLTI63LHEZNQATLIZHSZAIGSKTAOBWGGINONRUUBIF3', // AQX
+  'CBBBGORMTQ4B2DULIT3GG2GOQ5VZ724M652JYIDHNDWVUC76242VINME', // VLTK
+  'CCU7FIONTYIEZK2VWF4IBRHGWQ6ZN2UYIL6A4NKFCG32A2JUEWN2LPY5', // SLX
+  'CCAIKLYMECH7RTVNR3GLWDU77WHOEDUKRVFLYMDXJDA7CX74VX6SRXWE', // WRX
+  'CDYGMXR7K4DSN4SE4YAIGBZDP7GHSPP7DADUBHLO3VPQEHHCDJRNWU6O', // SIXN
+  'CBXSQDQUYGJ7TDXPJTVISXYRMJG4IPLGN22NTLXX27Y2TPXA5LZUHQDP', // MBIUS
+  'CB4MYY4N7IPH76XX6HFJNKPNORSDFMWBL4ZWDJ4DX73GK4G2KPSRLBGL', // TRIO
+  'CDRFQC4J5ZRAYZQUUSTS3KGDMJ35RWAOITXGHQGRXDVRJACMXB32XF7H', // RELIO
+  'CB4JLZSNRR37UQMFZITKTFMQYG7LJR3JHJXKITXEVDFXRQTFYLFKLEDW', // TRI
+  'CDBBFLGF35YDKD3VXFB7QGZOJFYZ4I2V2BE3NB766D5BUDFCRVUB7MRR', // NUMER
+];
+
+/**
  * Search tokens by symbol or name
- * IMPORTANT: Only returns Soroban tokens (addresses starting with 'C')
- * Classic Stellar assets (G issuers) are filtered out
+ * IMPORTANT: When searching for custom tokens, only returns our 10 custom tokens with real liquidity pools
+ * Other searches return all Soroban tokens (addresses starting with 'C')
  */
 export async function searchTokens(
   query: string,
-  network: Network = 'testnet'
+  network: Network = 'testnet',
+  customOnly: boolean = false
 ): Promise<TokenInfo[]> {
   try {
     // First try server-side search (will query Soroswap API for Soroban tokens only)
     const backendUrl = import.meta.env.VITE_PUBLIC_BACKEND_URL || 'https://syft-f6ad696f49ee.herokuapp.com';
-    const response = await fetch(`${backendUrl}/api/tokens/popular?network=${network}&search=${encodeURIComponent(query)}`);
+    const customOnlyParam = customOnly ? '&customOnly=true' : '';
+    const response = await fetch(`${backendUrl}/api/tokens/popular?network=${network}&search=${encodeURIComponent(query)}${customOnlyParam}`);
     const data = await response.json();
 
     if (data.success && data.tokens && data.tokens.length > 0) {
-      // Filter to only show Soroban tokens (addresses starting with 'C')
-      return data.tokens.filter((token: TokenInfo) => 
+      let results = data.tokens.filter((token: TokenInfo) => 
         token.address && token.address.startsWith('C')
       );
+      
+      // If customOnly is true and backend didn't filter, filter to only show our 10 custom tokens
+      if (customOnly) {
+        results = results.filter((token: TokenInfo) => 
+          token.address && CUSTOM_TOKEN_ADDRESSES.includes(token.address)
+        );
+      }
+      
+      return results;
     }
   } catch (error) {
     console.warn('Server-side search failed, falling back to client-side filter:', error);
@@ -130,13 +156,22 @@ export async function searchTokens(
   const queryLower = query.toLowerCase();
   
   // Filter to only show Soroban tokens (addresses starting with 'C')
-  return popularTokens.filter(
+  let results = popularTokens.filter(
     (token) =>
       (token.symbol.toLowerCase().includes(queryLower) ||
        token.name.toLowerCase().includes(queryLower)) &&
       token.address &&
       token.address.startsWith('C')
   );
+  
+  // If customOnly is true, filter to only show our 10 custom tokens
+  if (customOnly) {
+    results = results.filter((token) => 
+      token.address && CUSTOM_TOKEN_ADDRESSES.includes(token.address)
+    );
+  }
+  
+  return results;
 }
 
 /**

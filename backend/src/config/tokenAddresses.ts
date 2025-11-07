@@ -121,6 +121,67 @@ export const tokenAddresses: { [key: string]: { [key: string]: string } } = {
     'mainnet': '',
     'public': '',
   },
+  // Custom testnet tokens with real liquidity pools (10 functional tokens)
+  'AQX': {
+    'testnet': process.env.AQX_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'VLTK': {
+    'testnet': process.env.VLTK_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'SLX': {
+    'testnet': process.env.SLX_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'WRX': {
+    'testnet': process.env.WRX_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'SIXN': {
+    'testnet': process.env.SIXN_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'MBIUS': {
+    'testnet': process.env.MBIUS_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'TRIO': {
+    'testnet': process.env.TRIO_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'RELIO': {
+    'testnet': process.env.RELIO_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'TRI': {
+    'testnet': process.env.TRI_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
+  'NUMER': {
+    'testnet': process.env.NUMER_ADDRESS || '',
+    'futurenet': '',
+    'mainnet': '',
+    'public': '',
+  },
 };
 
 /**
@@ -208,6 +269,12 @@ export function getAssetSymbol(assetAddress: string): string {
     'CDUCWV4VK6MXD3JMYFQUQ2KUHHGTMR7RAS6C2SPF7EHHUEGKFCRO3ZZF': 'VOEZ',
     'CAT5EZTZVB4V4O7E5ZA2HQJTL7MZPWDJWQZIJYPMTAY6DMRWOIK5AMCD': 'JORV',
   };
+  
+  // Check if it's a custom token from env
+  if (process.env.ALPHA_ADDRESS === assetAddress) return 'ALPHA';
+  if (process.env.BETA_ADDRESS === assetAddress) return 'BETA';
+  if (process.env.GAMMA_ADDRESS === assetAddress) return 'GAMMA';
+  
   return knownAssets[assetAddress] || 'TOKEN';
 }
 

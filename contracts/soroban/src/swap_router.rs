@@ -32,6 +32,23 @@ pub fn swap_via_router(
         return Err(VaultError::InvalidAmount);
     }
 
+    // PRIORITY CHECK: If either token is a custom token with a real liquidity pool,
+    // use the real pool client instead of Soroswap router
+    let custom_pool_from = crate::real_pool_client::get_custom_token_pool(env, from_token);
+    let custom_pool_to = crate::real_pool_client::get_custom_token_pool(env, to_token);
+    
+    // If either token has a custom pool, use it (assumes XLM is the other token)
+    if let Some(pool_address) = custom_pool_from.or(custom_pool_to) {
+        return crate::real_pool_client::swap_via_real_pool(
+            env,
+            &pool_address,
+            from_token,
+            to_token,
+            amount_in,
+            min_amount_out,
+        );
+    }
+
     // WORKAROUND: Instead of using the router which has auth issues,
     // we'll swap directly through the liquidity pool
     // This avoids the authorize_as_current_contract problem
