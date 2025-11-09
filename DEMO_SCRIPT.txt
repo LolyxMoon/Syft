@@ -317,21 +317,18 @@ Each quest has clear steps, rewards, and real outcomes."
 
 [Click on a quest]
 
-"For example: 'Create Your First Vault' - complete this quest and earn 
-50 SYFT tokens. Or 'Master the Terminal' - execute 10 different blockchain 
-operations to unlock exclusive badges."
+"For example: 'Connect Your Wallet' - complete this quest and earn 
+the Wallet Pioneer NFT. Or 'Build And Deploy Your Own Vault' - which gives you the Creator NFT."
 
 [Show quest progress]
 
-"As you complete quests, you unlock achievements, earn platform tokens, 
+"As you complete quests, you earn the platform's NFTs, 
 and most importantly - you learn how to build sophisticated strategies 
 through hands-on experience."
 
 [Show rewards]
 
-"Completed quests don't just give you tokens - they build your reputation 
-on the platform. Other users see your achievements, making your vaults 
-more trustworthy when you list them on the marketplace."
+"Completed quests don't just give you NFTs - they provide real useful knowledge for building your own vaults."
 
 
 ═══════════════════════════════════════════════════════════════════════

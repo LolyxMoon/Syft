@@ -29,9 +29,6 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
   const [userShares, setUserShares] = useState<string | null>(null);
   const [loadingShares, setLoadingShares] = useState(false);
   const [resolvedAssetNames, setResolvedAssetNames] = useState<string[]>([]);
-  // Allow users to select which asset to deposit
-  const [selectedDepositToken, setSelectedDepositToken] = useState<string>('XLM');
-  const [depositTokenOptions, setDepositTokenOptions] = useState<Array<{ symbol: string; address: string }>>([]);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -67,7 +64,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
     fetchUserShares();
   }, [address, vaultId]);
 
-  // Resolve asset names when vault config changes and build deposit options
+  // Resolve asset names when vault config changes
   useEffect(() => {
     if (vaultConfig?.assets && vaultConfig.assets.length > 0) {
       console.log('[VaultActions] Vault config received:', vaultConfig);
@@ -76,77 +73,13 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       
       resolveAssetNames(vaultConfig.assets, 'testnet').then(names => {
         setResolvedAssetNames(names);
-        
-        // Build deposit token options from vault assets
-        const options: Array<{ symbol: string; address: string }> = [];
-        
-        // Known Soroban token addresses on testnet
-        const knownTokenAddresses: { [key: string]: string } = {
-          'XLM': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-          'USDC': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA', // Soroswap USDC
-          'AQUA': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC', // Placeholder, will be replaced by vault config
-        };
-        
-        // Always include XLM as an option
-        const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
-        const xlmAddresses: { [key: string]: string } = {
-          'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
-          'futurenet': 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT',
-          'mainnet': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
-        };
-        options.push({ symbol: 'XLM', address: xlmAddresses[normalizedNetwork] || xlmAddresses['testnet'] });
-        
-        // Add vault assets as deposit options
-        vaultConfig.assets.forEach((asset: any, index: number) => {
-          const assetSymbol = names[index] || `Asset ${index + 1}`;
-          let assetAddress = '';
-          
-          if (typeof asset === 'string') {
-            // If it's a string, check if it's a contract address (starts with C) or a symbol
-            if (asset.startsWith('C') && asset.length === 56) {
-              assetAddress = asset;
-            } else {
-              // It's a symbol, look it up in known addresses
-              assetAddress = knownTokenAddresses[asset] || asset;
-            }
-          } else if (asset.issuer) {
-            assetAddress = asset.issuer;
-          } else if (asset.code) {
-            // If code is provided but it's not a contract address, look it up
-            if (asset.code.startsWith('C') && asset.code.length === 56) {
-              assetAddress = asset.code;
-            } else {
-              assetAddress = knownTokenAddresses[asset.code] || asset.code;
-            }
-          }
-          
-          // Only add if we have a valid address and it's not already XLM
-          if (assetAddress && assetSymbol !== 'XLM' && !options.find(opt => opt.symbol === assetSymbol)) {
-            console.log(`[VaultActions] Adding deposit option: ${assetSymbol} -> ${assetAddress}`);
-            options.push({ symbol: assetSymbol, address: assetAddress });
-          }
-        });
-        
-        console.log('[VaultActions] Deposit token options:', options);
-        setDepositTokenOptions(options);
-        
-        // Always default to XLM
-        setSelectedDepositToken('XLM');
       });
     }
-  }, [vaultConfig, network, networkPassphrase]);
+  }, [vaultConfig]);
 
-  // Get token address for deposit - use pre-built options
-  const getDepositTokenAddress = (tokenSymbol: string): string => {
-    // Find the token in our deposit options
-    const option = depositTokenOptions.find(opt => opt.symbol === tokenSymbol);
-    if (option) {
-      console.log(`[VaultActions] Found deposit token ${tokenSymbol} at address: ${option.address}`);
-      return option.address;
-    }
-    
-    // Fallback to XLM if not found
-    console.warn(`[VaultActions] Token ${tokenSymbol} not found in deposit options, falling back to XLM`);
+  // Get token address for deposit - always XLM
+  const getDepositTokenAddress = (): string => {
+    // Always return XLM address based on network
     const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
     const xlmAddresses: { [key: string]: string } = {
       'testnet': 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
@@ -193,9 +126,9 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       const normalizedNetwork = normalizeNetwork(network, networkPassphrase);
       console.log(`[VaultActions] Using network: ${normalizedNetwork} (raw: ${network}, passphrase: ${networkPassphrase})`);
       
-      // Get the deposit token address based on user selection
-      const depositToken = getDepositTokenAddress(selectedDepositToken);
-      console.log(`[VaultActions] Depositing with token: ${depositToken} (${selectedDepositToken})`);
+      // Get the deposit token address - always XLM
+      const depositToken = getDepositTokenAddress();
+      console.log(`[VaultActions] Depositing with token: ${depositToken} (XLM)`);
       
       // 🎭 FAKE ROUTING: Show progress messages
       console.log(`[VaultActions] 🔍 Analyzing DeFi protocols for optimal yield...`);
@@ -371,13 +304,13 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
       setMessage({
         type: 'success',
         text: rebalanceSuccess 
-          ? `Successfully deposited ${amount} ${selectedDepositToken} with smart routing and optimized allocation!`
-          : `Successfully deposited ${amount} ${selectedDepositToken} with smart routing!`,
+          ? `Successfully deposited ${amount} XLM with smart routing and optimized allocation!`
+          : `Successfully deposited ${amount} XLM with smart routing!`,
       });
       modal.message(
         rebalanceSuccess 
-          ? `Deposited ${amount} ${selectedDepositToken} and optimized across protocols!`
-          : `Deposited ${amount} ${selectedDepositToken} with intelligent routing!`,
+          ? `Deposited ${amount} XLM and optimized across protocols!`
+          : `Deposited ${amount} XLM with intelligent routing!`,
         'Deposit Complete',
         'success'
       );
@@ -596,30 +529,6 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
         <div>
           <h3 className="text-base font-semibold mb-3 text-neutral-50">Deposit Assets</h3>
           
-          {/* Token Selection Dropdown */}
-          {depositTokenOptions.length > 1 && (
-            <div className="mb-3">
-              <label className="text-sm text-neutral-400 mb-2 block">
-                Select token to deposit
-              </label>
-              <select
-                value={selectedDepositToken}
-                onChange={(e) => setSelectedDepositToken(e.target.value)}
-                className="w-full px-4 py-2 bg-input border border-default rounded-lg text-neutral-50 focus:outline-none focus:border-primary-500 transition-colors cursor-pointer"
-                disabled={isProcessing}
-              >
-                {depositTokenOptions.map((option) => (
-                  <option key={option.symbol} value={option.symbol}>
-                    {option.symbol}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-neutral-500 mt-1.5">
-                💡 Choose the token you want to deposit. If depositing a different token than the vault's base asset, it will be automatically swapped.
-              </p>
-            </div>
-          )}
-          
           <div className="flex gap-3">
             <div className="flex-1 relative">
               <input
@@ -631,7 +540,7 @@ export const VaultActions: React.FC<VaultActionsProps> = ({
                 disabled={isProcessing}
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-primary-400">
-                {selectedDepositToken}
+                XLM
               </span>
             </div>
             <button
