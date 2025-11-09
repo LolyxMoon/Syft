@@ -16,7 +16,7 @@
 
 [Live Demo](https://syft-defi.vercel.app) · [Documentation](./docs) · [Report Bug](https://github.com/zaikaman/Syft/issues) · [Request Feature](https://github.com/zaikaman/Syft/issues)
 
-</div>
+</div>a
 
 ---
 
