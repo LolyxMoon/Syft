@@ -4,6 +4,7 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { buildDeploymentTransaction } from '../services/vaultDeploymentService.js';
+import { getVaultAnalytics } from '../services/analyticsService.js';
 
 const router = Router();
 
@@ -207,29 +208,48 @@ router.get('/listings', async (req: Request, res: Response) => {
       });
     }
 
-    // Transform response to match frontend expectations
-    const transformedListings = listings?.map((listing: any) => ({
-      listing_id: listing.listing_id || listing.id,
-      nft_id: listing.vault_nfts?.nft_id || listing.nft_id,
-      vault_id: listing.vault_nfts?.vaults?.vault_id,
-      seller: listing.seller_wallet_address || listing.seller_address,
-      profit_share_percentage: listing.profit_share_percentage,
-      price: listing.price,
-      currency: listing.price_asset || listing.currency || 'XLM',
-      status: listing.status,
-      created_at: listing.created_at,
-      vault_nfts: {
-        nft_id: listing.vault_nfts?.nft_id,
-        metadata: listing.vault_nfts?.metadata || {},
-        vaults: {
+    // Transform response and fetch performance data for each vault
+    const transformedListings = await Promise.all(
+      (listings || []).map(async (listing: any) => {
+        let performance = 0;
+        let totalValue = listing.vault_nfts?.vaults?.total_value_locked || 0;
+        
+        // Fetch real-time analytics for the vault
+        if (listing.vault_nfts?.vaults?.vault_id) {
+          try {
+            const analytics = await getVaultAnalytics(listing.vault_nfts.vaults.vault_id);
+            performance = analytics.earningsPercentage || 0; // Use all-time returns percentage
+            totalValue = analytics.tvl || totalValue; // Use real-time TVL
+          } catch (err) {
+            console.warn(`Failed to fetch analytics for vault ${listing.vault_nfts.vaults.vault_id}:`, err);
+            // Keep default values if analytics fetch fails
+          }
+        }
+
+        return {
+          listing_id: listing.listing_id || listing.id,
+          nft_id: listing.vault_nfts?.nft_id || listing.nft_id,
           vault_id: listing.vault_nfts?.vaults?.vault_id,
-          name: listing.vault_nfts?.vaults?.name || listing.vault_nfts?.vaults?.config?.name || 'Unknown Vault',
-          description: listing.vault_nfts?.vaults?.description || listing.vault_nfts?.vaults?.config?.description || '',
-          total_value: listing.vault_nfts?.vaults?.total_value_locked || 0,
-          performance: 0, // TODO: Calculate from performance table
-        },
-      },
-    })) || [];
+          seller: listing.seller_wallet_address || listing.seller_address,
+          profit_share_percentage: listing.profit_share_percentage,
+          price: listing.price,
+          currency: listing.price_asset || listing.currency || 'XLM',
+          status: listing.status,
+          created_at: listing.created_at,
+          vault_nfts: {
+            nft_id: listing.vault_nfts?.nft_id,
+            metadata: listing.vault_nfts?.metadata || {},
+            vaults: {
+              vault_id: listing.vault_nfts?.vaults?.vault_id,
+              name: listing.vault_nfts?.vaults?.name || listing.vault_nfts?.vaults?.config?.name || 'Unknown Vault',
+              description: listing.vault_nfts?.vaults?.description || listing.vault_nfts?.vaults?.config?.description || '',
+              total_value: totalValue,
+              performance: performance,
+            },
+          },
+        };
+      })
+    );
 
     return res.json({
       success: true,
@@ -279,6 +299,27 @@ router.get('/listings/:listingId', async (req: Request, res: Response) => {
         success: false,
         error: 'Listing not found',
       });
+    }
+
+    // Fetch real-time analytics for the vault
+    if (listing.vault_nfts?.vaults?.vault_id) {
+      try {
+        const analytics = await getVaultAnalytics(listing.vault_nfts.vaults.vault_id);
+        // Add performance data to the response
+        listing.vault_nfts.vaults.performance = analytics.earningsPercentage || 0; // All-time returns percentage
+        listing.vault_nfts.vaults.total_value = analytics.tvl || listing.vault_nfts.vaults.total_value_locked || 0;
+        listing.vault_nfts.vaults.analytics = {
+          apy: analytics.apy,
+          tvl: analytics.tvl,
+          totalEarnings: analytics.totalEarnings,
+          earningsPercentage: analytics.earningsPercentage,
+          tvlChange24h: analytics.tvlChange24h,
+          tvlChange7d: analytics.tvlChange7d,
+        };
+      } catch (err) {
+        console.warn(`Failed to fetch analytics for vault ${listing.vault_nfts.vaults.vault_id}:`, err);
+        // Continue without analytics if fetch fails
+      }
     }
 
     return res.json({
